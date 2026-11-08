@@ -33,3 +33,4 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
 $$;
 REVOKE ALL ON FUNCTION erp.migration_inbox() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION erp.migration_inbox() TO authenticated, service_role;
+

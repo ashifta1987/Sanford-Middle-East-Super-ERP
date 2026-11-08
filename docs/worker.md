@@ -20,6 +20,9 @@ the Supabase project (`xhsfkbbcejgwvqxpqdgq`). It never runs on Vercel or in the
 | `SUPABASE_URL` | `https://xhsfkbbcejgwvqxpqdgq.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | the secret key — only on this server |
 
+## Recommended: AWS Mumbai with one paste
+See [hosting.md](hosting.md) and [`worker/cloud-init.yaml`](../worker/cloud-init.yaml).
+
 ## Option A · Docker (restart policy)
 ```bash
 docker build -f worker/Dockerfile -t sanford-migration-worker .

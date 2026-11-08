@@ -1,0 +1,68 @@
+#cloud-config
+# Sanford ERP migration worker · one-paste server setup
+# Use as "User data" when launching the server:
+#   AWS EC2 · Region: Asia Pacific (Mumbai) ap-south-1 (same region as the Supabase project)
+#   AMI: Ubuntu Server 24.04 LTS · Type: t3.large (2 vCPU, 8 GB) · Disk: 100 GB gp3 · No inbound ports needed
+# Fill the three values below before launching. Nothing else to do: the worker starts on boot and restarts itself.
+
+write_files:
+  - path: /etc/sanford/worker.env
+    permissions: '0600'
+    content: |
+      DATABASE_URL=postgresql://postgres.xhsfkbbcejgwvqxpqdgq:<DB-PASSWORD>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+      SUPABASE_URL=https://xhsfkbbcejgwvqxpqdgq.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY=<SUPABASE-SECRET-KEY>
+
+  - path: /opt/sanford/fetch-scripts.sh
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      # The 02/03/04/04z/06 scripts are not in the public repo; they live in the private Storage bucket worker-assets.
+      set -e
+      . /etc/sanford/worker.env
+      mkdir -p /opt/sanford/sql
+      for f in 02_clean_blank_keys.sql 03_orphan_check.sql 04_foreign_keys.sql 04z_drop_foreign_keys.sql 06_security.sql; do
+        curl -fsS -o "/opt/sanford/sql/$f" "$SUPABASE_URL/storage/v1/object/worker-assets/sql/$f" \
+          -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+      done
+
+  - path: /etc/systemd/system/sanford-worker.service
+    content: |
+      [Unit]
+      Description=Sanford ERP migration worker
+      After=network-online.target docker.service
+      Requires=docker.service
+
+      [Service]
+      ExecStartPre=/opt/sanford/fetch-scripts.sh
+      ExecStartPre=-/usr/bin/docker rm -f sanford-worker
+      ExecStart=/usr/bin/docker run --name sanford-worker --env-file /etc/sanford/worker.env \
+        -v /opt/sanford/sql:/opt/sanford/sql:ro -v /opt/sanford/work:/work sanford-migration-worker
+      ExecStop=/usr/bin/docker stop -t 30 sanford-worker
+      Restart=always
+      RestartSec=15
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/sanford/update.sh
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      # Pull the latest worker from GitHub and restart: sudo /opt/sanford/update.sh
+      set -e
+      cd /opt/sanford/repo && git pull --ff-only
+      docker build -f worker/Dockerfile -t sanford-migration-worker .
+      systemctl restart sanford-worker
+
+package_update: true
+packages: [docker.io, git, curl]
+
+runcmd:
+  - systemctl enable --now docker
+  - mkdir -p /opt/sanford/work && chown 10001:10001 /opt/sanford/work
+  - git clone --depth 1 https://github.com/ashifta1987/Sanford-Middle-East-Super-ERP.git /opt/sanford/repo
+  - docker build -f /opt/sanford/repo/worker/Dockerfile -t sanford-migration-worker /opt/sanford/repo
+  - systemctl daemon-reload
+  - systemctl enable --now sanford-worker
+# Logs: sudo journalctl -u sanford-worker -f

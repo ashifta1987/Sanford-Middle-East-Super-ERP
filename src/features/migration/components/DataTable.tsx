@@ -11,7 +11,7 @@ export interface Column<T> {
 }
 
 /** Table that scrolls inside its own box (phones: wide tables never push the page). */
-export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, footer, empty }: {
+export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, footer, empty, minWidth = 640 }: {
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string | number;
@@ -19,10 +19,12 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, foote
   onRowClick?: (row: T) => void;
   footer?: ReactNode;
   empty?: ReactNode;
+  /** px before the table scrolls inside its box */
+  minWidth?: number;
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-[15px]">
+      <table className="w-full border-collapse text-[15px]" style={{ minWidth }}>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr className="border-b border-line">

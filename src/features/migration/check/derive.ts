@@ -116,3 +116,4 @@ export function stockRows(checks: MigrationReviewRow[]): { rows: WarehouseRow[];
   const total = tq || tv ? { whs: '', qtySap: tq?.raw_value, qtyApp: tq?.app_value, valSap: tv?.raw_value, valApp: tv?.app_value, ok: tq?.ok !== false && tv?.ok !== false } : null;
   return { rows: [...map.values()].sort((a, b) => a.whs.localeCompare(b.whs)), total };
 }
+

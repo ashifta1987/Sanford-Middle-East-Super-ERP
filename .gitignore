@@ -1,0 +1,11 @@
+node_modules
+dist
+.vercel
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+# Source packages and the IT-only DB install scripts stay out of the repo (see README-FIRST.md)
+*.zip
+_inbox/

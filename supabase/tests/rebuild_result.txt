@@ -1,0 +1,47 @@
+== fresh database mc_rebuild
+00_setup                           PASS  0.1s
+01a_sap_standard                   PASS  4.1s
+01b_addon_udt                      PASS  0.8s
+  raw tables                             3250
+load_company AE01                  PASS  0.7s
+load_company SA01                  PASS  0.9s
+  load log                               AE01:loaded=30 SA01:loaded=24
+  rows loaded = row_counts.csv           54/54
+02_clean_blank_keys                PASS  0.4s
+03_orphan_check                    PASS  0 orphan rows; sap._link 3656 links
+04_foreign_keys                    PASS  7.4s
+  links validated                        3657/3657
+apply_keys.py keys_test.csv        PASS  0.3s
+07_real_keys                       PASS  0.1s
+  AAC1 key                               PRIMARY KEY (company_code, "Code", "DprAreaID", "LineNum", "LogInstanc")
+06_security                        PASS  0.5s
+10_erp_schema                      PASS  0.2s
+11_erp_sync                        PASS  0.1s
+12_erp_security                    PASS  0.1s
+13_migration_console               PASS  0.1s
+13 again (idempotent)              PASS  0.1s
+sync_company AE01                  PASS  0.2s
+  rows written                           51
+check_sync AE01                    PASS  0 not ok of 10
+check_deleted AE01                 PASS  0 rows
+sync_company SA01                  PASS  0.3s
+  rows written                           44
+check_sync SA01                    PASS  0 not ok of 10
+check_deleted SA01                 PASS  0 rows
+second sync writes 0 rows          PASS  0 rows in 166 steps
+  access: PASS finance cannot update customers
+  access: PASS finance cannot grant company access
+  access: PASS finance cannot add journal lines
+  access: PASS finance sees no salaries
+  access: PASS finance reads customers (4)
+  access: PASS HR sees salaries (2)
+  access: PASS employee sees only own record
+  access: PASS merchandiser logs own visit
+  access: PASS merchandiser cannot log a visit as someone else
+  access: PASS anon has no access to erp
+  access: PASS anon has no access to sap
+  access: PASS app users have no access to sap
+  access: PASS app users cannot read sync_log
+NOTICE:  database "mc_loader" does not exist, skipping
+loader regression (fakeexp, fake2)       OCPC=column_mismatch 2/2; OCRD=column_mismatch 2/2; OSLP=column_mismatch 2/3
+  OCRD Arabic / OCPC binary              نون للتجارة, "Jeddah" | Hello

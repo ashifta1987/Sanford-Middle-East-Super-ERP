@@ -1,0 +1,44 @@
+{
+  "app": { "name": "Super ERP", "group": "Sanford Group", "loading": "Loading…", "empty": "Nothing here yet", "retry": "Try again", "cancel": "Cancel", "confirm": "Confirm", "close": "Close", "skip": "Skip to content" },
+  "nav": {
+    "group": "Group", "modules": "Modules",
+    "dashboard": "Dashboard", "myHr": "My HR", "approvals": "Approvals",
+    "sales": "Sales Control", "field": "Field force", "accountant": "Super Accountant", "warehouses": "Warehouses",
+    "logistics": "Logistics and fleet", "quality": "Product Quality", "purchase": "Purchase", "marketing": "Marketing",
+    "hr": "HR & Payroll", "backoffice": "Back Office", "openMenu": "Open menu", "closeMenu": "Close menu"
+  },
+  "top": {
+    "search": "Search orders, customers, SKUs, employees…", "ask": "Ask", "notifications": "Notifications",
+    "language": "Language", "company": "Company", "allCompanies": "Sanford Group · all companies",
+    "companiesSummary": "{{count}} companies", "parent": "Parent company", "signOut": "Sign out"
+  },
+  "tabs": {
+    "requests": "Requests", "licences": "Licences and contracts", "it": "IT and equipment", "sysadmin": "System admin",
+    "migration": "SAP migration", "upload": "Upload backup", "run": "Rebuild run", "check": "Cross-check",
+    "caption": "PRO, licences, IT and system"
+  },
+  "auth": {
+    "title": "Sign in to Super ERP", "email": "Email", "password": "Password", "signIn": "Sign in", "signingIn": "Signing in…",
+    "notConfigured": "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
+    "noProfile": "Your sign-in works, but you have no Super ERP profile yet. Ask IT to add you."
+  },
+  "access": { "title": "No access", "body": "You don't have access to this page. If you need it, ask IT to change your position.", "home": "Go to dashboard" },
+  "errors": { "denied": "You don't have access to this", "generic": "Something went wrong" },
+  "placeholder": { "soon": "This module is being built", "body": "{{name}} will appear here." },
+  "status": {
+    "uploading": "Uploading", "queued": "Queued", "validating": "Checking files", "loading": "Loading", "rebuilding": "Rebuilding",
+    "checking": "Cross-checking", "needs_review": "Needs review", "signed_off": "Signed off", "failed": "Failed", "cancelled": "Cancelled",
+    "pending": "Waiting", "running": "Running", "ok": "Done", "warning": "Done · note", "skipped": "Skipped"
+  },
+  "steps": {
+    "upload": "Upload", "checkFiles": "Check files", "loadSap": "Load SAP copy", "rebuild": "Rebuild app tables", "crossCheck": "Cross-check", "signOff": "Sign-off",
+    "done": "Done", "action": "Needs action", "waiting": "Waiting", "current": "Current step"
+  },
+  "migration": {
+    "centre": { "title": "SAP Business One → Sanford ERP", "subtitle": "One SAP database per company · 3,250 tables each · loaded into the raw copy, then the app tables", "upload": "Upload backup", "loadLog": "Load log", "crossCheck": "Cross-check", "byCompany": "By company", "toFix": "To fix before the final run", "noCompanies": "No companies you can manage yet." },
+    "upload": { "title": "Upload SAP backup", "subtitle": "One company at a time · the upload is checked before anything is loaded", "breadcrumb": "Upload" },
+    "run": { "title": "Rebuild run", "note": "Runs on the migration server, not in this browser · you can close this page and come back", "notFound": "Run not found or you can't see it." },
+    "check": { "title": "Cross-check and sign-off", "breadcrumb": "Cross-check" },
+    "phase": "Screen arrives in the next build phase."
+  }
+}

@@ -1,0 +1,112 @@
+before: SA01 raw 24 tables/39 rows, app 51 rows, check_sync 105.000000,1,945.000000,2,945.000000,0.000000,2,1,6,940.000000, load log 144, links 3657/3657
+run 71f44d1f-ace6-48a9-b36f-fa930df4301d  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/safety/stage_bad
+  validate       ok       rows=50         0.3s  50 files, 24 tables with data
+run 71f44d1f-ace6-48a9-b36f-fa930df4301d: FAILED - stage failed - StepError: 24 table(s) could not be read: OSLP (unterminated CSV quoted field); PCH1 (relation "_stg_0" already exists); OACT (relation "_stg_0" already exists); OBPL (relation "_stg_0" already exists); OPCH (relation "_stg_0" already exists); OITM (relation "_stg_0" already exists); OINV (relation "_stg_0" already exists); OITW (relation "_stg_0" already exists); OWHS (relation "_stg_0" already exists); JDT1 (relation "_stg_0" already exists) SA01 was not changed (the run stopped before any company data was written).
+71f44d1f-ace6-48a9-b36f-fa930df4301d failed
+ 
+PASS 1a stage failure (unreadable CSV): run failed                                  failed
+PASS 1a SA01 raw, app, check_sync, load log, links unchanged                        
+run 77b90a7a-8b8e-4177-a8ec-0aaf99c8fb78  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/safety/cast_bad
+  validate       ok       rows=50         0.3s  50 files, 24 tables with data
+  stage          ok       rows=40         1.6s  24 tables staged, 0 skipped (not in sap schema or no data file), 0.1s
+run 77b90a7a-8b8e-4177-a8ec-0aaf99c8fb78: FAILED - cast failed - StepError: 1 table(s) failed to cast: @ALT_HR_PRRT: duplicate key value violates unique constraint "alt_hr_prrt_pkey"
+DETAIL:  Key (company_code, "Code")=(SA01, D-07-202610) already exists. SA01 is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.
+77b90a7a-8b8e-4177-a8ec-0aaf99c8fb78 failed
+ 
+PASS 1b mid-load failure (duplicate key in @ALT_HR_PRRT, cast as table 24 of 24): run failed at cast ('failed', 'failed')
+PASS 1b SA01 raw, app, check_sync, load log, links unchanged                        SA01 raw 24 tables/39 rows, app 51 rows, check_sync 105.000000,1,945.000000,2,945.000000,0.000000,2,1,6,940.000000, load log 144, links 3657/3657
+PASS 1b failure is a critical issue that says the company was rolled back           Run failed: cast failed - StepError: 1 table(s) failed to cast: @ALT_HR_PRRT: duplicate key value violates unique constraint "alt_hr_prrt_pkey"
+DETAIL:  Key (company_code, "Code")=(SA01, D-07-
+
+  cast           ok       rows=39         1.9s  24 loaded; 3656 links dropped (04z); 0 stale rows removed from tables not in the export; 0.2s
+  clean_02       ok       rows=0          0.4s  blank links and SAP -1 values set to NULL for SA01 only
+  orphans_03     warning  rows=1          0.9s  1 orphan rows on 1 links (critical issues in cross_check; those links stay NOT VALID): JDT1.Account -> OACT.AcctCode [ZZZZ]
+  links_04       warning  rows=3656       6.0s  3656 links validated; 1 left NOT VALID because of orphan rows: jdt1_account_fkey
+  real_keys      skipped  rows=None       0.0s  no constraints.csv (05 query 2) in the upload
+  security_06    ok       rows=3253       0.0s  3253 raw tables with RLS, sap schema closed to anon/authenticated
+run 1e99aa8e-b476-48c1-9f80-de33b19a69d2: FAILED - app_sync failed - ForeignKeyViolation: insert or update on table "journal_line" violates foreign key constraint "journal_line_company_code_acct_code_fkey"
+DETAIL:  Key (company_code, acct_code)=(SA01, ZZZZ) is not present in table "account".
+CONTEXT:  SQL statement "INSERT INTO erp.journal_line AS t (company_code, trans_id, line_id, acct_code, short_name, contra_acct, debit, credit, fc_debit, fc_credit, fc_currency, sys_debit, sys_credit, memo, cost_centre, cost_centre2, cost_centre3, project, ref_date, due_date, branch_id, tax_code, match_no)
+  SELECT s.company_code AS company_code,
+         s."TransId" AS trans_id,
+         s."Line_ID" AS line_id,
+         s."Account" AS acct_code,
+         nullif(s."ShortName", s."Account") AS short_name,
+         s."ContraAct" AS contra_acct,
+         coalesce(s."Debit", 0) AS debit,
+         coalesce(s."Credit", 0) AS credit,
+         s."FCDebit" AS fc_debit,
+         s."FCCredit" AS fc_credit,
+         s."FCCurrency" AS fc_currency,
+         s."SYSDeb" AS sys_debit,
+         s."SYSCred" AS sys_credit,
+         s."LineMemo" AS memo,
+         s."ProfitCode" AS cost_centre,
+         s."OcrCode2" AS cost_centre2,
+         s."OcrCode3" AS cost_centre3,
+         s."Project" AS project,
+         s."RefDate"::date AS ref_date,
+         s."DueDate"::date AS due_date,
+         s."BPLId" AS branch_id,
+         s."VatGroup" AS tax_code,
+         s."IntrnMatch" AS match_no
+    FROM sap."JDT1" s
+   WHERE s.company_code = p_company
+  ON CONFLICT (company_code, trans_id, line_id) DO UPDATE  SA01 is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.
+1e99aa8e-b476-48c1-9f80-de33b19a69d2 failed
+ 
+PASS 1c mid-app-sync failure: cast..security ok, app_sync failed                    {'cast': 'ok', 'links_04': 'warning', 'app_sync': 'failed', 'check_sync': 'skipped'}
+PASS 1c SA01 raw, app (incl. stock synced before the error), check_sync, load log, links unchanged SA01 raw 24 tables/39 rows, app 51 rows, check_sync 105.000000,1,945.000000,2,945.000000,0.000000,2,1,6,940.000000, load log 144, links 3657/3657
+PASS 1c AE01 unchanged                                                              
+PASS 2 cancel while uploading: cancelled at once                                    
+PASS 2 "Stop run" on a running run (after cast) returns stop_requested              [('stop_requested',)]
+PASS 2 while the run is open others never see the new rows (raw: waits for the run (locked), app: 0) 
+run 58a3d55f-52f6-433c-a750-1cce0e983c50  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/safety/stop
+  validate       ok       rows=50         0.2s  50 files, 24 tables with data
+  stage          ok       rows=39         2.0s  24 tables staged, 0 skipped (not in sap schema or no data file), 0.1s
+  cast           ok       rows=39         2.1s  24 loaded; 3656 links dropped (04z); 0 stale rows removed from tables not in the export; 0.2s
+  clean_02       ok       rows=0          0.4s  blank links and SAP -1 values set to NULL for SA01 only
+run 58a3d55f-52f6-433c-a750-1cce0e983c50: CANCELLED before orphans_03 - SA01 is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.
+58a3d55f-52f6-433c-a750-1cce0e983c50 cancelled
+
+PASS 2 run marked cancelled, stop recorded with the user                            ('cancelled', True, UUID('00000000-0000-0000-0000-000000000004'))
+PASS 2 stopped between steps: later steps skipped                                   [('validate', 'ok'), ('stage', 'ok'), ('cast', 'ok'), ('clean_02', 'ok'), ('orphans_03', 'skipped'), ('links_04', 'skipped'), ('real_keys', 'skipped'), ('security_06', 'skipped'), ('app_sync', 'skipped'), ('check_sync', 'skipped'), ('check_deleted', 'skipped'), ('cross_check', 'skipped')]
+PASS 2 info issue for the stop                                                      Run stopped on request before step orphans_03
+PASS 2 SA01 raw, app, check_sync, load log, links unchanged after the stop          SA01 raw 24 tables/39 rows, app 51 rows, check_sync 105.000000,1,945.000000,2,945.000000,0.000000,2,1,6,940.000000, load log 144, links 3657/3657
+PASS 2 cancelling a finished run is refused                                         ERROR: run is cancelled, only an uploading, queued or running run can be cancelled
+PASS 2 AE01 unchanged                                                               
+run a8040290-8c0e-4ff3-8f67-0a43b6e9c4f8  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/testexp/SA01
+  validate       ok       rows=50         0.2s  50 files, 24 tables with data
+  stage          ok       rows=39         2.0s  24 tables staged, 0 skipped (not in sap schema or no data file), 0.2s
+  cast           ok       rows=39         1.6s  24 loaded; 3656 links dropped (04z); 0 stale rows removed from tables not in the export; 0.1s
+  clean_02       ok       rows=0          0.4s  blank links and SAP -1 values set to NULL for SA01 only
+  orphans_03     ok       rows=0          0.7s  3656 links checked for SA01, no orphans
+  links_04       ok       rows=3657       6.3s  3657 links validated
+  real_keys      skipped  rows=None       0.0s  no constraints.csv (05 query 2) in the upload
+  security_06    ok       rows=3253       0.0s  3253 raw tables with RLS, sap schema closed to anon/authenticated
+  app_sync       ok       rows=0          0.1s  83 sync steps, 0 rows written
+  check_sync     ok       rows=10         0.0s  10 checks, 0 not ok
+  check_deleted  ok       rows=0          0.0s  no app rows missing from SAP
+  cross_check    ok       rows=128        1.4s  2 companies cross-checked: 128 checks, 0 failed; open issues 0 critical, 8 warning, 0 info
+run a8040290-8c0e-4ff3-8f67-0a43b6e9c4f8: needs_review - committed (37685 locks held at commit) - open issues: 0 critical, 8 warning, 0 info
+a8040290-8c0e-4ff3-8f67-0a43b6e9c4f8 needs_review
+ 
+PASS 3 clean run ends needs_review                                                  needs_review
+PASS 3 account group totals (debit - credit): assets 105, liabilities -805, equity 0, revenue -100, expenses 800 {'account group assets': Decimal('105.000000'), 'account group liabilities': Decimal('-805.000000'), 'account group equity': Decimal('0'), 'account group revenue': Decimal('-100.000000'), 'account group expenses': Decimal('800.000000')}
+PASS 3 8 warnings "Finance has not entered the SAP report figure" (run company only) 8
+PASS 3 finance enters 8 figures; A/P 545 vs 540 reported not ok                     [('open A/P (invoices + down payments - credit notes)', Decimal('545'), Decimal('540.000000'), Decimal('540.000000'), False)]
+PASS 3 the A/P difference opens a critical issue                                    [('SA01: SAP report figure differs - open A/P (invoices + down payments - credit notes)',)]
+PASS 3 missing-figure warnings closed once entered                                  0
+PASS 3 finance sign-off refused while the report differs                            ERROR: sign-off refused: 1 critical issue(s) still open
+PASS 3 a merchandiser cannot enter report figures                                   ERROR: only finance sign-off users or admin/IT can enter SAP report figures
+PASS 3 unknown check name refused                                                   ERROR: run has no check "no such check" in area finance for SA01
+PASS 3 finance cannot read the figure table directly (admin only); sees figures via migration_review [(0,)]
+PASS 3 admin corrects A/P to 540 -> ok                                              [('open A/P (invoices + down payments - credit notes)', Decimal('540'), Decimal('540.000000'), Decimal('540.000000'), True)]
+PASS 3 critical issue closed                                                        0
+PASS 3 raw/app values untouched by the figure (540 / 540)                           (Decimal('540.000000'), Decimal('540.000000'))
+PASS 3 figures survive a re-run of the cross-check (8 compared), no issue re-opened (8, (0, 0))
+PASS 3 finance sees report_value next to raw and app in migration_review (7 finance headline checks) [('account group assets', Decimal('105'), Decimal('105.000000'), Decimal('105.000000'), True, True), ('account group equity', Decimal('0'), Decimal('0'), Decimal('0'), True, True)]
+PASS 3 migration_status counts figures entered / missing                            [(8, 0)]
+PASS 3 finance signs once the report figures agree                                  [('needs_review',)]
+
+34 passed, 0 failed

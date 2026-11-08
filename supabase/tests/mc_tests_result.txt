@@ -1,0 +1,128 @@
+AE01 fingerprint before: 30 tables, 45 rows
+PASS (b) admin migration_request returns run_id                             [(UUID('21ed0e15-5682-4c1d-bbe7-152fb6cd7ba2'),)]
+PASS (b) admin migration_submit -> queued                                   [('queued',)]
+PASS (b) second request for a company with a queued run refused             ERROR: company SA01 already has a run in progress (21ed0e15-5682-4c1d-bbe7-152fb6cd7ba2)
+run 21ed0e15-5682-4c1d-bbe7-152fb6cd7ba2  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/broken/SA01
+  validate       ok       rows=50         0.3s  50 files, 24 tables with data
+  stage          ok       rows=38         1.5s  24 tables staged, 0 skipped (not in sap schema or no data file), 0.1s
+  cast           warning  rows=38         1.9s  1 count_mismatch, 23 loaded; 3656 links dropped (04z); 0 stale rows removed from tables not in the export; 0.1s
+  clean_02       ok       rows=0          0.3s  blank links and SAP -1 values set to NULL for SA01 only
+  orphans_03     warning  rows=1          0.6s  1 orphan rows on 1 links (critical issues in cross_check; those links stay NOT VALID): INV1.ItemCode -> OITM.ItemCode [SF-GHOST]
+  links_04       warning  rows=3656       5.5s  3656 links validated; 1 left NOT VALID because of orphan rows: inv1_itemcode_fkey
+  real_keys      skipped  rows=None       0.0s  no constraints.csv (05 query 2) in the upload
+  security_06    ok       rows=3253       0.0s  3253 raw tables with RLS, sap schema closed to anon/authenticated
+  app_sync       ok       rows=1          0.1s  83 sync steps, 1 rows written
+  check_sync     warning  rows=10         0.0s  10 checks, 2 not ok: journal lines raw 5 app 6; credits raw 105.000000 app 945.000000
+  check_deleted  ok       rows=0          0.0s  no app rows missing from SAP
+  cross_check    warning  rows=129        1.1s  2 companies cross-checked: 129 checks, 11 failed; open issues 9 critical, 8 warning, 0 info
+run 21ed0e15-5682-4c1d-bbe7-152fb6cd7ba2: needs_review - committed (37685 locks held at commit) - open issues: 9 critical, 8 warning, 0 info
+21ed0e15-5682-4c1d-bbe7-152fb6cd7ba2 needs_review
+ 
+PASS (b) broken run ends needs_review                                       needs_review
+    steps: validate=ok, stage=ok, cast=warning, clean_02=ok, orphans_03=warning, links_04=warning, real_keys=skipped, security_06=ok, app_sync=ok, check_sync=warning, check_deleted=ok, cross_check=warning
+    open issues:
+       ('critical', 'app_tables', 'SA01: app layer differs from SAP - credits')
+       ('critical', 'app_tables', 'SA01: app layer differs from SAP - journal lines')
+       ('critical', 'finance', 'SA01: 1 journal(s) do not balance')
+       ('critical', 'finance', 'SA01: account group liabilities differs')
+       ('critical', 'finance', 'SA01: journal debits and credits do not balance')
+       ('critical', 'finance', 'SA01: supplier balance (journal BP lines) differs')
+       ('critical', 'finance', 'SA01: trial balance of account 2000 differs')
+       ('critical', 'orphans', 'SA01: 1 rows of INV1 point at a missing OITM')
+       ('critical', 'row_counts', 'SA01: JDT1 has 5 rows, SAP export says 6')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: account group assets')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: account group equity')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: account group expenses')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: account group liabilities')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: account group revenue')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: open A/P (invoices + down payments - credit notes)')
+       ('warning', 'finance', 'Finance has not entered the SAP report figure: open A/R (invoices + down payments - credit notes)')
+       ('warning', 'stock', 'Finance has not entered the SAP report figure: on hand value, all warehouses')
+PASS (b) row count mismatch issue (JDT1 5 vs 6)                             
+PASS (b) orphan issue (INV1.ItemCode -> OITM)                               
+PASS (b) unbalanced journal issue                                           
+PASS (b) only the orphan link left NOT VALID                                [('inv1_itemcode_fkey',)]
+PASS (b) AE01 untouched by the SA01 rebuild                                 
+PASS (b) cross-check covered AE01 too, all ok                               (67, 0)
+PASS (b) finance sign-off refused while critical issues open                ERROR: sign-off refused: 9 critical issue(s) still open
+PASS (d) anon cannot read migration_run                                     ERROR: permission denied for schema erp
+PASS (d) anon cannot call migration_request                                 ERROR: permission denied for schema erp
+PASS (d) finance (non-admin) reads 0 rows of migration_run                  [(0,)]
+PASS (d) finance (non-admin) reads 0 rows of migration_file                 [(0,)]
+PASS (d) finance (non-admin) reads 0 rows of migration_step                 [(0,)]
+PASS (d) finance (non-admin) reads 0 rows of migration_check                [(0,)]
+PASS (d) finance (non-admin) reads 0 rows of migration_issue                [(0,)]
+PASS (d) finance (non-admin) reads 0 rows of migration_signoff              [(0,)]
+PASS (d) merchandiser reads 0 migration issues                              [(0,)]
+PASS (d) admin reads migration runs                                         [(2,)]
+PASS (d) admin limited to AE01 sees no SA01 runs                            [(0,)]
+PASS (d) admin limited to AE01 cannot start an SA01 run                     ERROR: company SA01 is not in your company list
+PASS (d) fin cannot call worker-only migration_cross_check                  ERROR: permission denied for function migration_cross_check
+PASS (d) admin cannot call worker-only migration_cross_check                ERROR: permission denied for function migration_cross_check
+PASS (d) fin cannot call worker-only migration_orphans                      ERROR: permission denied for function migration_orphans
+PASS (d) admin cannot call worker-only migration_orphans                    ERROR: permission denied for function migration_orphans
+PASS (d) fin cannot call worker-only migration_add_issue                    ERROR: permission denied for function migration_add_issue
+PASS (d) admin cannot call worker-only migration_add_issue                  ERROR: permission denied for function migration_add_issue
+PASS (d) finance cannot insert a run directly                               ERROR: permission denied for table migration_run
+PASS (d) admin cannot insert a run directly either (function only)          ERROR: permission denied for table migration_run
+PASS (d) admin cannot update issues directly                                ERROR: permission denied for table migration_issue
+PASS (d) finance cannot start a run                                         ERROR: only admin or IT positions can start a migration
+PASS (d) finance cannot resolve issues                                      ERROR: only admin or IT positions can change migration issues
+PASS (d) finance (sign-off role) can read migration_status                  [('validate', 'ok', 9)]
+PASS (d) merchandiser cannot read migration_status                          ERROR: run not found
+PASS (d) finance can read the review list of a run that needs review        [(46,)]
+PASS (d) finance cannot sign as it                                          ERROR: your position cannot sign off as it
+PASS (d) accepting a critical issue without a note refused                  ERROR: accepting a critical issue needs a note saying why
+PASS (d) admin resolved every critical issue                                0
+PASS (d) finance signs finance once issues are resolved                     [('needs_review',)]
+PASS (d) business cannot sign as finance                                    ERROR: your position cannot sign off as finance
+PASS (d) IT signs it                                                        [('needs_review',)]
+PASS (d) business signs business -> signed_off                              [('signed_off',)]
+PASS (d) issues frozen after sign-off                                       ERROR: run is signed off - issues can no longer change
+PASS (d) request, submit, 3 sign-offs and every issue decision (9) are in erp.audit_log (5, 9)
+run 247cbb19-1dbf-46e2-9960-67b9d7952f24  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/structure_upload
+  validate       ok       rows=1          5.0s  structure Table_With_Field.xlsx: 3691 tables / 117772 fields, 3250 matched, 441 not in sap schema, 0 missing columns, 0 type mismatches, 9 table names
+run 247cbb19-1dbf-46e2-9960-67b9d7952f24: needs_review (structure only)
+247cbb19-1dbf-46e2-9960-67b9d7952f24 needs_review
+ 
+PASS (c) structure upload ends needs_review, detected as structure_only     ('needs_review', 'structure_only')
+    tables in field list                             sap=3691     raw=3250     ok=True
+    fields of matched tables                         sap=112868   raw=112868   ok=True
+    missing columns (in SAP, not in sap schema)      sap=0        raw=0        ok=True
+    type mismatches                                  sap=0        raw=0        ok=True
+    nullability differences                          sap=0        raw=0        ok=True
+    sap columns not in field list                    sap=0        raw=0        ok=True
+    tables not in sap schema (skipped on load)       sap=441      raw=0        ok=True
+    sap tables not in field list                     sap=0        raw=0        ok=True
+    table names repaired (Excel dates)               sap=9        raw=9        ok=True
+PASS (c) 3,691 tables / 3,250 matched                                       (Decimal('3691'), Decimal('3250'), True)
+PASS (c) 441 tables not in sap schema                                       
+PASS (c) 0 missing columns                                                  
+PASS (c) 0 type mismatches                                                  
+PASS (c) AUG1 repaired from an Excel date (9 fields)                        
+PASS (c) file classified as structure_xlsx                                  [('structure_xlsx', 1)]
+PASS (c) info issue "Structure only, no data rows"                          [('info', 'structure', '441 tables in the field list are not in the sap schema'), ('info', 'structure', 'Structure only, no data rows')]
+PASS (c) no critical issue                                                  
+PASS (c) every data step skipped                                            (11, 12)
+PASS (c) no data touched (load log, SA01 and AE01 unchanged)                
+run d427111d-4c33-4a85-8c37-baa7a05f950b  company SA01  kind full  folder /tmp/claude-0/-home-claude/b8128d69-9c25-5ac1-bf8e-19ca71e39a75/scratchpad/backend/mctest/testexp/SA01
+  validate       ok       rows=50         0.3s  50 files, 24 tables with data
+  stage          ok       rows=39         1.6s  24 tables staged, 0 skipped (not in sap schema or no data file), 0.1s
+  cast           ok       rows=39         2.7s  24 loaded; 3656 links dropped (04z); 0 stale rows removed from tables not in the export; 0.2s
+  clean_02       ok       rows=0          0.4s  blank links and SAP -1 values set to NULL for SA01 only
+  orphans_03     ok       rows=0          0.7s  3656 links checked for SA01, no orphans
+  links_04       ok       rows=3657       6.3s  3657 links validated
+  real_keys      skipped  rows=None       0.0s  no constraints.csv (05 query 2) in the upload
+  security_06    ok       rows=3253       0.0s  3253 raw tables with RLS, sap schema closed to anon/authenticated
+  app_sync       ok       rows=1          0.1s  83 sync steps, 1 rows written
+  check_sync     ok       rows=10         0.0s  10 checks, 0 not ok
+  check_deleted  ok       rows=0          0.0s  no app rows missing from SAP
+  cross_check    ok       rows=128        2.0s  2 companies cross-checked: 128 checks, 0 failed; open issues 0 critical, 8 warning, 0 info
+run d427111d-4c33-4a85-8c37-baa7a05f950b: needs_review - committed (37685 locks held at commit) - open issues: 0 critical, 8 warning, 0 info
+d427111d-4c33-4a85-8c37-baa7a05f950b needs_review
+ 
+PASS clean reload after the broken one: needs_review, all steps ok, 0 open issues besides the SAP report figures to enter ('needs_review', 0, 0)
+PASS all links validated again                                              (3657, 3657)
+PASS AE01 still untouched                                                   
+
+60 passed, 0 failed

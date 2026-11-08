@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-page text-ink font-sans antialiased; font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid #1D4ED8; outline-offset: 2px; }
+  [dir='rtl'] body { font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif; }
+}
+
+@layer components {
+  .card { @apply bg-white border border-line rounded-card; }
+  .input { @apply w-full min-h-[44px] rounded-btn border border-line bg-white px-3 text-ink placeholder:text-muted focus:border-primary; }
+  .pill { @apply inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold; }
+  .pill-ok { @apply bg-ok-bg text-ok-fg; }
+  .pill-warning { @apply bg-warn-bg text-warn-fg; }
+  .pill-crit { @apply bg-crit-bg text-crit-fg; }
+  .pill-info { @apply bg-info-bg text-info-fg; }
+  .pill-neutral { @apply bg-neutral-bg text-neutral-fg; }
+  .num { font-variant-numeric: tabular-nums; }
+}
+
+@keyframes indeterminate { 0% { inset-inline-start: -35%; } 100% { inset-inline-start: 100%; } }
+.bar-indeterminate { position: absolute; top: 0; bottom: 0; width: 35%; animation: indeterminate 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .bar-indeterminate { animation: none; width: 100%; opacity: .5; } }

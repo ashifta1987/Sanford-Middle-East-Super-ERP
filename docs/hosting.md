@@ -31,3 +31,4 @@ then: `pg_dump` → restore, copy Storage objects, point `VITE_SUPABASE_URL` / `
 - The GitHub repository is **public**. It contains no secrets (checked), but it does contain the database design and worker
   code. Recommended: make it private (GitHub → Settings → General → Danger zone → Change visibility); Vercel keeps deploying.
 - Rotate the Supabase secret key, database password and the three temporary login passwords (all appeared in chat).
+

@@ -50,7 +50,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, foote
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={clsx('px-4 py-2.5 align-middle', c.align === 'end' && 'num text-end', c.mono && 'font-mono text-sm', c.className)}
+                    className={clsx('px-4 py-2.5 align-middle', c.align === 'end' && 'num whitespace-nowrap text-end', c.mono && 'font-mono text-sm', c.className)}
                   >
                     {c.cell(r)}
                   </td>

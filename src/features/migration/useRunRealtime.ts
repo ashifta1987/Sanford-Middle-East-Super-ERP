@@ -16,7 +16,11 @@ export function useRunRealtime(runId?: string) {
   useEffect(() => {
     if (!runId) return;
     let poll: ReturnType<typeof setInterval> | undefined;
-    const invalidate = () => qc.invalidateQueries({ queryKey: mk.run(runId) });
+    const invalidate = () => Promise.all([
+      qc.invalidateQueries({ queryKey: mk.run(runId) }),
+      qc.invalidateQueries({ queryKey: [...mk.all, 'company-runs'] }),
+      qc.invalidateQueries({ queryKey: [...mk.all, 'latest'] }),
+    ]);
 
     const startPolling = () => {
       setMode('polling');

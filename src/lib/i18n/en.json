@@ -252,12 +252,106 @@
     "run": {
       "title": "Rebuild run",
       "note": "Runs on the migration server, not in this browser · you can close this page and come back",
-      "notFound": "Run not found or you can't see it."
+      "notFound": "Run not found or you can't see it.",
+      "titleFull": "Rebuild run · {{code}} {{name}}",
+      "stepsDone": "Steps done",
+      "stepsDoneNote": "step {{n}} running",
+      "rowsLoaded": "Rows loaded",
+      "rowsLoadedNote": "{{tables}} tables loaded",
+      "timeSoFar": "Time so far",
+      "timeNote": "started {{time}}",
+      "timeTotal": "Total time",
+      "notes": "Notes",
+      "notesNote": "{{critical}} critical · {{info}} info",
+      "steps": "Steps",
+      "stepsCaption": "each step must pass before the next starts",
+      "colStep": "Step",
+      "colRows": "Rows",
+      "colTime": "Time",
+      "colStatus": "Status",
+      "log": "Live log",
+      "newest": "newest first",
+      "logEmpty": "Waiting for the migration server…",
+      "started": "started",
+      "finished": "finished",
+      "safeTitle": "Safe for the other companies",
+      "safe1": "Only {{code}} rows are replaced. The other companies keep working; their SAP updates wait until this run ends.",
+      "safe2": "If a step fails or you stop the run, {{code}} goes back to exactly the data it had before, and the reason goes to the issue list. Stop takes effect before the next step.",
+      "earlier": "Earlier runs",
+      "noEarlier": "No earlier runs",
+      "stop": "Stop run",
+      "stopping": "Stopping after the current step…",
+      "stopTitle": "Stop this run?",
+      "stopBody": "The migration server stops before its next step and puts {{code}} back exactly as it was before the run.",
+      "stopNotRunning": "Only a run that is uploading, queued or running can be stopped",
+      "reviewBanner": "The rebuild finished. Check the totals and sign off.",
+      "openCheck": "Open cross-check",
+      "failedBanner": "The run failed at “{{step}}”. {{code}} is unchanged.",
+      "seeIssue": "See the issue",
+      "cancelledBanner": "The run was stopped. {{code}} is exactly as it was before.",
+      "live": "Live",
+      "polling": "Updating every 5 s",
+      "connecting": "Connecting…",
+      "kind": {
+        "full": "Full load",
+        "tables": "Some tables",
+        "structure_only": "Structure check"
+      }
     },
     "check": {
       "title": "Cross-check and sign-off",
       "breadcrumb": "Cross-check"
     },
     "phase": "Screen arrives in the next build phase."
+  },
+  "stepNames": {
+    "validate": {
+      "name": "Check the files",
+      "desc": "Table folders, column order, keys and row counts"
+    },
+    "stage": {
+      "name": "Read the data files",
+      "desc": "Every CSV read as text first, so nothing is lost on a bad value"
+    },
+    "cast": {
+      "name": "Copy into the SAP copy",
+      "desc": "Values turned into numbers and dates · each table counted against SAP"
+    },
+    "clean_02": {
+      "name": "Clean blank links",
+      "desc": "Empty codes and SAP “-1” values set to empty"
+    },
+    "orphans_03": {
+      "name": "Look for broken links",
+      "desc": "Lines that point at a record missing in this company"
+    },
+    "links_04": {
+      "name": "Add table links",
+      "desc": "Links between tables switched on and verified"
+    },
+    "real_keys": {
+      "name": "Use SAP's real keys",
+      "desc": "Provisional keys compared with the keys from HANA"
+    },
+    "security_06": {
+      "name": "Lock the SAP copy",
+      "desc": "Raw copy closed to the app · read only"
+    },
+    "app_sync": {
+      "name": "Fill the app tables",
+      "desc": "Customers, items, documents, journals, stock, HR and 3PL"
+    },
+    "check_sync": {
+      "name": "App checks",
+      "desc": "Counts and totals in the app compared with the SAP copy"
+    },
+    "check_deleted": {
+      "name": "Deleted in SAP",
+      "desc": "Records that exist in the app but no longer in SAP"
+    },
+    "cross_check": {
+      "name": "Cross-check the whole system",
+      "desc": "Finance, stock and HR totals · then sign-off"
+    }
   }
 }

@@ -30,6 +30,9 @@ export const useSteps = (id?: string) =>
 export const useFiles = (id?: string) =>
   useQuery({ queryKey: mk.files(id ?? ''), queryFn: () => migrationApi.files(id!), enabled: Boolean(id) });
 
+export const useCompanyRuns = (company?: string) =>
+  useQuery({ queryKey: [...mk.all, 'company-runs', company ?? ''], queryFn: () => migrationApi.runsForCompany(company!), enabled: Boolean(company) });
+
 export const useReview = (id?: string, area?: string | null) =>
   useQuery({ queryKey: mk.review(id ?? '', area), queryFn: () => migrationApi.review(id!, area), enabled: Boolean(id) });
 

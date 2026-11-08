@@ -50,7 +50,7 @@ export function ModuleTabs() {
           </NavLink>
         ))}
       </nav>
-      <span className="ms-4 hidden whitespace-nowrap text-xs text-muted xl:block">{t('tabs.caption')}</span>
+      <span className="ms-4 hidden whitespace-nowrap text-xs text-muted 2xl:block">{t('tabs.caption')}</span>
     </div>
   );
 }

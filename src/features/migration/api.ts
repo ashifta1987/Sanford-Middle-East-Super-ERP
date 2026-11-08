@@ -72,6 +72,13 @@ export const migrationApi = {
     return data as MigrationIssue[];
   },
 
+  async runsForCompany(company: string, limit = 10): Promise<MigrationRun[]> {
+    const { data, error } = await erp().from('migration_run').select('*').eq('company_code', company)
+      .order('created_at', { ascending: false }).limit(limit);
+    if (error) throw new ApiError(error);
+    return data as MigrationRun[];
+  },
+
   async latestRunForCompany(company: string): Promise<MigrationRun | null> {
     const { data, error } = await erp().from('migration_run').select('*').eq('company_code', company)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();

@@ -18,7 +18,7 @@
   .pill-crit { @apply bg-crit-bg text-crit-fg; }
   .pill-info { @apply bg-info-bg text-info-fg; }
   .pill-neutral { @apply bg-neutral-bg text-neutral-fg; }
-  .num { font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; unicode-bidi: plaintext; }
 }
 
 @keyframes indeterminate { 0% { inset-inline-start: -35%; } 100% { inset-inline-start: 100%; } }

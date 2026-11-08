@@ -45,7 +45,7 @@ export function fmtDuration(seconds: number | null | undefined) {
   const s = Math.round(seconds);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
   if (h) return `${h} h ${m} min`;
-  if (m) return `${m} min ${r} s`;
+  if (m) return `${m} min`;
   return `${r} s`;
 }
 

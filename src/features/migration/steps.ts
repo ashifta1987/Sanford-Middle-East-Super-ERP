@@ -1,3 +1,5 @@
+export const STEP_ORDER = ['validate', 'stage', 'cast', 'clean_02', 'orphans_03', 'links_04', 'real_keys', 'security_06', 'app_sync', 'check_sync', 'check_deleted', 'cross_check'];
+
 /** Plain names for the worker's step codes (P4). */
 export const STEP_NAMES: Record<string, { name: string; desc: string }> = {
   validate: { name: 'Check the files', desc: 'Unpack, classify files, read the field list' },

@@ -223,3 +223,4 @@ export const TABLE_KEY: Record<string, string> = {
   OITM: 'item', OITB: 'itemGroup', OITW: 'stockWarehouse', ITM1: 'itemPrice', OUGP: 'unitGroup', UGP1: 'unitGroupLine',
   OCRD: 'businessPartner', OACT: 'account', OINV: 'arInvoice', OPCH: 'apInvoice', OJDT: 'journal', JDT1: 'journalLine', OWHS: 'warehouse', OHEM: 'employee',
 };
+

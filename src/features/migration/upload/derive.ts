@@ -101,6 +101,13 @@ export function found(review: MigrationReviewRow[] | undefined, analysis: Analys
   };
 }
 
+/** migration_review issue detail is jsonb { detail, table, note, resolved_at } (a plain string is accepted too). */
+export function issueText(d: unknown): string | null {
+  if (d == null) return null;
+  if (typeof d === 'string') return d;
+  return ((d as { detail?: string | null }).detail ?? null) || null;
+}
+
 export type PointTone = 'blocker' | 'sendCsv' | 'fix' | 'info';
 export interface Point { key: string; tone: PointTone; title: string; detail?: string | null }
 
@@ -130,14 +137,14 @@ export function points(args: {
     if (/^Structure only, no data rows/.test(r.name)) continue; // shown as the "No records" blocker
     const left = r.name.match(/^(\d+) tables in the field list are not in the sap schema/);
     if (left) {
-      out.push({ key: `i${r.id}`, tone: 'info', title: t('migration.upload.leftOutTitle', { n: Number(left[1]).toLocaleString('en-US') }), detail: String(r.detail ?? '') });
+      out.push({ key: `i${r.id}`, tone: 'info', title: t('migration.upload.leftOutTitle', { n: Number(left[1]).toLocaleString('en-US') }), detail: issueText(r.detail) });
       continue;
     }
     out.push({
       key: `i${r.id}`,
       tone: r.severity === 'critical' ? 'blocker' : r.severity === 'warning' ? 'fix' : 'info',
       title: r.name,
-      detail: typeof r.detail === 'string' ? r.detail : null,
+      detail: issueText(r.detail),
     });
   }
   if (has?.data && !has.constraints) {

@@ -30,8 +30,8 @@ npm run dev
 | P2 App shell, routing, data layer, i18n (EN/AR) | Done |
 | P3 B6 Upload backup (TUS resumable, folder/zip, structure check) | Done — needs DB to test end to end |
 | P4 B7 Rebuild run (live steps, log, stop, earlier runs) | Done — needs DB + worker to test live |
-| P5 B8 Cross-check and sign-off | Next |
-| P6 B5 Migration centre, worker deploy, acceptance | — |
+| P5 B8 Cross-check and sign-off (areas, finance + SAP report figures, stock, issues, sign-off, go-live, PDF/Excel) | Done — needs DB to test end to end |
+| P6 B5 Migration centre, worker deploy, acceptance | Next |
 
 > Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` go to the browser / Vercel. The secret key lives only on the worker server.
 

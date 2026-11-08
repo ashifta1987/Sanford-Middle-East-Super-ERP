@@ -67,6 +67,11 @@ export interface MigrationIssue {
   created_at: string;
 }
 
+export interface SignoffEntry { role: SignRole; decision: Decision; signed_by: string; signed_at: string; comment: string | null }
+
+/** issue rows of migration_review carry detail = { detail, table, note, resolved_at } */
+export interface IssueDetail { detail?: string | null; table?: string | null; note?: string | null; resolved_at?: string | null }
+
 export interface MigrationStatusRow {
   run_id: string;
   company_code: string;
@@ -91,7 +96,7 @@ export interface MigrationStatusRow {
   critical_open: number;
   warning_open: number;
   info_open: number;
-  signoffs: Record<string, { decision: Decision; signed_by?: string; signed_at?: string; comment?: string | null }> | null;
+  signoffs: SignoffEntry[] | null;
   stop_requested_at: string | null;
   stop_requested_by: string | null;
   report_figures: number;

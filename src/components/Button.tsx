@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import clsx from 'clsx';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -15,6 +15,7 @@ const styles: Record<Variant, string> = {
   secondary: 'bg-white text-ink border border-line hover:bg-page',
   ghost: 'bg-transparent text-ink hover:bg-page border border-transparent',
   danger: 'bg-white text-crit-fg border border-[#F2C1C1] hover:bg-crit-bg',
+  success: 'bg-ok-fg text-white border border-ok-fg hover:bg-[#0F3F22]',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

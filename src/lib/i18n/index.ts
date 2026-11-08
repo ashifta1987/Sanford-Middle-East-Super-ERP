@@ -12,6 +12,7 @@ void i18n.use(initReactI18next).init({
   lng: saved ?? 'en',
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
+  nsSeparator: false, // SAP check names contain ':'
 });
 
 export function applyDir(lang: string) {

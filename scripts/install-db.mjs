@@ -46,14 +46,51 @@ const sql = postgres(DATABASE_URL, { ssl: 'require', max: 1, onnotice: () => {},
 const t0 = Date.now();
 const log = (s) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(4)}s] ${s}`);
 
-// Each finished file is recorded in public._sanford_install, so a re-run continues where it stopped.
+// Split a SQL script into statements (respects quotes, "identifiers", line and block comments, $tag$ bodies).
+function splitSql(text) {
+  const out = [];
+  let start = 0, i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i], d = text[i + 1];
+    if (c === '-' && d === '-') { const e = text.indexOf('\n', i); i = e < 0 ? n : e + 1; continue; }
+    if (c === '/' && d === '*') { const e = text.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+    if (c === "'" || c === '"') { i++; while (i < n) { if (text[i] === c) { if (text[i + 1] === c) { i += 2; continue; } break; } i++; } i++; continue; }
+    if (c === '$') {
+      const m = /^\$[A-Za-z_]*\$/.exec(text.slice(i, i + 64));
+      if (m) { const e = text.indexOf(m[0], i + m[0].length); i = e < 0 ? n : e + m[0].length; continue; }
+    }
+    if (c === ';') { const st = text.slice(start, i + 1).trim(); if (st.replace(/;$/, '').trim()) out.push(st); start = i + 1; }
+    i++;
+  }
+  const tail = text.slice(start).trim();
+  if (tail && !/^(--[^\n]*\n?\s*)*$/.test(tail)) out.push(tail);
+  return out;
+}
+
+// Large files run in batches (each its own transaction) so creating 3,000+ tables never needs more locks than the
+// database allows. Every finished batch is recorded in public._sanford_install, so a re-run continues where it stopped.
+const BATCH = 40;
 async function runFile(label, path, { always = false } = {}) {
   const step = label.split(' ')[0];
   if (!always && (await sql`select 1 from public._sanford_install where step = ${step}`).length) { log(`skip  ${label} (already installed)`); return; }
   if (!existsSync(path)) throw new Error(`${path} not found - unzip sanford-db-install.zip into _inbox/`);
-  log(`run   ${label} …`);
   const t = Date.now();
-  await sql.unsafe(readFileSync(path, 'utf8'));
+  const stmts = splitSql(readFileSync(path, 'utf8'));
+  const batches = Math.ceil(stmts.length / BATCH);
+  log(`run   ${label} · ${stmts.length} statements …`);
+  for (let b = 0; b < batches; b++) {
+    const key = `${step}#${b}`;
+    if (!always && (await sql`select 1 from public._sanford_install where step = ${key}`).length) continue;
+    const chunk = stmts.slice(b * BATCH, (b + 1) * BATCH).join('\n');
+    try {
+      await sql.unsafe(chunk);
+    } catch (e) {
+      throw new Error(`${label}, batch ${b + 1}/${batches}: ${e.message}\n  near: ${chunk.slice(0, 200).replace(/\s+/g, ' ')}`);
+    }
+    if (!always) await sql`insert into public._sanford_install (step) values (${key}) on conflict do nothing`;
+    if (batches > 10 && (b + 1) % Math.ceil(batches / 10) === 0) log(`      ${label} ${b + 1}/${batches}`);
+  }
   await sql`insert into public._sanford_install (step) values (${step}) on conflict (step) do update set at = now()`;
   log(`ok    ${label} (${((Date.now() - t) / 1000).toFixed(1)} s)`);
 }

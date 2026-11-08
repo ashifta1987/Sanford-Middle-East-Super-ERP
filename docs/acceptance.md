@@ -9,12 +9,15 @@ Recorded 8 Nov 2026. ✅ passed · ⏳ blocked until the database is installed o
 | 3 | `testexp` goes queued → loading → rebuilding → checking → needs review, live on B7 | ⏳ | Client side: `testexp/AE01` read as 30 tables + columns.csv + row_counts.csv; B7 live view rendered with sample data. Needs DB + worker |
 | 4 | `broken` raises row-count and orphan issues; sign-off locked; wrong SAP report figure blocks sign-off | ⏳ | B8 lock and figure logic rendered with sample data; the rules themselves are enforced by `13_migration_console.sql` (tested by the backend team, `tests/mc_tests_result.txt`) |
 | 5 | Stop mid-run / forced failure leaves the company unchanged | ⏳ | Worker behaviour (`tests/safety_tests_result.txt`); UI Stop run + "Stopping after the current step…" built |
-| 6 | Non-admin: no menu entry, blocked route, RLS error on direct RPC; signed-out gets nothing | ✅ UI · ⏳ RLS | Chrome: Finance user sees no Back Office migration tabs and gets "No access" on B5; signed-out users are sent to sign-in. RLS needs the DB |
+| 6 | Non-admin: no menu entry, blocked route, RLS error on direct RPC; signed-out gets nothing | ✅ | Chrome: Finance user sees no Back Office migration tabs and gets "No access" on B5; signed-out users are sent to sign-in. Database (8 Nov, `scripts/test-access.mjs`, 10/10 PASS): admin sees the overview, non-admin 0 rows, anonymous "permission denied for schema erp", non-admin upload to `sap-exports` refused, go-live refused before signed-off / for non-CFO / a second time |
 | 7 | Closed tab mid-upload resumes | ⏳ | Upload URLs and finished files kept in IndexedDB, "Resume upload" banner built; needs the `sap-exports` bucket |
 | 8 | B5–B8 match the design at 1440 px, work at 390 px and in Arabic | ✅ | Chrome screenshots of every screen at 1440/390, EN/AR, compared with `design/` |
 
+## Database
+Installed 8 Nov 2026 with `node scripts/install-db.mjs`: 3,253 sap tables, 68 erp tables, 3,657 links; companies AE01–AE04; 13 and 14 run twice without errors.
+
 ## To finish the ⏳ rows
-1. Install `sanford-db-install` 00 → 13 on Supabase, then `14_realtime.sql` and `14_console_views.sql`.
+1. ~~Install the database~~ done.
 2. Expose schema `erp`; raise `max_locks_per_transaction`.
 3. Create the first users (`erp.app_user`, `erp.user_company`).
 4. Start the worker.

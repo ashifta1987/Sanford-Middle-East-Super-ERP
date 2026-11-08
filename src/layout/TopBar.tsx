@@ -66,3 +66,4 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
     </header>
   );
 }
+

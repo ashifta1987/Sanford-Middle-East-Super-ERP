@@ -28,9 +28,10 @@ npm run dev
 |---|---|
 | P1 Supabase setup (`14_realtime.sql`, `14_console_views.sql`, storage) | Written — waiting for DB install to run |
 | P2 App shell, routing, data layer, i18n (EN/AR) | Done |
-| P3 B6 Upload backup | Next |
-| P4 B7 Rebuild run | — |
+| P3 B6 Upload backup (TUS resumable, folder/zip, structure check) | Done — needs DB to test end to end |
+| P4 B7 Rebuild run | Next |
 | P5 B8 Cross-check and sign-off | — |
 | P6 B5 Migration centre, worker deploy, acceptance | — |
 
 > Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` go to the browser / Vercel. The secret key lives only on the worker server.
+

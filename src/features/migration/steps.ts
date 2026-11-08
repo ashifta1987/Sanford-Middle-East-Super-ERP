@@ -13,3 +13,4 @@ export const STEP_NAMES: Record<string, { name: string; desc: string }> = {
   check_deleted: { name: 'Deleted in SAP', desc: 'App rows no longer in SAP' },
   cross_check: { name: 'Cross-check the whole system', desc: 'Counts, links, finance, stock, HR' },
 };
+

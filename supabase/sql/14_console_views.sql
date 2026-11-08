@@ -163,3 +163,4 @@ CREATE POLICY sap_exports_select ON storage.objects FOR SELECT TO authenticated
 -- storage.objects policies call these as the signed-in user
 GRANT USAGE ON SCHEMA erp TO authenticated;
 GRANT EXECUTE ON FUNCTION erp.migration_is_admin(), erp.migration_can_read(varchar), erp.migration_can_sign(text) TO authenticated;
+

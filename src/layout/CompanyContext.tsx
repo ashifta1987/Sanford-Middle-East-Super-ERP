@@ -22,3 +22,4 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 }
 
 export const useCompany = () => useContext(Ctx);
+

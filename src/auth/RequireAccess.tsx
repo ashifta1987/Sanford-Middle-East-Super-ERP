@@ -19,3 +19,4 @@ export function RequireAccess({ access, children }: { access: Access; children: 
     access === 'migrationAdmin' ? isMigrationAdmin : isMigrationAdmin || signRoles.length > 0;
   return ok ? <>{children}</> : <Navigate to="/no-access" replace />;
 }
+

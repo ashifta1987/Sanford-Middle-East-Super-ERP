@@ -44,3 +44,4 @@ export function StepStatusPill({ status }: { status: StepStatus | null | undefin
   if (!status) return <StatusPill tone="neutral">—</StatusPill>;
   return <StatusPill tone={stepTone(status)}>{t(`status.${status}`)}</StatusPill>;
 }
+

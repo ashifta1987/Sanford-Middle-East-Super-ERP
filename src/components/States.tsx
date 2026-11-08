@@ -43,3 +43,4 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
     </div>
   );
 }
+

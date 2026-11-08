@@ -89,3 +89,4 @@ export function useGoLive(run: string) {
   const inv = useInvalidateRun();
   return useMutation({ mutationFn: (company: string) => migrationApi.goLive(company, run), onSuccess: () => inv(run) });
 }
+

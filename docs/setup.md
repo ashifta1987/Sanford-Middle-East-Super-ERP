@@ -38,3 +38,4 @@ npx supabase gen types typescript --project-id xhsfkbbcejgwvqxpqdgq --schema erp
 |---|---|
 | Publishable (anon) `sb_publishable_…` | Browser / Vercel `VITE_SUPABASE_ANON_KEY` |
 | Secret / service role `sb_secret_…` | **Only** on the worker server (`SUPABASE_SERVICE_ROLE_KEY`). Never in this repo or Vercel. |
+

@@ -56,3 +56,4 @@ export function ConfirmDialog({ open, title, body, confirmLabel, tone = 'primary
     </dialog>
   );
 }
+

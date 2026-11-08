@@ -24,3 +24,4 @@
 @keyframes indeterminate { 0% { inset-inline-start: -35%; } 100% { inset-inline-start: 100%; } }
 .bar-indeterminate { position: absolute; top: 0; bottom: 0; width: 35%; animation: indeterminate 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .bar-indeterminate { animation: none; width: 100%; opacity: .5; } }
+

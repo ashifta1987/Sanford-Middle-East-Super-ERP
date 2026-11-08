@@ -16,3 +16,4 @@ export function Card({ title, actions, children, className, bodyClassName }: {
     </section>
   );
 }
+

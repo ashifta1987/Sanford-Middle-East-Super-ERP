@@ -176,3 +176,4 @@ export interface Company {
   sap_schema: string | null;
   is_parent: boolean;
 }
+

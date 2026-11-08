@@ -15,3 +15,4 @@ export const SUPABASE_URL = url ?? '';
 
 /** Every app call goes to the exposed `erp` schema. */
 export const erp = () => supabase.schema('erp');
+

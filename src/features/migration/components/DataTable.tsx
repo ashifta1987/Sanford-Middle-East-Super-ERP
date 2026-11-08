@@ -64,3 +64,4 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, foote
     </div>
   );
 }
+

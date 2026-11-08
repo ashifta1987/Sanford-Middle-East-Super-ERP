@@ -30,3 +30,4 @@ export function PlaceholderPage({ nameKey }: { nameKey: string }) {
     </div>
   );
 }
+

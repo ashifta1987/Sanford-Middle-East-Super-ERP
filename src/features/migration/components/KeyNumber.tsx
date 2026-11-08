@@ -14,3 +14,4 @@ export function KeyNumber({ label, value, note, tone = 'neutral' }: { label: str
     </div>
   );
 }
+

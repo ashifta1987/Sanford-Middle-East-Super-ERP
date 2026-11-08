@@ -165,7 +165,7 @@ export function receivedRows(args: {
 }): ReceivedRow[] {
   const { t, analysis, workerFiles, progress } = args;
   const facts = new Map((analysis?.files ?? []).map((f) => [safeKey(f.path), f]));
-  const readAsLabel = (f?: FileFacts, kind?: string) => {
+  const readAsLabel = (f?: FileFacts, kind?: string, name?: string) => {
     if (f) {
       const label = f.readAs.table
         ? (f.readAs.key === 'labelsOf' && f.readAs.table === 'OITM'
@@ -173,6 +173,14 @@ export function receivedRows(args: {
           : TABLE_KEY[f.readAs.table] ? t(`migration.upload.tables.${TABLE_KEY[f.readAs.table]}`) : f.readAs.table)
         : '';
       return t(`migration.upload.readAs.${f.readAs.key}`, { label });
+    }
+    // no local analysis (another browser): best guess from the worker's kind and the file name
+    const stem = (name ?? '').replace(/\.(xlsx|xlsm|csv)$/i, '').replace(/[_\W].*$/, '').toUpperCase();
+    const label = TABLE_KEY[stem] ? t(`migration.upload.tables.${stem === 'OITM' && kind === 'other' ? 'itemShort' : TABLE_KEY[stem]}`) : stem;
+    if ((kind === 'structure_xlsx' || kind === 'structure_csv') && TABLE_KEY[stem]) return t('migration.upload.readAs.fieldsOf', { label });
+    if (kind === 'other' && /\.xlsx?$/i.test(name ?? '')) {
+      if (TABLE_KEY[stem]) return t('migration.upload.readAs.labelsOf', { label });
+      if (/^table/i.test(name ?? '')) return t('migration.upload.readAs.tableNames', { label: '' });
     }
     const k = { columns_csv: 'columns', constraints_csv: 'constraints', row_counts_csv: 'rowCounts', structure_xlsx: 'fieldListAll', structure_csv: 'fieldListAll' }[kind ?? ''] ?? 'other';
     return t(`migration.upload.readAs.${k}`, { label: '' });
@@ -191,7 +199,7 @@ export function receivedRows(args: {
         : wf.kind === 'other' && isXlsx ? { tone: 'info', label: t('migration.upload.result.labels') }
         : wf.status === 'ok' ? { tone: 'ok', label: t('migration.upload.result.ok') }
         : { tone: 'neutral', label: t(`migration.upload.result.${wf.status}`) };
-      rows.push({ key: wf.path, file: wf.path.split('/').pop()!, readAs: readAsLabel(f, wf.kind), rows: f?.rows ?? null, size: wf.bytes, result });
+      rows.push({ key: wf.path, file: wf.path.split('/').pop()!, readAs: readAsLabel(f, wf.kind, wf.path.split('/').pop()), rows: f?.rows ?? null, size: wf.bytes, result });
     }
     if (data.length) {
       const tables = new Set(data.map((d) => d.table_name)).size;

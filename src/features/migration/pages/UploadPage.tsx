@@ -145,7 +145,7 @@ export function UploadPage() {
       uploader.current = null;
       const after = await sessions.get(rid);
       if (after) setSession(after);
-      const complete = after && Object.values(after.files).every((x) => x.done);
+      const complete = result.done === result.total || Boolean(after && Object.values(after.files).every((x) => x.done));
       // field lists only: submit as soon as the upload finishes; the worker checks the structure
       if (complete && merged.structureOnly && result.failed === 0) {
         await migrationApi.submit(rid);

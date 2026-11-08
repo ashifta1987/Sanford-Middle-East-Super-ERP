@@ -485,6 +485,8 @@ class Run:
         self.structure_only = self.kind == 'structure_only' or (not data and bool(struct))
         notes = []
         if struct:
+            # Sanford change 8 Nov: check the biggest field list (the full Table_With_Field list), not the first by name
+            struct.sort(key=os.path.getsize, reverse=True)
             notes.append(self.structure_check(struct[0]))
         if self.structure_only:
             if not struct:

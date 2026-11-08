@@ -10,3 +10,4 @@ dist
 *.zip
 _inbox/
 
+.venv-worker/

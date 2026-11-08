@@ -70,11 +70,20 @@ export const sessions = {
     const all = (await tx<UploadSession[]>('sessions', 'readonly', (s) => s.getAll())) ?? [];
     return all.filter((x) => x.company === company).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  /** Read-modify-write inside ONE transaction: several files finish at the same moment (4 in parallel). */
   async markDone(runId: string, path: string) {
-    const s = await sessions.get(runId);
-    if (!s || !s.files[path]) return;
-    s.files[path].done = true;
-    await sessions.put(s);
+    const db = await open();
+    await new Promise<void>((resolve, reject) => {
+      const t = db.transaction('sessions', 'readwrite');
+      const store = t.objectStore('sessions');
+      const req = store.get(runId);
+      req.onsuccess = () => {
+        const s = req.result as UploadSession | undefined;
+        if (s?.files[path]) { s.files[path].done = true; store.put(s); }
+      };
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
   },
 };
 

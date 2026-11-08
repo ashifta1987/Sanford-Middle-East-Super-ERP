@@ -33,16 +33,13 @@ const SQL14 = join(root, 'supabase', 'sql');
 const args = process.argv.slice(2);
 const adminEmail = args.includes('--admin') ? args[args.indexOf('--admin') + 1] : null;
 
-// Companies known from the Sanford pack (design/B5). The other five (QA02, KW01, OM01, IN01, IN02) are added by IT
-// when their HANA schema names are known: INSERT INTO sap._company VALUES (...).
+// Phase 1: the four UAE companies (AE01 parent + AE02-AE04). The others (SA01, QA01, QA02, KW01, BH01, OM01, IN01, IN02)
+// are added later: append them here and re-run - existing rows are left as they are.
 const COMPANIES = [
   ['AE01', 'SBO_SANFORD', 'Sanford Middle East DWC L.L.C', 'AE', 'AED', 'free_zone'],
   ['AE02', 'SBO_ATMM', 'A.T.M.M. Electronics', 'AE', 'AED', 'mainland'],
   ['AE03', 'SBO_ABDMOH', 'Abdulla Mohamed Home Appliances', 'AE', 'AED', 'mainland'],
   ['AE04', 'SBO_IZAAN', 'Izaan General Trading', 'AE', 'AED', 'mainland'],
-  ['SA01', 'SBO_SANFORD_KSA', 'Sanford Japan Electronics Trading Company', 'SA', 'SAR', 'foreign'],
-  ['QA01', 'SBO_ALSHABIB', 'Al Shabib Trading Stores', 'QA', 'QAR', 'foreign'],
-  ['BH01', 'SBO_SFBAH', 'Sanford Electronics', 'BH', 'BHD', 'foreign'],
 ];
 
 const sql = postgres(DATABASE_URL, { ssl: 'require', max: 1, onnotice: () => {}, connect_timeout: 30, idle_timeout: 0 });

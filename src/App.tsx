@@ -9,9 +9,10 @@ import { UploadPage } from '@/features/migration/pages/UploadPage';
 import { RunPage } from '@/features/migration/pages/RunPage';
 import { CrossCheckPage } from '@/features/migration/pages/CrossCheckPage';
 import { useAuth } from '@/auth/AuthProvider';
+import { ApprovalsPage } from '@/pages/ApprovalsPage';
 
 const modules: Array<[string, string]> = [
-  ['my-hr', 'nav.myHr'], ['approvals', 'nav.approvals'], ['sales', 'nav.sales'], ['field', 'nav.field'],
+  ['my-hr', 'nav.myHr'], ['sales', 'nav.sales'], ['field', 'nav.field'],
   ['accountant', 'nav.accountant'], ['warehouses', 'nav.warehouses'], ['logistics', 'nav.logistics'],
   ['quality', 'nav.quality'], ['purchase', 'nav.purchase'], ['marketing', 'nav.marketing'], ['hr', 'nav.hr'],
 ];
@@ -39,6 +40,7 @@ export default function App() {
       >
         <Route index element={<PlaceholderPage nameKey="nav.dashboard" />} />
         {modules.map(([path, key]) => <Route key={path} path={path} element={<PlaceholderPage nameKey={key} />} />)}
+        <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="backoffice" element={<BackOfficeHome />} />
         {backOffice.map(([path, key]) => <Route key={path} path={`backoffice/${path}`} element={<PlaceholderPage nameKey={key} />} />)}
 

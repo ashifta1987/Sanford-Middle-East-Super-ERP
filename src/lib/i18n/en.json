@@ -520,5 +520,25 @@
       "name": "Cross-check the whole system",
       "desc": "Finance, stock and HR totals · then sign-off"
     }
+  },
+  "inbox": {
+    "title": "Approvals",
+    "subtitle": "SAP migration runs waiting for your sign-off",
+    "empty": "Nothing waiting for you",
+    "open": "Open cross-check",
+    "waitingYou": "Waiting for you",
+    "done": "You have signed",
+    "live": "Live",
+    "critical": "{{n}} critical open",
+    "signed": "{{n}} of 3 signed"
+  },
+  "account": {
+    "password": "Change password",
+    "new": "New password",
+    "confirm": "Repeat new password",
+    "save": "Save password",
+    "saved": "Password changed",
+    "short": "At least 10 characters",
+    "mismatch": "The two passwords are different"
   }
 }

@@ -31,7 +31,13 @@ if (/pooler\.supabase\.com:6543/.test(DATABASE_URL)) { console.error('Use the DI
 const DBI = join(root, '_inbox', 'sanford-erp-backend');
 const SQL14 = join(root, 'supabase', 'sql');
 const args = process.argv.slice(2);
-const adminEmail = args.includes('--admin') ? args[args.indexOf('--admin') + 1] : null;
+// --admin <email>                 IT migration lead (whole console)
+// --user <email> <POSITION>       e.g. CHIEF_ACC (Finance sign-off) or GROUP_CFO (business sign-off + go-live)
+const users = [];
+args.forEach((a, i) => {
+  if (a === '--admin') users.push([args[i + 1], 'IT_ADMIN']);
+  if (a === '--user') users.push([args[i + 1], args[i + 2]]);
+});
 
 // Phase 1: the four UAE companies (AE01 parent + AE02-AE04). The others (SA01, QA01, QA02, KW01, BH01, OM01, IN01, IN02)
 // are added later: append them here and re-run - existing rows are left as they are.
@@ -120,6 +126,7 @@ try {
   await runFile('13_migration_console', join(DBI, '13_migration_console.sql'), { always: true });
   await runFile('14_realtime', join(SQL14, '14_realtime.sql'), { always: true });
   await runFile('14_console_views', join(SQL14, '14_console_views.sql'), { always: true });
+  await runFile('14_signoff_inbox', join(SQL14, '14_signoff_inbox.sql'), { always: true });
 
   // erp.company rows (what erp.sync_company writes first) so users can be given companies before the first load
   await sql`insert into erp.company (company_code, legal_name, short_name, country, currency, licence_type, sap_schema, is_parent)
@@ -132,29 +139,27 @@ try {
             on conflict (position_code) do nothing`;
   log('ok    positions IT_ADMIN, CHIEF_ACC, GROUP_CFO');
 
-  if (adminEmail) {
-    if (!SECRET) throw new Error('SUPABASE_SECRET_KEY missing in .env.db (needed to create the login)');
+  for (const [email, position] of users) {
+    if (!SECRET) throw new Error('SUPABASE_SECRET_KEY missing in .env.db (needed to create logins)');
     const password = randomBytes(12).toString('base64url');
     const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: 'POST',
       headers: { apikey: SECRET, Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: adminEmail, password, email_confirm: true }),
+      body: JSON.stringify({ email, password, email_confirm: true }),
     });
     const body = await res.json();
     let uid = body.id;
     if (!res.ok) {
-      if (!/already/i.test(JSON.stringify(body))) throw new Error(`create user: ${JSON.stringify(body)}`);
-      const [u] = await sql`select id from auth.users where email = ${adminEmail}`;
-      uid = u.id;
-      log(`login ${adminEmail} already exists - giving it admin access`);
+      if (!/already/i.test(JSON.stringify(body))) throw new Error(`create user ${email}: ${JSON.stringify(body)}`);
+      [{ id: uid }] = await sql`select id from auth.users where email = ${email}`;
+      log(`login ${email} already exists - setting position ${position}`);
     } else {
-      log(`login ${adminEmail} created · temporary password: ${password}`);
+      log(`login ${email} created (${position}) · temporary password: ${password}`);
     }
     await sql`insert into erp.app_user (user_id, company_code, display_name, email, position_code)
-              values (${uid}, 'AE01', ${adminEmail.split('@')[0]}, ${adminEmail}, 'IT_ADMIN')
-              on conflict (user_id) do update set position_code = 'IT_ADMIN', active = true`;
+              values (${uid}, 'AE01', ${email.split('@')[0]}, ${email}, ${position})
+              on conflict (user_id) do update set position_code = ${position}, active = true`;
     await sql`insert into erp.user_company (user_id, company_code) select ${uid}, company_code from erp.company on conflict do nothing`;
-    log('ok    admin access to every company');
   }
 
   const [s] = await sql`select (select count(*) from pg_tables where schemaname = 'sap') as sap_tables,

@@ -4,6 +4,7 @@ import { Bell, Menu, Mic, Search, LogOut } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { useCompany } from './CompanyContext';
 import { LanguageToggle } from './LanguageToggle';
+import { ChangePassword } from './ChangePassword';
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { t } = useTranslation();
@@ -59,6 +60,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
           <Bell className="h-5 w-5" aria-hidden />
         </button>
         <LanguageToggle />
+        <ChangePassword />
         <button type="button" onClick={signOut} className="grid h-11 w-11 place-items-center rounded-btn border border-line" aria-label={t('top.signOut')} title={t('top.signOut')}>
           <LogOut className="h-5 w-5 rtl:rotate-180" aria-hidden />
         </button>

@@ -19,3 +19,4 @@ Recorded 8 Nov 2026. ✅ passed · ⏳ blocked until the database is installed o
 3. Create the first users (`erp.app_user`, `erp.user_company`).
 4. Start the worker.
 5. Re-run rows 2–7 with `supabase/tests/testexp` and `supabase/tests/broken`.
+

@@ -53,3 +53,4 @@ WantedBy=multi-user.target
 - `max_locks_per_transaction` raised (see `docs/setup.md`), otherwise the rebuild fails with "out of shared memory".
 - One rebuild runs at a time (advisory lock). If the worker process dies, Postgres rolls the company back; the run stays
   in its running status — press **Stop run** in B7 (or re-queue).
+

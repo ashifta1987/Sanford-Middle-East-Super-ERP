@@ -11,3 +11,4 @@ dist
 _inbox/
 
 .venv-worker/
+scripts/local-stack/.invited.json

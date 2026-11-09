@@ -9,6 +9,11 @@ const PORT = Number(process.env.GATEWAY_PORT ?? 54321);
 const PGRST = process.env.PGRST_URL ?? 'http://127.0.0.1:3000';
 const SECRET = process.env.JWT_SECRET ?? 'local-dev-secret-local-dev-secret-0001';
 const users = JSON.parse(fs.readFileSync(new URL('./users.json', import.meta.url)));
+// A10 · invited users and the test inbox (local only; the file is git-ignored). Stands in for Supabase Auth + Inbucket.
+const INVITED = new URL('./.invited.json', import.meta.url);
+const store = fs.existsSync(INVITED) ? JSON.parse(fs.readFileSync(INVITED)) : { users: [], inbox: [] };
+users.push(...store.users);
+const persist = () => fs.writeFileSync(INVITED, JSON.stringify(store, null, 2));
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
 function sign(payload) {
@@ -46,7 +51,7 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/auth/v1/token') {
     const body = JSON.parse((await readBody(req)) || '{}');
     if (url.searchParams.get('grant_type') === 'password') {
-      const u = users.find((x) => x.email === body.email && x.password === body.password);
+      const u = users.find((x) => x.email === body.email && x.password && x.password === body.password);
       return u ? send(res, 200, session(u)) : send(res, 400, { error: 'invalid_grant', error_description: 'Invalid login credentials', code: 'invalid_credentials', msg: 'Invalid login credentials' });
     }
     const u = users.find((x) => `rt.${x.id}` === body.refresh_token);
@@ -55,7 +60,49 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/auth/v1/user') {
     const p = verify((req.headers.authorization ?? '').replace(/^Bearer /i, ''));
     const u = p && users.find((x) => x.id === p.sub);
-    return u ? send(res, 200, userObj(u)) : send(res, 401, { msg: 'invalid JWT' });
+    if (!u) return send(res, 401, { msg: 'invalid JWT' });
+    if (req.method === 'PUT') {  // set / change password (invited users set theirs after following the email link)
+      const body = JSON.parse((await readBody(req)) || '{}');
+      if (body.password) {
+        if (String(body.password).length < 6) return send(res, 422, { code: 'weak_password', msg: 'Password should be at least 6 characters.' });
+        u.password = body.password;
+        const inv = store.users.find((x) => x.id === u.id);
+        if (inv) { inv.password = body.password; persist(); }
+      }
+    }
+    return send(res, 200, userObj(u));
+  }
+  // A10 · test inbox: the emails the local invite-user stand-in "sent".
+  if (url.pathname === '/local/inbox') {
+    const to = (url.searchParams.get('email') ?? '').toLowerCase();
+    return send(res, 200, store.inbox.filter((m) => !to || m.to === to));
+  }
+  // A10 · stand-in for the invite-user Edge Function (supabase/functions/invite-user): same three steps, same rules.
+  if (url.pathname === '/functions/v1/invite-user' && req.method === 'POST') {
+    const auth = req.headers.authorization ?? '';
+    if (!verify(auth.replace(/^Bearer /i, ''))) return send(res, 401, { code: '42501', message: 'Sign in first.' });
+    const invite = JSON.parse((await readBody(req)) || '{}');
+    const rpc = (fn, args, authz) => fetch(`${PGRST}/rpc/${fn}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'content-profile': 'erp', authorization: authz }, body: JSON.stringify(args),
+    });
+    // 1. as the admin
+    const r1 = await rpc('admin_invite_create', { p_invite: invite }, auth);
+    const j1 = await r1.json();
+    if (!r1.ok) return send(res, j1.code === '42501' ? 403 : 400, { code: j1.code, message: j1.message });
+    // 2. "Supabase Auth": create the user and drop the email in the test inbox
+    const u = { id: crypto.randomUUID(), email: j1.email, password: null, name: invite.display_name };
+    users.push(u); store.users.push(u);
+    const s = session(u);
+    const origin = req.headers.origin ?? 'http://127.0.0.1:5173';
+    store.inbox.push({ to: j1.email, at: new Date().toISOString(), subject: 'You have been invited to Sanford Super ERP',
+      link: `${origin}/#access_token=${s.access_token}&expires_at=${s.expires_at}&expires_in=3600&refresh_token=${s.refresh_token}&token_type=bearer&type=invite` });
+    persist();
+    // 3. as the service role
+    const service = `Bearer ${sign({ role: 'service_role', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 60 })}`;
+    const r3 = await rpc('admin_invite_link', { p_invite_id: j1.invite_id, p_user_id: u.id }, service);
+    const j3 = await r3.json();
+    if (!r3.ok) return send(res, 400, { code: j3.code, message: j3.message, invite_id: j1.invite_id });
+    return send(res, 200, { invite_id: j1.invite_id, user_id: u.id, email: j1.email, state: 'sent' });
   }
   if (url.pathname === '/auth/v1/logout') return send(res, 204);
   if (url.pathname.startsWith('/rest/v1/')) {

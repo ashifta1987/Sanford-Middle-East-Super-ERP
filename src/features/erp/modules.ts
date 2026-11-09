@@ -115,6 +115,11 @@ export const docKindByObj = (obj: number) => (Object.keys(DOC_KINDS) as DocKind[
 
 /** module › SAP function name → working screen */
 const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
+  // A10 · Administration
+  administration: {
+    'Exchange Rates and Indexes': '/admin/exchange-rates', 'Approval Process': '/admin/approval-templates', License: '/admin/users',
+    'Data Import/Export': '/backoffice/migration',
+  },
   financials: {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
   },
@@ -152,7 +157,7 @@ const LIVE_ITEMS: Record<string, string> = {
   'Goods Receipt': '/docs/goods_receipt', 'Goods Issue': '/docs/goods_issue', 'Inventory Transfer Request': '/docs/transfer_request',
   'Inventory Transfer': '/docs/inventory_transfer', 'Inventory Status': '/inventory/stock', 'Items List': '/items',
   'Inventory in Warehouse Report': '/inventory/stock', 'Find an item': '/items', 'Stock per warehouse': '/inventory/stock', 'Price Report': '/inventory/prices',
-  'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '',
+  'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '/admin/exchange-rates',
   'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
   'New sales order': '/docs/sales_order/new',
   // A4 · sales cycle
@@ -195,6 +200,10 @@ const LIVE_ITEMS: Record<string, string> = {
   'Late and absent': '/hr/attendance?f_flagged=true', Shifts: '/hr/setup', 'Leave requests': '/hr/leave', 'Leave balances': '/portal', 'Holiday calendar': '/hr/setup',
   'Monthly payroll run': '/hr/payroll', 'WPS salary file': '/hr/payroll', Payslips: '/portal', 'End-of-service': '/hr/employees', 'My day': '/portal',
   'Check in and out': '/portal', 'Leave and payslips': '/portal',
+  // A10 · Administration
+  'Company Details': '/admin/company', 'Authorizations ›': '/admin/authorizations', 'Document Numbering': '/admin/numbering',
+  'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approval-templates', 'Approval Stages': '/admin/approval-templates',
+  'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -209,6 +218,7 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   inventory: { 'Inventory Transactions': '/inventory/transfer/new', 'Item Master Data': '/items/new' },
   bp: { 'Business Partner Master Data': '/bp/new' },
   hr: { 'Employee Master Data': '/hr/employees/new', Leave: '/portal' },
+  administration: { License: '/admin/users/invite' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

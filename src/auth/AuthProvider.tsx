@@ -48,7 +48,8 @@ const ROLE_MODULES: Record<'finance' | 'it' | 'business', string[]> = {
 async function loadProfile(userId: string): Promise<Profile> {
   const { data: user, error } = await erp().from('app_user').select('*').eq('user_id', userId).maybeSingle();
   if (error) throw error;
-  if (!user) return { user: null, position: null, companies: [], modules: [], levels: {} };
+  // A10: a deactivated user is treated like a user without a profile (the database already refuses every company).
+  if (!user || user.active === false) return { user: null, position: null, companies: [], modules: [], levels: {} };
   const [{ data: position }, { data: uc }, { data: pm, error: pmError }] = await Promise.all([
     erp().from('position').select('position_code,name,module_access').eq('position_code', user.position_code).maybeSingle(),
     erp().from('user_company').select('company_code').eq('user_id', userId),

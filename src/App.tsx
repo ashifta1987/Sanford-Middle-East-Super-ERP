@@ -36,6 +36,8 @@ import { EmployeeDetailPage, EmployeeFormPage, HrSetupPage, PayrollListPage, Pay
 import {
   CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage,
 } from '@/features/erp/pages/InventoryPages';
+import { AuthorizationsPage, UserFormPage, UsersPage } from '@/features/erp/pages/AdminPages';
+import { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage, NumberingPage } from '@/features/erp/pages/AdminSetupPages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -174,6 +176,16 @@ export default function App() {
         <Route path="hr/payroll/:company/:id" element={<PayrollRunPage />} />
         <Route path="hr/setup" element={<HrSetupPage />} />
         <Route path="portal" element={<PortalPage />} />
+        {/* A10 · Administration */}
+        <Route path="admin/users" element={<UsersPage />} />
+        <Route path="admin/users/invite" element={<UserFormPage key="u-new" mode="new" />} />
+        <Route path="admin/users/:id" element={<UserFormPage key="u-edit" mode="edit" />} />
+        <Route path="admin/authorizations" element={<AuthorizationsPage />} />
+        <Route path="admin/approval-templates" element={<ApprovalTemplatesPage />} />
+        <Route path="admin/numbering" element={<NumberingPage />} />
+        <Route path="admin/company" element={<CompanyDetailsPage />} />
+        <Route path="admin/exchange-rates" element={<ExchangeRatesPage />} />
+        <Route path="admin/ai-assistant" element={<AiAssistantPage />} />
         <Route path="portal/payslip/:company/:run" element={<PayslipPage />} />
 
         {legacy.map(([from, to]) => <Route key={from} path={from} element={<Navigate to={to} replace />} />)}

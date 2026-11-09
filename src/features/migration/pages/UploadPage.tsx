@@ -312,7 +312,7 @@ export function UploadPage() {
               onDragLeave={() => setDragOver(false)}
               onDrop={disabledPick ? (e) => e.preventDefault() : onDrop}
               className={clsx('flex flex-col items-center gap-3 rounded-card border-2 border-dashed px-6 py-8 text-center',
-                dragOver ? 'border-primary bg-primary-soft' : 'border-[#C9CED6]')}
+                dragOver ? 'border-primary bg-primary-soft' : 'border-line-strong')}
             >
               <UploadCloud className="h-9 w-9 text-primary" aria-hidden />
               <p className="text-lg font-semibold">{t('migration.upload.drop')}</p>
@@ -451,7 +451,7 @@ export function UploadPage() {
             )}
           </Card>
 
-          <section className="card border-[#C7D4F7] bg-info-bg p-5">
+          <section className="card border-primary-line bg-info-bg p-5">
             <h2 className="text-[17px] font-semibold text-info-fg">{t('migration.upload.nextStep')}</h2>
             <ol className="mt-2 list-decimal space-y-1 ps-5 text-[15px]">
               <li>{t('migration.upload.next1', { schema })}</li>

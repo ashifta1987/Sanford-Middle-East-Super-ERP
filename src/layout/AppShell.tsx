@@ -13,7 +13,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-50 focus:rounded-btn focus:bg-white focus:p-3">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-50 focus:rounded-btn focus:bg-surface focus:p-3">
         {t('app.skip')}
       </a>
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />

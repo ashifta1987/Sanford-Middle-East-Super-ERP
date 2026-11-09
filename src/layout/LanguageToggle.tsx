@@ -8,7 +8,7 @@ export function LanguageToggle() {
       type="button"
       onClick={() => i18n.changeLanguage(next)}
       aria-label={`${t('top.language')}: ${next === 'ar' ? 'العربية' : 'English'}`}
-      className="min-h-[44px] rounded-btn border border-line bg-white px-3 text-[15px] font-medium hover:bg-page"
+      className="min-h-[44px] whitespace-nowrap rounded-btn border border-line bg-surface px-2.5 text-[15px] font-medium hover:bg-page sm:px-3"
     >
       {i18n.language === 'ar' ? 'ع · EN' : 'EN · ع'}
     </button>

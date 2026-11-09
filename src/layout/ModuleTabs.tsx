@@ -34,7 +34,7 @@ export function ModuleTabs() {
   ];
 
   return (
-    <div className="flex items-center border-b border-line bg-white px-4 lg:px-6">
+    <div className="flex items-center border-b border-line bg-surface px-4 lg:px-6">
       <nav aria-label={t('nav.backoffice')} className="-mb-px flex flex-1 gap-1 overflow-x-auto">
         {tabs.filter((x) => x.show).map((tab) => (
           <NavLink

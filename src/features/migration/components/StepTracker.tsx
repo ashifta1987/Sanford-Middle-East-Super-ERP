@@ -25,7 +25,7 @@ export function StepTracker({ steps, current }: { steps: TrackerStep[]; current:
               className={clsx(
                 'grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-semibold',
                 s.state === 'done' && 'bg-ok-fg text-white',
-                s.state === 'action' && 'border border-[#F5C27A] bg-warn-bg text-warn-fg',
+                s.state === 'action' && 'border border-warn-fg/40 bg-warn-bg text-warn-fg',
                 s.state === 'waiting' && 'bg-neutral-bg text-neutral-fg',
               )}
               aria-hidden

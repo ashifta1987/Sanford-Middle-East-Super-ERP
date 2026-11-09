@@ -133,7 +133,7 @@ export function RunPage() {
             <div className="font-semibold text-crit-fg">{t('migration.run.failedBanner', { step: failed ? t(`stepNames.${failed.step_code}.name`) : '—', code })}</div>
             {failed?.step_message && <div className="mt-1 line-clamp-3 font-mono text-xs text-crit-fg">{failed.step_message}</div>}
           </div>
-          <Link to={`/backoffice/migration/runs/${head.run_id}/check`} className="inline-flex min-h-[44px] items-center rounded-btn border border-crit-fg/30 bg-white px-4 font-medium text-crit-fg">
+          <Link to={`/backoffice/migration/runs/${head.run_id}/check`} className="inline-flex min-h-[44px] items-center rounded-btn border border-crit-fg/30 bg-surface px-4 font-medium text-crit-fg">
             {t('migration.run.seeIssue')}
           </Link>
         </div>

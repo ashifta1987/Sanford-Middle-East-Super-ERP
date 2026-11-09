@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+// Colours come from CSS variables (src/index.css) so light and dark themes share one set of class names.
+// Values are "R G B" channels so opacity modifiers (bg-black/30, border-crit-fg/30) keep working.
+const c = (v) => `rgb(var(--c-${v}) / <alpha-value>)`;
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -8,21 +12,24 @@ export default {
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       colors: {
-        page: '#F6F7F9',
-        line: '#E2E5EA',
-        ink: '#16191F',
-        muted: '#5B6270',
-        primary: { DEFAULT: '#1D4ED8', soft: '#E8EEFC' },
-        ok: { bg: '#E7F6EC', fg: '#14532D' },
-        warn: { bg: '#FFF4E5', fg: '#8A3B00' },
-        crit: { bg: '#FDECEC', fg: '#8F1D1D' },
-        info: { bg: '#EEF2FF', fg: '#1E3A8A' },
-        neutral: { bg: '#F1F3F6', fg: '#4A5160' },
+        page: c('page'),
+        surface: { DEFAULT: c('surface'), 2: c('surface-2') },
+        line: { DEFAULT: c('line'), strong: c('line-strong') },
+        ink: { DEFAULT: c('ink'), 2: c('ink-2') },
+        muted: c('muted'),
+        primary: { DEFAULT: c('primary'), hover: c('primary-hover'), soft: c('primary-soft'), text: c('primary-text'), line: c('primary-line') },
+        side: { DEFAULT: c('side'), active: c('side-active'), 'active-text': c('side-active-text'), text: c('side-text') },
+        success: c('success'),
+        ok: { bg: c('ok-bg'), fg: c('ok-fg') },
+        warn: { bg: c('warn-bg'), fg: c('warn-fg') },
+        crit: { bg: c('crit-bg'), fg: c('crit-fg') },
+        info: { bg: c('info-bg'), fg: c('info-fg') },
+        neutral: { bg: c('neutral-bg'), fg: c('neutral-fg') },
       },
-      borderRadius: { card: '12px', btn: '10px' },
-      maxWidth: { content: '1180px' },
+      borderRadius: { card: '16px', btn: '10px' },
+      boxShadow: { card: 'var(--shadow)' },
+      maxWidth: { content: '1280px' },
     },
   },
   plugins: [],
 };
-

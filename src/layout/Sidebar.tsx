@@ -1,45 +1,42 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import {
-  Home, User, Inbox, Tag, MapPin, Calculator, Box, Truck, ShieldCheck, ShoppingCart, Megaphone, Users, FolderOpen, X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
+import { MODULES, canOpenModule, DOC_KINDS } from '@/features/erp/modules';
+import { ModuleIcon } from '@/features/erp/icons';
 
-const groupItems = [
-  { to: '/', key: 'dashboard', icon: Home, end: true },
-  { to: '/my-hr', key: 'myHr', icon: User },
-  { to: '/approvals', key: 'approvals', icon: Inbox },
-];
-const moduleItems = [
-  { to: '/sales', key: 'sales', icon: Tag },
-  { to: '/field', key: 'field', icon: MapPin },
-  { to: '/accountant', key: 'accountant', icon: Calculator },
-  { to: '/warehouses', key: 'warehouses', icon: Box },
-  { to: '/logistics', key: 'logistics', icon: Truck },
-  { to: '/quality', key: 'quality', icon: ShieldCheck },
-  { to: '/purchase', key: 'purchase', icon: ShoppingCart },
-  { to: '/marketing', key: 'marketing', icon: Megaphone },
-  { to: '/hr', key: 'hr', icon: Users },
-  { to: '/backoffice', key: 'backoffice', icon: FolderOpen },
-];
+/** Which module a working screen belongs to, so the module stays highlighted on its list and detail pages. */
+function moduleOfPath(p: string): string | undefined {
+  if (p.startsWith('/m/')) return p.split('/')[2];
+  if (p.startsWith('/docs/')) return DOC_KINDS[p.split('/')[2] as keyof typeof DOC_KINDS]?.module;
+  if (p.startsWith('/bp')) return 'bp';
+  if (p.startsWith('/items') || p.startsWith('/inventory')) return 'inventory';
+  if (p.startsWith('/financials')) return 'financials';
+  if (p.startsWith('/banking')) return 'banking';
+  if (p.startsWith('/hr')) return 'hr';
+  if (p.startsWith('/backoffice')) return 'administration';
+  if (p.startsWith('/preview')) return new URLSearchParams(window.location.search).get('from') ?? 'administration';
+  return undefined;
+}
 
-function Item({ to, label, Icon, end, onNavigate }: { to: string; label: string; Icon: typeof Home; end?: boolean; onNavigate?: () => void }) {
+function Item({ to, label, icon, active, onNavigate, num }: { to: string; label: string; icon: string; active?: boolean; onNavigate?: () => void; num?: string }) {
   return (
     <li>
       <NavLink
         to={to}
-        end={end}
+        end={to === '/'}
         onClick={onNavigate}
         className={({ isActive }) =>
           clsx(
-            'flex min-h-[44px] items-center gap-3 rounded-btn px-3 text-[15px]',
-            isActive ? 'bg-primary-soft font-semibold text-primary' : 'text-ink hover:bg-page',
+            'flex min-h-[40px] items-center gap-3 rounded-btn px-3 text-[14px]',
+            isActive || active ? 'bg-side-active font-semibold text-side-active-text' : 'text-side-text hover:bg-surface-2',
           )
         }
       >
-        <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
-        {label}
+        <ModuleIcon name={icon} className="h-[18px] w-[18px] shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {num && <span className="num text-[11px] text-muted">{num}</span>}
       </NavLink>
     </li>
   );
@@ -47,24 +44,25 @@ function Item({ to, label, Icon, end, onNavigate }: { to: string; label: string;
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
-  const { profile, isMigrationAdmin } = useAuth();
+  const { profile } = useAuth();
+  const loc = useLocation();
   const name = profile?.user?.display_name ?? '—';
   const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
   const companyCount = profile?.companies.length ?? 0;
-  // Back office houses the admin modules; hide it for users without admin/IT.
-  const modules = moduleItems.filter((m) => m.key !== 'backoffice' || isMigrationAdmin);
+  const mods = MODULES.filter((m) => canOpenModule(m, profile?.modules ?? []));
+  const current = moduleOfPath(loc.pathname);
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={onClose} aria-hidden />}
+      {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} aria-hidden />}
       <aside
         className={clsx(
-          'fixed inset-y-0 start-0 z-40 flex w-[240px] shrink-0 flex-col border-e border-line bg-white transition-transform lg:sticky lg:top-0 lg:h-screen',
+          'fixed inset-y-0 start-0 z-40 flex w-[248px] shrink-0 flex-col border-e border-line bg-side transition-transform lg:sticky lg:top-0 lg:h-screen',
           !open && 'max-lg:ltr:-translate-x-full max-lg:rtl:translate-x-full',
         )}
-        aria-label="Main"
+        aria-label={t('nav.main')}
       >
-        <div className="flex items-center justify-between px-5 py-5">
+        <div className="flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="grid h-9 w-9 place-items-center rounded-btn bg-primary font-semibold text-white" aria-hidden>S</span>
             <div>
@@ -72,22 +70,26 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               <div className="text-xs text-muted">{t('app.group')}</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-btn hover:bg-page lg:hidden" aria-label={t('nav.closeMenu')}>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-btn hover:bg-surface-2 lg:hidden" aria-label={t('nav.closeMenu')}>
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3">
-          <h2 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted">{t('nav.group')}</h2>
+        <nav className="flex-1 overflow-y-auto px-3 pb-3">
           <ul className="space-y-0.5">
-            {groupItems.map((i) => <Item key={i.key} to={i.to} end={i.end} label={t(`nav.${i.key}`)} Icon={i.icon} onNavigate={onClose} />)}
+            <Item to="/" label={t('nav.home')} icon="home" onNavigate={onClose} />
           </ul>
-          <h2 className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-muted">{t('nav.modules')}</h2>
+          {mods.length > 0 && <h2 className="eyebrow px-3 pb-1 pt-4">{t('nav.modules')}</h2>}
           <ul className="space-y-0.5">
-            {modules.map((i) => <Item key={i.key} to={i.to} label={t(`nav.${i.key}`)} Icon={i.icon} onNavigate={onClose} />)}
+            {mods.map((m) => <Item key={m.key} to={`/m/${m.key}`} label={m.title} icon={m.key} num={m.num} active={current === m.key} onNavigate={onClose} />)}
+          </ul>
+          <h2 className="eyebrow px-3 pb-1 pt-4">{t('nav.oversight')}</h2>
+          <ul className="space-y-0.5">
+            <Item to="/control" label={t('nav.control')} icon="control" onNavigate={onClose} />
+            <Item to="/approvals" label={t('nav.approvals')} icon="approvals" onNavigate={onClose} />
           </ul>
         </nav>
         <div className="mx-3 mb-4 flex items-center gap-3 border-t border-line px-2 pt-4">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary" aria-hidden>{initials}</span>
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary-text" aria-hidden>{initials}</span>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{name}</div>
             <div className="truncate text-xs text-muted">
@@ -99,4 +101,3 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     </>
   );
 }
-

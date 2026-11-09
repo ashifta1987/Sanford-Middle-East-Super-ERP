@@ -89,10 +89,10 @@ export function CrossCheckPage() {
         <div className="flex flex-wrap items-center gap-2">
           <RunStatusPill status={head.run_status} />
           <details className="relative">
-            <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-2 rounded-btn border border-line bg-white px-4 font-medium hover:bg-page">
+            <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-2 rounded-btn border border-line bg-surface px-4 font-medium hover:bg-page">
               <Download className="h-4 w-4" aria-hidden /> {busyReport ? t('migration.check.building') : t('migration.check.download')}
             </summary>
-            <div className="absolute end-0 z-10 mt-1 w-48 rounded-btn border border-line bg-white p-1 shadow-lg">
+            <div className="absolute end-0 z-10 mt-1 w-48 rounded-btn border border-line bg-surface p-1 shadow-lg">
               <button type="button" disabled={!!busyReport || review.isLoading} onClick={() => void report('pdf')} className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 hover:bg-page">
                 <FileText className="h-4 w-4" aria-hidden /> {t('migration.check.pdf')}
               </button>

@@ -2,26 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens from the canvas design (Super ERP UI/UX Structure). Light is the default;
+   [data-theme='dark'] on <html> switches every colour. Channels only, see tailwind.config.js. */
+:root {
+  --c-page: 244 245 247;          /* #F4F5F7 */
+  --c-surface: 255 255 255;       /* #FFFFFF */
+  --c-surface-2: 248 249 251;     /* #F8F9FB */
+  --c-line: 228 231 236;          /* #E4E7EC */
+  --c-line-strong: 208 213 221;   /* #D0D5DD */
+  --c-ink: 16 24 40;              /* #101828 */
+  --c-ink-2: 71 84 103;           /* #475467 */
+  --c-muted: 93 107 130;          /* #5D6B82 */
+  --c-primary: 67 56 202;         /* #4338CA */
+  --c-primary-hover: 55 48 163;   /* #3730A3 */
+  --c-primary-soft: 238 240 255;  /* #EEF0FF */
+  --c-primary-text: 55 48 163;    /* #3730A3 */
+  --c-primary-line: 199 203 250;  /* #C7CBFA */
+  --c-side: 255 255 255;
+  --c-side-text: 52 64 84;        /* #344054 */
+  --c-side-active: 238 240 255;
+  --c-side-active-text: 55 48 163;
+  --c-success: 6 118 71;          /* #067647 */
+  --c-ok-bg: 236 253 243;   --c-ok-fg: 6 118 71;
+  --c-warn-bg: 255 250 235; --c-warn-fg: 181 71 8;
+  --c-crit-bg: 254 243 242; --c-crit-fg: 180 35 24;
+  --c-info-bg: 238 240 255; --c-info-fg: 55 48 163;
+  --c-neutral-bg: 242 244 247; --c-neutral-fg: 52 64 84;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  --c-page: 11 15 23;             /* #0B0F17 */
+  --c-surface: 18 24 38;          /* #121826 */
+  --c-surface-2: 24 32 50;        /* #182032 */
+  --c-line: 37 48 73;             /* #253049 */
+  --c-line-strong: 51 64 90;      /* #33405A */
+  --c-ink: 242 244 247;           /* #F2F4F7 */
+  --c-ink-2: 192 199 212;         /* #C0C7D4 */
+  --c-muted: 152 162 179;         /* #98A2B3 */
+  --c-primary: 79 70 229;         /* #4F46E5 */
+  --c-primary-hover: 99 102 241;  /* #6366F1 */
+  --c-primary-soft: 30 32 80;     /* #1E2050 */
+  --c-primary-text: 199 210 254;  /* #C7D2FE */
+  --c-primary-line: 59 63 143;    /* #3B3F8F */
+  --c-side: 14 20 32;             /* #0E1420 */
+  --c-side-text: 192 199 212;
+  --c-side-active: 30 32 80;
+  --c-side-active-text: 224 231 255;
+  --c-success: 6 118 71;
+  --c-ok-bg: 10 42 28;     --c-ok-fg: 117 224 167;
+  --c-warn-bg: 46 31 6;    --c-warn-fg: 254 200 75;
+  --c-crit-bg: 45 18 18;   --c-crit-fg: 253 162 155;
+  --c-info-bg: 30 32 80;   --c-info-fg: 199 210 254;
+  --c-neutral-bg: 29 38 56; --c-neutral-fg: 208 213 221;
+  --shadow: none;
+  color-scheme: dark;
+}
+
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
   body { @apply bg-page text-ink font-sans antialiased; font-variant-numeric: tabular-nums; }
-  :focus-visible { outline: 2px solid #1D4ED8; outline-offset: 2px; }
+  :focus-visible { outline: 2px solid rgb(var(--c-primary)); outline-offset: 2px; }
+  [data-theme='dark'] :focus-visible { outline-color: rgb(var(--c-primary-text)); }
   [dir='rtl'] body { font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif; }
+  h1, h2, h3 { letter-spacing: -0.01em; }
 }
 
 @layer components {
-  .card { @apply bg-white border border-line rounded-card; }
-  .input { @apply w-full min-h-[44px] rounded-btn border border-line bg-white px-3 text-ink placeholder:text-muted focus:border-primary; }
-  .pill { @apply inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold; }
+  .card { @apply bg-surface border border-line rounded-card shadow-card; }
+  .input { @apply w-full min-h-[44px] rounded-btn border border-line-strong bg-surface px-3 text-ink placeholder:text-muted focus:border-primary; }
+  .pill { @apply inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold; }
   .pill-ok { @apply bg-ok-bg text-ok-fg; }
   .pill-warning { @apply bg-warn-bg text-warn-fg; }
   .pill-crit { @apply bg-crit-bg text-crit-fg; }
   .pill-info { @apply bg-info-bg text-info-fg; }
   .pill-neutral { @apply bg-neutral-bg text-neutral-fg; }
   .num { font-variant-numeric: tabular-nums; unicode-bidi: plaintext; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-wider text-muted; }
 }
+
+/* In dark mode, the primary colour is used for fills; text in "primary" switches to the lighter accent so it stays readable. */
+[data-theme='dark'] .text-primary,
+[data-theme='dark'] .hover\:text-primary:hover { color: rgb(var(--c-primary-text)); }
 
 @keyframes indeterminate { 0% { inset-inline-start: -35%; } 100% { inset-inline-start: 100%; } }
 .bar-indeterminate { position: absolute; top: 0; bottom: 0; width: 35%; animation: indeterminate 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .bar-indeterminate { animation: none; width: 100%; opacity: .5; } }
-

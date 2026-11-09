@@ -13,7 +13,7 @@ import { qty } from '../check/derive';
 import type { CompanyOverviewRow } from '@/lib/database.types';
 
 const sevTone: Record<string, Tone> = { critical: 'critical', warning: 'warning', info: 'info' };
-const linkBtn = 'inline-flex min-h-[44px] items-center gap-2 rounded-btn border border-line bg-white px-4 font-medium hover:bg-page';
+const linkBtn = 'inline-flex min-h-[44px] items-center gap-2 rounded-btn border border-line bg-surface px-4 font-medium hover:bg-page';
 
 /** B5 Migration centre (design/B5-migration-centre.jpg). Data: erp.migration_company_overview. */
 export function MigrationCentrePage() {

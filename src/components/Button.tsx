@@ -11,11 +11,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const styles: Record<Variant, string> = {
-  primary: 'bg-primary text-white hover:bg-[#1A43BE] border border-primary',
-  secondary: 'bg-white text-ink border border-line hover:bg-page',
+  primary: 'bg-primary text-white hover:bg-primary-hover border border-primary',
+  secondary: 'bg-surface text-ink border border-line hover:bg-page',
   ghost: 'bg-transparent text-ink hover:bg-page border border-transparent',
-  danger: 'bg-white text-crit-fg border border-[#F2C1C1] hover:bg-crit-bg',
-  success: 'bg-ok-fg text-white border border-ok-fg hover:bg-[#0F3F22]',
+  danger: 'bg-surface text-crit-fg border border-crit-fg/30 hover:bg-crit-bg',
+  success: 'bg-success text-white border border-success hover:brightness-110',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -30,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-describedby={disabled && disabledReason ? rest.id && `${rest.id}-reason` : undefined}
       className={clsx(
         'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-btn px-4 text-[15px] font-medium transition-colors',
-        disabled ? 'cursor-not-allowed border border-transparent bg-[#E6E8EC] text-[#5B6270]' : styles[variant],
+        disabled ? 'cursor-not-allowed border border-transparent bg-neutral-bg text-muted' : styles[variant],
         className,
       )}
       {...rest}

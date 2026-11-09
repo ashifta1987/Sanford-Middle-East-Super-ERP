@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppShell } from '@/layout/AppShell';
 import { CompanyProvider } from '@/layout/CompanyContext';
 import { LoginPage } from '@/auth/LoginPage';
@@ -10,11 +10,17 @@ import { RunPage } from '@/features/migration/pages/RunPage';
 import { CrossCheckPage } from '@/features/migration/pages/CrossCheckPage';
 import { useAuth } from '@/auth/AuthProvider';
 import { ApprovalsPage } from '@/pages/ApprovalsPage';
+import { ControlTowerPage, HomePage, ModulePage, SearchPage } from '@/features/erp/pages/HomePages';
+import { PreviewPage } from '@/features/erp/pages/PreviewPage';
+import {
+  AccountsPage, BusinessPartnersPage, DocumentsPage, EmployeesPage, ItemsPage, JournalsPage, PaymentsPage, PricesPage, StockPage,
+} from '@/features/erp/pages/ListPages';
+import { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } from '@/features/erp/pages/DetailPages';
 
-const modules: Array<[string, string]> = [
-  ['my-hr', 'nav.myHr'], ['sales', 'nav.sales'], ['field', 'nav.field'],
-  ['accountant', 'nav.accountant'], ['warehouses', 'nav.warehouses'], ['logistics', 'nav.logistics'],
-  ['quality', 'nav.quality'], ['purchase', 'nav.purchase'], ['marketing', 'nav.marketing'], ['hr', 'nav.hr'],
+// Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
+const legacy: Array<[string, string]> = [
+  ['sales', '/m/sales'], ['purchase', '/m/purchasing'], ['accountant', '/m/financials'], ['warehouses', '/m/inventory'],
+  ['hr', '/m/hr'], ['my-hr', '/'], ['field', '/'], ['logistics', '/'], ['quality', '/'], ['marketing', '/'],
 ];
 const backOffice: Array<[string, string]> = [
   ['requests', 'tabs.requests'], ['licences', 'tabs.licences'], ['it', 'tabs.it'], ['sysadmin', 'tabs.sysadmin'],
@@ -23,6 +29,10 @@ const backOffice: Array<[string, string]> = [
 function BackOfficeHome() {
   const { isMigrationAdmin } = useAuth();
   return <Navigate to={isMigrationAdmin ? '/backoffice/migration' : '/backoffice/requests'} replace />;
+}
+function ModuleRoute() {
+  const { key = '' } = useParams();
+  return <ModulePage key={key} moduleKey={key} />;
 }
 
 export default function App() {
@@ -38,8 +48,28 @@ export default function App() {
           </RequireAccess>
         }
       >
-        <Route index element={<PlaceholderPage nameKey="nav.dashboard" />} />
-        {modules.map(([path, key]) => <Route key={path} path={path} element={<PlaceholderPage nameKey={key} />} />)}
+        <Route index element={<HomePage />} />
+        <Route path="m/:key" element={<ModuleRoute />} />
+        <Route path="preview/:key" element={<PreviewPage />} />
+        <Route path="search" element={<SearchPage />} />
+        <Route path="control" element={<ControlTowerPage />} />
+
+        {/* Working screens on live data (Stage 1: read, search, filter, export) */}
+        <Route path="bp" element={<BusinessPartnersPage />} />
+        <Route path="bp/:company/:code" element={<BusinessPartnerDetail />} />
+        <Route path="items" element={<ItemsPage />} />
+        <Route path="items/:company/:code" element={<ItemDetail />} />
+        <Route path="inventory/stock" element={<StockPage />} />
+        <Route path="inventory/prices" element={<PricesPage />} />
+        <Route path="docs/:kind" element={<DocumentsPage />} />
+        <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
+        <Route path="financials/accounts" element={<AccountsPage />} />
+        <Route path="financials/journals" element={<JournalsPage />} />
+        <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
+        <Route path="banking/payments/:dir" element={<PaymentsPage />} />
+        <Route path="hr/employees" element={<EmployeesPage />} />
+
+        {legacy.map(([from, to]) => <Route key={from} path={from} element={<Navigate to={to} replace />} />)}
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="backoffice" element={<BackOfficeHome />} />
         {backOffice.map(([path, key]) => <Route key={path} path={`backoffice/${path}`} element={<PlaceholderPage nameKey={key} />} />)}
@@ -56,4 +86,3 @@ export default function App() {
     </Routes>
   );
 }
-

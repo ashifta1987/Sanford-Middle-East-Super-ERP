@@ -1,0 +1,5 @@
+[
+  { "id": "00000000-0000-4000-8000-000000000001", "email": "qa.admin@sample.test", "password": "local-only-1", "name": "QA Admin (all modules)" },
+  { "id": "00000000-0000-4000-8000-000000000002", "email": "qa.sales@sample.test", "password": "local-only-2", "name": "QA Sales (sales only)" },
+  { "id": "00000000-0000-4000-8000-000000000003", "email": "qa.nobody@sample.test", "password": "local-only-3", "name": "QA No profile" }
+]

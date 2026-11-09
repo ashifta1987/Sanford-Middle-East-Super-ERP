@@ -173,7 +173,7 @@ export function PostingPeriodsPage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [year, setYear] = useState<string>('');
-  const [newYear, setNewYear] = useState(String(new Date().getFullYear() + 1));
+  const [yearInput, setNewYear] = useState<string | null>(null);
   const [lockFor, setLockFor] = useState<Period | null>(null);
   const q = useQuery({
     queryKey: ['periods', company], enabled: Boolean(company),
@@ -187,6 +187,8 @@ export function PostingPeriodsPage() {
   const thisYear = String(new Date().getFullYear());
   const shown = year || (years.includes(thisYear) ? thisYear : years[years.length - 1] ?? '');
   const rows = (q.data ?? []).filter((p) => p.from_date.startsWith(shown));
+  // Suggest the year after the last one in the calendar.
+  const newYear = yearInput ?? String(Number(years[years.length - 1] ?? Number(thisYear) - 1) + 1);
 
   async function setStatus(p: Period, s: PeriodStatus) {
     setErr(null); setFlash(null); setBusy(true);
@@ -244,7 +246,7 @@ export function PostingPeriodsPage() {
                           <div className="flex flex-wrap justify-end gap-1">
                             {p.status !== 'open' && <Button variant="ghost" className="min-h-[40px] px-3 text-sm" disabled={busy} id={`per-open-${p.period_code}`} onClick={() => setStatus(p, 'open')} icon={<LockOpen className="h-4 w-4" aria-hidden />}>{t('fs.per.open')}</Button>}
                             {p.status !== 'closed' && <Button variant="ghost" className="min-h-[40px] px-3 text-sm" disabled={busy} id={`per-close-${p.period_code}`} onClick={() => setStatus(p, 'closed')}>{t('fs.per.close')}</Button>}
-                            {p.status !== 'locked' && <Button variant="ghost" className="min-h-[40px] px-3 text-sm text-crit-fg" disabled={busy} id={`per-lock-${p.period_code}`} onClick={() => setLockFor(p)} icon={<Lock className="h-4 w-4" aria-hidden />}>{t('fs.per.lock')}</Button>}
+                            {p.status !== 'locked' && <Button variant="ghost" className="min-h-[40px] px-3 text-sm" disabled={busy} id={`per-lock-${p.period_code}`} onClick={() => setLockFor(p)} icon={<Lock className="h-4 w-4" aria-hidden />}>{t('fs.per.lock')}</Button>}
                           </div>
                         </td>
                       )}

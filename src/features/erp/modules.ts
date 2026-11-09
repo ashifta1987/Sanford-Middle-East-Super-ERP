@@ -129,7 +129,10 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'A/P Invoice': '/docs/ap_invoice', 'A/P Credit Memo': '/docs/ap_credit_note',
   },
   bp: { 'Business Partner Master Data': '/bp' },
-  banking: { 'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out' },
+  banking: {
+    'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out', Deposits: '/banking/deposits',
+    'Bank Statements and External Reconciliations': '/banking/statements', 'Banking Reports': '/banking/cash-position',
+  },
   inventory: { 'Item Master Data': '/items', 'Price Lists': '/inventory/prices' },
   hr: { 'Employee Master Data': '/hr/employees' },
 };
@@ -150,12 +153,20 @@ const LIVE_ITEMS: Record<string, string> = {
   'New journal entry': '/financials/journals/new', 'Recent entries': '/financials/journals',
   'G/L Account Determination': '/financials/gl-determination', 'G/L Account Determination ›': '/financials/gl-determination',
   'Posting Periods': '/financials/periods',
+  // A5 · banking
+  'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out', 'Check Register': '/banking/deposits/new',
+  Deposit: '/banking/deposits/new', 'Postdated Check Deposit': '/banking/deposits/new',
+  'Import bank statement': '/banking/statements', 'Auto-match': '/banking/statements', 'Manual reconciliation': '/banking/statements',
+  'Manage previous reconciliations': '/banking/statements', 'Payment Drafts Report': '/banking/payment-drafts',
+  'BP Bank Accounts Query': '/banking/bp-bank-accounts', 'House Bank Accounts Query': '/banking/cash-position', 'Bank balances': '/banking/cash-position',
+  'House Bank Accounts': '/banking/setup', 'Banking ›': '/banking/setup',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
 const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   sales: { 'Sales Quotation': '/docs/sales_quotation/new', 'Sales Order': '/docs/sales_order/new', 'A/R Invoice': '/docs/ar_invoice/new' },
   financials: { 'Journal Entry': '/financials/journals/new' },
+  banking: { 'Incoming Payments': '/banking/payments/in/new', 'Outgoing Payments': '/banking/payments/out/new', Deposits: '/banking/deposits/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

@@ -12,6 +12,7 @@ import type { Row } from '../api';
 import { NewSalesOrderAction, StatePill } from './SalesOrderPages';
 import { NewCycleAction } from './SalesCyclePages';
 import { DraftsLink, NewJournalAction } from './JournalPages';
+import { DraftsLink as PaymentDraftsLink, NewPaymentAction, PaymentsList } from './BankingPages';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -275,33 +276,15 @@ export function JournalsPage() {
   );
 }
 
-// ---------- Incoming / outgoing payments ----------
+// ---------- Incoming / outgoing payments (A5: Super ERP payments, new payment, drafts) ----------
 export function PaymentsPage() {
   const { t } = useTranslation();
   const { dir = 'in' } = useParams();
   const incoming = dir !== 'out';
-  const cfg = useMemo<ListConfig<R>>(() => ({
-    id: `payment-${dir}`, table: 'payment',
-    select: 'company_code,direction,doc_entry,doc_num,doc_date,card_code,card_name,currency,total,cash,transfer,cheque,card,cancelled',
-    searchCols: ['card_code', 'card_name', 'memo'], numberSearchCols: ['doc_num'], searchLabel: t('erp.search.payment'),
-    fixed: { direction: incoming ? 'I' : 'O' },
-    filters: [{ key: 'cancelled', label: t('erp.col.status'), options: [['false', t('erp.status.posted')], ['true', t('erp.status.cancelled')]], type: 'boolean' }],
-    defaultSort: { col: 'doc_date', asc: false },
-    rowKey: (r) => `${r.company_code}|${r.direction}|${r.doc_entry}`,
-    columns: [
-      { key: 'doc_num', header: t('erp.col.docNo'), mono: true },
-      { key: 'doc_date', header: t('erp.col.date'), cell: (r) => fmtDay(r.doc_date), csv: (r) => r.doc_date },
-      { key: 'card_name', header: incoming ? t('erp.col.customer') : t('erp.col.supplier'),
-        cell: (r) => <span><span className="font-mono text-[13px] text-muted">{r.card_code}</span> {r.card_name}</span> },
-      { key: 'means', header: t('erp.col.means'), sortable: false, hideBelow: 'md',
-        cell: (r) => (['cash', 'transfer', 'cheque', 'card'] as const).filter((k) => Number(r[k]) > 0).map((k) => t(`erp.means.${k}`)).join(', ') || '—' },
-      { key: 'cancelled', header: t('erp.col.status'), cell: (r) => <StatusTag value={r.cancelled ? 'cancelled' : 'posted'} />, csv: (r) => (r.cancelled ? 'cancelled' : 'posted') },
-      { key: 'total', header: t('erp.col.amount'), align: 'end', cell: (r) => fmtMoney(r.total, r.currency) },
-    ],
-  }), [t, dir, incoming]);
   return (
-    <Frame module="banking" title={incoming ? t('erp.page.paymentsIn') : t('erp.page.paymentsOut')} desc={t('erp.page.paymentsDesc')}>
-      <ListScreen key={dir} config={cfg} />
+    <Frame module="banking" title={incoming ? t('erp.page.paymentsIn') : t('erp.page.paymentsOut')} desc={t('erp.page.paymentsDesc')}
+      actions={<>{!incoming && <PaymentDraftsLink />}<NewPaymentAction dir={incoming ? 'I' : 'O'} /></>}>
+      <PaymentsList dir={incoming ? 'I' : 'O'} />
     </Frame>
   );
 }

@@ -22,6 +22,10 @@ import {
 } from '@/features/erp/pages/SalesCyclePages';
 import { JournalDraftPage, JournalDraftsPage, JournalNewPage } from '@/features/erp/pages/JournalPages';
 import { GlDeterminationPage, PostingPeriodsPage } from '@/features/erp/pages/FinanceSetupPages';
+import { PaymentDetailPage, PaymentDraftPage, PaymentDraftsPage, PaymentNewPage } from '@/features/erp/pages/BankingPages';
+import {
+  BankingSetupPage, BpBankAccountsPage, CashPositionPage, DepositNewPage, DepositsPage, StatementPage, StatementsPage,
+} from '@/features/erp/pages/BankingMorePages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -97,6 +101,18 @@ export default function App() {
         <Route path="financials/periods" element={<PostingPeriodsPage />} />
         <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
         <Route path="banking/payments/:dir" element={<PaymentsPage />} />
+        {/* A5 · banking: payments with approval, deposits, bank statements, cash position, bank details, setup */}
+        <Route path="banking/payments/:dir/new" element={<PaymentNewPage />} />
+        <Route path="banking/payments/:dir/:company/:entry" element={<PaymentDetailPage />} />
+        <Route path="banking/payment-drafts" element={<PaymentDraftsPage />} />
+        <Route path="banking/payment-drafts/:company/:id" element={<PaymentDraftPage />} />
+        <Route path="banking/deposits" element={<DepositsPage />} />
+        <Route path="banking/deposits/new" element={<DepositNewPage />} />
+        <Route path="banking/statements" element={<StatementsPage />} />
+        <Route path="banking/statements/:company/:id" element={<StatementPage />} />
+        <Route path="banking/cash-position" element={<CashPositionPage />} />
+        <Route path="banking/bp-bank-accounts" element={<BpBankAccountsPage />} />
+        <Route path="banking/setup" element={<BankingSetupPage />} />
         <Route path="hr/employees" element={<EmployeesPage />} />
 
         {legacy.map(([from, to]) => <Route key={from} path={from} element={<Navigate to={to} replace />} />)}

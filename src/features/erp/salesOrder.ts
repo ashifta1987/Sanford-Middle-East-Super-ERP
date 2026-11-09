@@ -10,7 +10,7 @@ import { rpc } from './api';
 export type SalesKind = 'sales_order' | 'sales_quotation';
 export const SALES_OBJ: Record<SalesKind, number> = { sales_order: 17, sales_quotation: 23 };
 export type WorkflowState = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
-export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount';
+export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount' | 'payment_amount' | 'bank_change';
 
 export interface Code<T = string> { code: T; name: string }
 export interface SoSetup {
@@ -56,7 +56,7 @@ export interface SoInfo {
   obj_type?: number; status?: string; can_copy?: boolean; copy_block?: 'not_approved' | 'closed' | 'read_only' | null;
 }
 export interface InboxRow {
-  approval_id: number; company_code: string; kind: 'sales_order' | 'sales_quotation' | 'journal'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
+  approval_id: number; company_code: string; kind: 'sales_order' | 'sales_quotation' | 'journal' | 'payment'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
   card_code: string | null; card_name: string | null; total: number; currency: string; requested_by_name: string | null; requested_at: string;
   reason: string | null; decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null;
   state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;

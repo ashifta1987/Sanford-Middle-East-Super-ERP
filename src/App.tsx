@@ -26,6 +26,10 @@ import { PaymentDetailPage, PaymentDraftPage, PaymentDraftsPage, PaymentNewPage 
 import {
   BankingSetupPage, BpBankAccountsPage, CashPositionPage, DepositNewPage, DepositsPage, StatementPage, StatementsPage,
 } from '@/features/erp/pages/BankingMorePages';
+import {
+  ApInvoiceNewPage, GrpoNewPage, LandedCostNewPage, LandedCostPage, LandedCostsPage, PurchaseDocEditPage, PurchaseDocNewPage, PurchaseDocPage,
+  PurchaseViewPage, PurchasingSetupPage, QuotationComparePage,
+} from '@/features/erp/pages/PurchasingPages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -89,6 +93,22 @@ export default function App() {
         <Route path="docs/ar_credit_note/:company/:entry" element={<SalesDocPage key="ar_credit_note" kind="ar_credit_note" />} />
         <Route path="sales/atp" element={<AtpCheckPage />} />
         <Route path="sales/atp-rules" element={<AtpRulesPage />} />
+        {/* A6 · purchasing, China flow */}
+        {(['purchase_request', 'purchase_quotation', 'purchase_order'] as const).map((k) => [
+          <Route key={`${k}-new`} path={`docs/${k}/new`} element={<PurchaseDocNewPage key={`${k}-new`} kind={k} />} />,
+          <Route key={`${k}-view`} path={`docs/${k}/:company/:entry`} element={<PurchaseDocPage key={k} kind={k} />} />,
+          <Route key={`${k}-edit`} path={`docs/${k}/:company/:entry/edit`} element={<PurchaseDocEditPage key={`${k}-edit`} kind={k} />} />,
+        ])}
+        {(['goods_receipt_po', 'ap_down_payment', 'ap_invoice'] as const).map((k) => (
+          <Route key={`${k}-view`} path={`docs/${k}/:company/:entry`} element={<PurchaseViewPage key={k} kind={k} />} />
+        ))}
+        <Route path="purchasing/compare/:company/:request" element={<QuotationComparePage />} />
+        <Route path="purchasing/grpo/new" element={<GrpoNewPage />} />
+        <Route path="purchasing/ap-invoice/new" element={<ApInvoiceNewPage />} />
+        <Route path="purchasing/landed-costs" element={<LandedCostsPage />} />
+        <Route path="purchasing/landed-costs/new" element={<LandedCostNewPage />} />
+        <Route path="purchasing/landed-costs/:company/:entry" element={<LandedCostPage />} />
+        <Route path="purchasing/setup" element={<PurchasingSetupPage />} />
         <Route path="docs/:kind" element={<DocumentsPage />} />
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
@@ -187,13 +187,19 @@ function PaymentForm({ dir }: { dir: Dir }) {
   const { profile } = useAuth();
   const { canWrite, readOnlyReason } = useModuleLevel('banking');
   const companies = profile?.companies ?? [];
-  const [company, setCompany] = useState(useDefaultCompany());
+  // A6: Purchasing links here with ?company=&card=&apply=<obj>:<entry>:<amount> to pay a deposit or an A/P invoice.
+  const [params] = useSearchParams();
+  const defCompany = useDefaultCompany();
+  const pre = (params.get('apply') ?? '').split(':');
+  const preCard = params.get('card') ?? '';
+  const preAmt = pre.length === 3 && Number(pre[2]) > 0 ? String(Number(pre[2])) : '';
+  const [company, setCompany] = useState(params.get('company') || defCompany);
   const setup = usePaySetup(company || null, dir);
   const incoming = dir === 'I';
-  const [bpText, setBpText] = useState('');
-  const [h, setHdr] = useState<Omit<PayHeaderInput, 'cheques'>>({ card_code: '', doc_date: todayIso(), memo: '', cash: '', transfer: '', transfer_bank: '', transfer_ref: '', cheque_bank: '', card: '', card_ref: '' });
+  const [bpText, setBpText] = useState(preCard);
+  const [h, setHdr] = useState<Omit<PayHeaderInput, 'cheques'>>({ card_code: preCard, doc_date: todayIso(), memo: '', cash: '', transfer: preAmt, transfer_bank: '', transfer_ref: '', cheque_bank: '', card: '', card_ref: '' });
   const [cheques, setCheques] = useState<FormCheque[]>([]);
-  const [apply, setApply] = useState<Record<string, string>>({});
+  const [apply, setApply] = useState<Record<string, string>>(preAmt ? { [`${pre[0]}:${pre[1]}`]: preAmt } : {});
   const [reason, setReason] = useState('');
   const [reasonErr, setReasonErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<PayEval | null>(null);

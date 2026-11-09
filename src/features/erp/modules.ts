@@ -127,6 +127,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Purchase Request': '/docs/purchase_request', 'Purchase Quotation': '/docs/purchase_quotation', 'Purchase Order': '/docs/purchase_order',
     'Goods Receipt PO': '/docs/goods_receipt_po', 'Goods Return': '/docs/goods_return', 'A/P Down Payment Invoice': '/docs/ap_down_payment',
     'A/P Invoice': '/docs/ap_invoice', 'A/P Credit Memo': '/docs/ap_credit_note',
+    // A6 · China flow
+    'Landed Costs': '/purchasing/landed-costs', 'PI Tracking Entry': '/docs/purchase_order?f_status=open',
   },
   bp: { 'Business Partner Master Data': '/bp' },
   banking: {
@@ -160,6 +162,16 @@ const LIVE_ITEMS: Record<string, string> = {
   'Manage previous reconciliations': '/banking/statements', 'Payment Drafts Report': '/banking/payment-drafts',
   'BP Bank Accounts Query': '/banking/bp-bank-accounts', 'House Bank Accounts Query': '/banking/cash-position', 'Bank balances': '/banking/cash-position',
   'House Bank Accounts': '/banking/setup', 'Banking ›': '/banking/setup',
+  // A6 · purchasing, China flow
+  'Requests waiting': '/docs/purchase_request?f_status=open', Convert: '/docs/purchase_request?f_status=open',
+  'New quotation request': '/docs/purchase_quotation/new', 'Compare quotes': '/docs/purchase_request?f_status=open',
+  'Purchase Quotation Comparison Report': '/docs/purchase_request?f_status=open', 'Copy to purchase order': '/docs/purchase_quotation?f_status=open',
+  'New purchase order': '/docs/purchase_order/new', 'Waiting approval': '/docs/purchase_order?f_state=pending_approval', 'Open POs': '/docs/purchase_order?f_status=open',
+  'Copy to goods receipt': '/docs/purchase_order?f_status=open', 'Receive against PO': '/docs/purchase_order?f_status=open',
+  'Record deposit invoice': '/docs/purchase_order?f_status=open', 'Open deposits': '/docs/ap_down_payment?f_status=open',
+  'New A/P invoice': '/docs/goods_receipt_po?f_status=open', 'New landed cost': '/purchasing/landed-costs/new', 'Cost lines': '/purchasing/landed-costs',
+  'Allocation method': '/purchasing/setup', 'Update item costs': '/purchasing/landed-costs', 'Purchasing ›': '/purchasing/setup',
+  'New PI entry': '/docs/purchase_order?f_status=open', 'Deposit status': '/docs/ap_down_payment',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -167,6 +179,10 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   sales: { 'Sales Quotation': '/docs/sales_quotation/new', 'Sales Order': '/docs/sales_order/new', 'A/R Invoice': '/docs/ar_invoice/new' },
   financials: { 'Journal Entry': '/financials/journals/new' },
   banking: { 'Incoming Payments': '/banking/payments/in/new', 'Outgoing Payments': '/banking/payments/out/new', Deposits: '/banking/deposits/new' },
+  purchasing: {
+    'Purchase Request': '/docs/purchase_request/new', 'Purchase Quotation': '/docs/purchase_quotation/new', 'Purchase Order': '/docs/purchase_order/new',
+    'Landed Costs': '/purchasing/landed-costs/new',
+  },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

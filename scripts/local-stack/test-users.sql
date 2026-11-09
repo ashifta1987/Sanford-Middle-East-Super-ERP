@@ -42,3 +42,13 @@ INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_c
 ON CONFLICT (user_id) DO NOTHING;
 INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000007', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A3 · finance manager (approver for manual journals above the ZZ99 sample limit; see 18_posting.sql sample rule).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_FIN_MGR', 'QA · finance manager', '{finance}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000008', 'ZZ99', 'QA Finance Manager', 'qa.finmgr@sample.test', 'QA_FIN_MGR', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000008', 'ZZ99')
+ON CONFLICT DO NOTHING;

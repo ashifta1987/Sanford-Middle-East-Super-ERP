@@ -257,9 +257,10 @@ ok('flow strip: every step done, PO current', states.join(',') === 'request:done
 await pa.screenshot({ path: `${OUT}/a6-po-done-en-light-1440.png`, fullPage: true });
 await pa.goto(`${BASE}/docs/purchase_order?f_china_office=SZ`); await settle(pa);
 await pa.locator('table').first().waitFor({ timeout: 10000 }).catch(() => {});
+await pa.locator(`text=${poNo}`).first().waitFor({ timeout: 10000 }).catch(() => {});
 const officeSel = await pa.locator('select').evaluateAll((els) => els.map((e) => e.value));
-ok('China office filter on the PO list', (await pa.locator(`text=${poNo}`).count()) > 0 && officeSel.includes('SZ')
-  && (await pa.locator('tbody tr').count()) === Number((await one(`SELECT count(*)::int n FROM erp.doc_workflow WHERE company_code = 'ZZ99' AND obj_type = 22 AND china_office = 'SZ'`)).n));
+const rowTexts = await pa.locator('tbody tr').allInnerTexts();
+ok('China office filter on the PO list', rowTexts.some((r) => r.includes(poNo)) && officeSel.includes('SZ') && rowTexts.every((r) => /\bSZ\b/.test(r)), `${rowTexts.length} rows`);
 await pa.goto(`${BASE}/purchasing/setup`); await settle(pa);
 ok('Purchasing Setup lists the landed cost codes', (await pa.locator('text=Sea freight').count()) > 0);
 await pa.goto(`${BASE}/m/purchasing?fn=17`); await settle(pa);

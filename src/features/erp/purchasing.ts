@@ -255,3 +255,4 @@ export async function grpoLines(company: string, entry: number) {
   if (error) throw new ApiError(error);
   return (data ?? []) as unknown as Array<{ line_num: number; item_code: string; description: string | null; quantity: number; price: number; line_total: number; whs_code: string; cbm: number | null }>;
 }
+

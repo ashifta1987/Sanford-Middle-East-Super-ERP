@@ -390,6 +390,8 @@ BEGIN
   PERFORM pg_temp.check(r::text = '0', 'sales-only user reads no purchasing rows (RLS)', r::text);
   r := pg_temp.call(staff, format($q$SELECT to_jsonb(count(*)) FROM erp.purchase_doc_list WHERE source = 'erp' AND doc_entry >= %s$q$, req));
   PERFORM pg_temp.check((r::text)::integer = 9, 'read-only staff lists the 9 Super ERP purchasing documents', r::text);
+  r := pg_temp.call(purch, format($q$SELECT to_jsonb(count(*)) FROM erp.purchase_doc_list WHERE doc_entry >= %s AND china_office = 'SZ' AND doc_no LIKE 'P%%'$q$, req));
+  PERFORM pg_temp.check((r::text)::integer = 2, 'purchasing user reads the Super ERP number and China office (doc_workflow policy)', r::text);
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM erp.journal_entry j WHERE j.company_code = 'ZZ99' AND j.trans_type IN (20, 204, 18, 69) AND j.source = 'erp'
                                       AND NOT pg_temp.balanced(j.trans_id)), 'every purchasing journal balances');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM erp.audit_log WHERE action LIKE 'grpo%' AND detail IS NULL)

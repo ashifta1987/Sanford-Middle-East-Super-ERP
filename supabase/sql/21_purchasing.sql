@@ -273,6 +273,13 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Purchasing users read the workflow rows (number, state, China office) of purchasing documents. 17's policy covers Sales and
+-- Financials only; permissive policies add up.
+DROP POLICY IF EXISTS doc_workflow_read_purchase ON erp.doc_workflow;
+CREATE POLICY doc_workflow_read_purchase ON erp.doc_workflow FOR SELECT TO authenticated
+  USING (erp.can_see(company_code) AND obj_type IN (1470000113, 540000006, 22, 20, 21, 204, 18, 19)
+         AND ((SELECT erp.can_read('purchase')) OR (SELECT erp.can_read('finance'))));
+
 -- QC photos: bucket qc, object names <company>/<po doc_entry>/<file>.
 INSERT INTO storage.buckets (id, name, public, file_size_limit)
 VALUES ('qc', 'qc', false, 10485760)

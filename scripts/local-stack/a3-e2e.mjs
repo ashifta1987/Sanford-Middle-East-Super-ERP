@@ -213,7 +213,7 @@ await pa.locator('[data-period="2026-12"] .pill', { hasText: 'Open' }).waitFor({
 
 // ---------- 6. G/L Account Determination ----------
 await pa.goto(`${BASE}/financials/gl-determination`); await settle(pa);
-ok('G/L screen: 22 posting keys in 5 areas', (await pa.locator('[data-testid=gl-row]').count()) === 22);
+ok('G/L screen: 23 posting keys in 5 areas (22 + A6 goods received not invoiced)', (await pa.locator('[data-testid=gl-row]').count()) === 23);
 ok('G/L screen: Revenue → 4100 for ZZ99', (await pa.locator('[data-testid=gl-row][data-key=revenue]').innerText()).includes('4100'));
 ok('G/L screen: Rounding not set (warning)', (await pa.locator('[data-testid=gl-row][data-key=rounding] .pill', { hasText: 'Not set' }).count()) === 1);
 await pa.click('#gl-edit-rounding');
@@ -248,7 +248,7 @@ await A.close();
   await page.goto(`${BASE}/financials/periods`); await settle(page);
   ok('owner: periods visible, no change buttons', (await page.locator('[data-testid=per-row]').count()) > 0 && (await page.locator('[id^=per-close-]').count()) === 0);
   await page.goto(`${BASE}/financials/gl-determination`); await settle(page);
-  ok('owner: G/L visible, no change buttons', (await page.locator('[data-testid=gl-row]').count()) === 22 && (await page.locator('[id^=gl-edit-]').count()) === 0);
+  ok('owner: G/L visible, no change buttons', (await page.locator('[data-testid=gl-row]').count()) === 23 && (await page.locator('[id^=gl-edit-]').count()) === 0);
   await ctx.close();
 }
 {

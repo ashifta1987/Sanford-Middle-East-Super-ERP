@@ -30,6 +30,9 @@ import {
   ApInvoiceNewPage, GrpoNewPage, LandedCostNewPage, LandedCostPage, LandedCostsPage, PurchaseDocEditPage, PurchaseDocNewPage, PurchaseDocPage,
   PurchaseViewPage, PurchasingSetupPage, QuotationComparePage,
 } from '@/features/erp/pages/PurchasingPages';
+import {
+  CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage,
+} from '@/features/erp/pages/InventoryPages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -109,6 +112,21 @@ export default function App() {
         <Route path="purchasing/landed-costs/new" element={<LandedCostNewPage />} />
         <Route path="purchasing/landed-costs/:company/:entry" element={<LandedCostPage />} />
         <Route path="purchasing/setup" element={<PurchasingSetupPage />} />
+        {/* A7 · inventory transactions, counting, batches / serials, bins */}
+        {(['goods_receipt', 'goods_issue', 'transfer_request', 'inventory_transfer'] as const).map((k) => (
+          <Route key={`${k}-inv`} path={`docs/${k}/:company/:entry`} element={<InvDocPage key={k} kind={k} />} />
+        ))}
+        <Route path="inventory/goods-receipt/new" element={<StockDocNewPage key="gr" kind="goods_receipt" />} />
+        <Route path="inventory/goods-issue/new" element={<StockDocNewPage key="gi" kind="goods_issue" />} />
+        <Route path="inventory/transfer-request/new" element={<TransferNewPage key="trq" kind="transfer_request" />} />
+        <Route path="inventory/transfer/new" element={<TransferNewPage key="tr" kind="inventory_transfer" />} />
+        <Route path="inventory/counts" element={<CountsPage />} />
+        <Route path="inventory/counts/new" element={<CountNewPage />} />
+        <Route path="inventory/counts/:company/:id" element={<CountPage />} />
+        <Route path="inventory/batches" element={<LotsPage key="B" kind="B" />} />
+        <Route path="inventory/serials" element={<LotsPage key="S" kind="S" />} />
+        <Route path="inventory/lots/:company/:id" element={<LotPage />} />
+        <Route path="inventory/setup" element={<InventorySetupPage />} />
         <Route path="docs/:kind" element={<DocumentsPage />} />
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />

@@ -135,7 +135,11 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out', Deposits: '/banking/deposits',
     'Bank Statements and External Reconciliations': '/banking/statements', 'Banking Reports': '/banking/cash-position',
   },
-  inventory: { 'Item Master Data': '/items', 'Price Lists': '/inventory/prices' },
+  inventory: {
+    'Item Master Data': '/items', 'Price Lists': '/inventory/prices',
+    // A7 · inventory transactions
+    'Bin Locations': '/inventory/setup', 'Inventory Transactions': '/docs/inventory_transfer',
+  },
   hr: { 'Employee Master Data': '/hr/employees' },
 };
 /** sub-function (item) name → working screen, wherever it appears */
@@ -172,6 +176,10 @@ const LIVE_ITEMS: Record<string, string> = {
   'New A/P invoice': '/docs/goods_receipt_po?f_status=open', 'New landed cost': '/purchasing/landed-costs/new', 'Cost lines': '/purchasing/landed-costs',
   'Allocation method': '/purchasing/setup', 'Update item costs': '/purchasing/landed-costs', 'Purchasing ›': '/purchasing/setup',
   'New PI entry': '/docs/purchase_order?f_status=open', 'Deposit status': '/docs/ap_down_payment',
+  // A7 · inventory: counting, batches / serials, bins, item history
+  'Inventory Counting Transactions ›': '/inventory/counts', 'Item Serial Numbers ›': '/inventory/serials', 'Batches ›': '/inventory/batches',
+  'Batches and serials': '/inventory/serials', 'Bin Location Master Data': '/inventory/setup', 'Bin Location Management': '/inventory/setup',
+  'Item history': '/items', 'Inventory ›': '/inventory/setup', 'Bin Locations': '/inventory/setup',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -183,6 +191,7 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Purchase Request': '/docs/purchase_request/new', 'Purchase Quotation': '/docs/purchase_quotation/new', 'Purchase Order': '/docs/purchase_order/new',
     'Landed Costs': '/purchasing/landed-costs/new',
   },
+  inventory: { 'Inventory Transactions': '/inventory/transfer/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

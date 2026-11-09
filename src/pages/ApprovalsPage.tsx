@@ -15,6 +15,8 @@ import { JeStatePill } from '@/features/erp/pages/JournalPages';
 import { DraftStatePill } from '@/features/erp/pages/BankingPages';
 import type { DraftState } from '@/features/erp/banking';
 import type { RunStatus } from '@/lib/database.types';
+import { CountStatePill } from '@/features/erp/pages/InventoryPages';
+import type { CountState } from '@/features/erp/inventory';
 
 interface MigrationRow {
   run_id: string; company_code: string; company_name: string; kind: string; status: RunStatus; finished_at: string | null;
@@ -102,6 +104,11 @@ function DocumentApprovals() {
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/banking/payment-drafts/${r.company_code}/${r.doc_entry}`}>{t('bk.draftN', { n: r.doc_no })}</Link>
                           <div dir="auto" className="text-xs text-muted">{t('inbox.kind.payment')} · {r.card_code} {r.card_name}</div>
                         </>
+                      ) : r.kind === 'inventory_count' ? (
+                        <>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/inventory/counts/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t('inbox.kind.inventory_count')} · {r.card_code} {r.card_name}</div>
+                        </>
                       ) : r.kind === 'journal' ? (
                         <>
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/financials/journals/drafts/${r.company_code}/${r.doc_entry}`}>{t('je.titleDraft', { n: r.doc_no })}</Link>
@@ -128,6 +135,7 @@ function DocumentApprovals() {
                       {view === 'waiting' ? <span className="num text-ink-2">{waited(r.requested_at)}</span>
                         : r.superseded && !r.decision ? <span className="pill pill-neutral">{t('inbox.closed')}</span>
                         : r.kind === 'payment' ? <DraftStatePill state={r.state as DraftState} />
+                        : r.kind === 'inventory_count' ? <CountStatePill state={r.state as CountState} />
                         : r.kind === 'journal' ? <JeStatePill state={r.state === 'approved' ? 'posted' : r.state} /> : <StatePill state={r.state as WorkflowState} />}
                     </td>
                   </tr>

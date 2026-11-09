@@ -14,6 +14,8 @@ import { NewCycleAction } from './SalesCyclePages';
 import { DraftsLink, NewJournalAction } from './JournalPages';
 import { DraftsLink as PaymentDraftsLink, NewPaymentAction, PaymentsList } from './BankingPages';
 import { NewPurchaseAction, isPurchaseKind } from './PurchasingPages';
+import { NewInventoryAction } from './InventoryPages';
+import { isInvKind } from '../inventory';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -131,12 +133,14 @@ export function DocumentsPage() {
   const cycle = ['sales_quotation', 'delivery', 'ar_invoice', 'ar_credit_note'].includes(kind);
   // A6: purchasing kinds read purchase_doc_list (Super ERP number, state and China office).
   const pu = isPurchaseKind(kind);
-  const so = kind === 'sales_order' || cycle || pu;
+  // A7: inventory kinds read inventory_doc_list (Super ERP number and state, from / to warehouse).
+  const inv = isInvKind(kind);
+  const so = kind === 'sales_order' || cycle || pu || inv;
   const cfg = useMemo<ListConfig<R> | null>(() => def ? ({
     id: `document-${kind}`,
-    table: kind === 'sales_order' ? 'sales_order_list' : cycle ? 'sales_doc_list' : pu ? 'purchase_doc_list' : 'document',
+    table: kind === 'sales_order' ? 'sales_order_list' : cycle ? 'sales_doc_list' : pu ? 'purchase_doc_list' : inv ? 'inventory_doc_list' : 'document',
     select: so
-      ? `company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source${cycle || pu ? ',paid' : ''}${pu ? ',china_office' : ''}`
+      ? `company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source${cycle || pu ? ',paid' : ''}${pu ? ',china_office' : ''}${inv ? ',from_whs,to_whs' : ''}`
       : 'company_code,obj_type,doc_entry,doc_num,doc_kind,status,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,paid,from_whs,to_whs',
     searchCols: so ? ['card_code', 'card_name', 'customer_ref', 'comments', 'doc_no'] : ['card_code', 'card_name', 'customer_ref', 'comments'],
     numberSearchCols: ['doc_num'], searchLabel: t('erp.search.doc'),
@@ -148,7 +152,7 @@ export function DocumentsPage() {
       ...(so ? [
         { key: 'source', label: t('so.filter.source'), options: [['sap', 'SAP'], ['erp', 'Super ERP'], ['sample', t('erp.sampleData')]] as Array<[string, string]> },
       ] : []),
-      ...(kind === 'sales_order' || kind === 'sales_quotation' || kind === 'purchase_order' ? [
+      ...(kind === 'sales_order' || kind === 'sales_quotation' || kind === 'purchase_order' || kind === 'goods_receipt' || kind === 'goods_issue' ? [
         { key: 'state', label: t('so.filter.approval'), options: [['pending_approval', t('so.state.pending_approval')], ['rejected', t('so.state.rejected')], ['draft', t('so.state.draft')]] as Array<[string, string]> },
       ] : []),
       ...(pu ? [{ key: 'china_office', label: t('pu.office'), from: { table: 'china_office', value: 'code', label: 'name' } }] : []),
@@ -173,12 +177,12 @@ export function DocumentsPage() {
       ...(kind.endsWith('invoice') ? [{ key: 'paid', header: t('erp.col.openAmount'), align: 'end' as const, sortable: false,
         cell: (r: R) => fmtMoney(Number(r.total) - Number(r.paid ?? 0)), csv: (r: R) => Number(r.total) - Number(r.paid ?? 0) }] : []),
     ],
-  }) : null, [t, kind, def, so, cycle, pu]);
+  }) : null, [t, kind, def, so, cycle, pu, inv]);
   if (!def || !cfg) return <PageTitle title={t('erp.notFound')} />;
   const title = t(`erp.doc.${kind}`, { defaultValue: def.title });
   return (
     <Frame module={def.module as ModuleKey} title={title} desc={t('erp.page.docsDesc')}
-      actions={kind === 'sales_order' ? <NewSalesOrderAction /> : cycle ? <NewCycleAction kind={kind as DocKind} /> : pu ? <NewPurchaseAction kind={kind as DocKind} /> : undefined}>
+      actions={kind === 'sales_order' ? <NewSalesOrderAction /> : cycle ? <NewCycleAction kind={kind as DocKind} /> : pu ? <NewPurchaseAction kind={kind as DocKind} /> : inv ? <NewInventoryAction kind={kind as DocKind} /> : undefined}>
       <ListScreen key={kind} config={cfg} />
     </Frame>
   );

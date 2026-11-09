@@ -9,6 +9,7 @@ import { RequireModule } from '../components/Guard';
 import { DOC_KINDS, docKindByObj, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import { useJournalInfo } from '../journal';
 import { ReverseAction } from './JournalPages';
+import { ItemHistoryCard } from './InventoryPages';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -155,6 +156,8 @@ export function ItemDetail() {
               </Table>
             </SectionCard>
           </div>
+          {/* A7 · Item history: every receipt, sale, transfer and count */}
+          <ItemHistoryCard company={company} item={code} />
         </div>
       )}
     </Shell>

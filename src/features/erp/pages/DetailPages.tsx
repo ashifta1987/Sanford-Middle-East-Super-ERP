@@ -1,5 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { erp } from '@/lib/supabase';
 import { ApiError } from '@/lib/format';
@@ -7,6 +7,8 @@ import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Fields, LiveBadge, PageTitle, SectionCard, StatusTag, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
 import { RequireModule } from '../components/Guard';
 import { DOC_KINDS, docKindByObj, moduleByKey, type DocKind, type ModuleKey } from '../modules';
+import { useJournalInfo } from '../journal';
+import { ReverseAction } from './JournalPages';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -23,8 +25,9 @@ async function single(table: string, select: string, match: Record<string, strin
   return data as unknown as R | null;
 }
 
-function Shell({ module, parent, title, live = true, children, q }: {
+function Shell({ module, parent, title, live = true, children, q, actions }: {
   module: ModuleKey; parent: [string, string]; title: string; live?: boolean; children: React.ReactNode; q: { isLoading: boolean; error: unknown; data: unknown; refetch: () => unknown };
+  actions?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const m = moduleByKey(module)!;
@@ -35,7 +38,7 @@ function Shell({ module, parent, title, live = true, children, q }: {
   return (
     <RequireModule module={module}>
       <PageTitle crumbs={[[t('nav.home'), '/'], [`${m.num} ${m.title}`, `/m/${m.key}`], parent, [title, undefined]]}
-        title={<span className="inline-flex flex-wrap items-center gap-3">{title} <LiveBadge live={live} /></span>} />
+        title={<span className="inline-flex flex-wrap items-center gap-3">{title} <LiveBadge live={live} /></span>} actions={q.data ? actions : undefined} />
       {body}
     </RequireModule>
   );
@@ -221,6 +224,12 @@ export function DocumentDetail() {
 export function JournalDetail() {
   const { t } = useTranslation();
   const { company = '', id = '' } = useParams();
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const loc = useLocation();
+  const flash = (loc.state as { flash?: string } | null)?.flash ?? null;
+  const info = useJournalInfo(company, Number(id));
+  const I = info.data;
   const q = useQuery({
     queryKey: ['je', company, id],
     queryFn: async () => {
@@ -238,12 +247,22 @@ export function JournalDetail() {
   const dr = q.data?.lines.reduce((s, l) => s + Number(l.debit ?? 0), 0) ?? 0;
   const cr = q.data?.lines.reduce((s, l) => s + Number(l.credit ?? 0), 0) ?? 0;
   return (
-    <Shell module="financials" parent={[t('erp.page.journals'), '/financials/journals']} title={je ? `${t('erp.col.number')} ${je.number}` : id} q={q}>
+    <Shell module="financials" parent={[t('erp.page.journals'), '/financials/journals']} title={je ? `${t('erp.col.number')} ${je.number}` : id} q={q}
+      actions={je && <ReverseAction company={company} je={je} info={I} onDone={(n) => {
+        qc.invalidateQueries({ queryKey: ['je-info', company] });
+        qc.invalidateQueries({ queryKey: ['erp-list'] });
+        nav(`/financials/journals/${company}/${n}`, { state: { flash: t('je.flash.reversed', { n }) } });
+      }} />}>
       {je && (
         <div className="space-y-5">
+          {flash && <p role="status" className="flex items-center gap-2 rounded-btn border border-ok-fg/30 bg-ok-bg px-4 py-3 text-sm font-medium text-ok-fg">{flash}</p>}
           <SectionCard title={t('erp.section.header')}>
             <Fields items={[[t('erp.col.postingDate'), fmtDay(je.ref_date)], [t('erp.col.remarks'), je.memo], [t('erp.col.ref'), [je.ref1, je.ref2].filter(Boolean).join(' / ')],
-              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Super ERP']]} />
+              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              ...(I?.reversal_of ? [[t('je.reversalOf'), <Link key="ro" className="text-primary hover:underline" to={`/financials/journals/${company}/${I.reversal_of}`}>{I.reversal_of}</Link>] as [string, React.ReactNode]] : []),
+              ...(I?.reversed_by ? [[t('je.reversedBy'), <Link key="rb" id="je-reversed-by" className="text-primary hover:underline" to={`/financials/journals/${company}/${I.reversed_by}`}>{I.reversed_by}</Link>] as [string, React.ReactNode]] : []),
+              ...(I?.draft_id ? [[t('je.fromDraft'), <Link key="dr" className="text-primary hover:underline" to={`/financials/journals/drafts/${company}/${I.draft_id}`}>{t('je.titleDraft', { n: I.draft_id })}</Link>] as [string, React.ReactNode]] : []),
+            ]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')} right={<span className={`pill ${Math.abs(dr - cr) < 0.005 ? 'pill-ok' : 'pill-crit'}`}>{Math.abs(dr - cr) < 0.005 ? t('erp.balanced') : t('erp.unbalanced')}</span>}>
             <Table empty={!q.data!.lines.length} head={[[t('erp.col.account')], [t('erp.col.name')], [t('erp.col.remarks')], [t('erp.col.debit'), true], [t('erp.col.credit'), true]]}>

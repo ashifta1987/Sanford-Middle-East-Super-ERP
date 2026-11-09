@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { Eye } from 'lucide-react';
 import { EmptyState } from '@/components/States';
 import { LiveBadge, PageTitle, SectionCard } from '../components/ui';
-import { PREVIEW_SCREENS, designData as D, moduleByKey } from '../modules';
+import { PREVIEW_SCREENS, designData as D, liveRouteForItem, moduleByKey } from '../modules';
 
 type Tab = { title: string; sub: string; add?: string; h: string[]; noteLabel?: string; note?: string; rows: string[][] };
 const TT_DATA: Record<string, string> = {
@@ -39,6 +39,7 @@ export function PreviewPage() {
   const [tab, setTab] = useState<string | null>(null);
   const meta = PREVIEW_SCREENS[key];
   if (key === 'migration') return <Navigate to="/backoffice/migration" replace />;
+  if (key === 'gldet') return <Navigate to="/financials/gl-determination" replace />; // A3: working screen
   if (!meta) return <PageTitle title={t('erp.notFound')} />;
   const from = moduleByKey(sp.get('from') ?? '') ?? moduleByKey('administration')!;
   const empty = t('erp.preview.noSample');
@@ -50,7 +51,12 @@ export function PreviewPage() {
     body = (
       <SectionCard>
         <ul className="grid gap-px bg-line sm:grid-cols-2">
-          {cards.list.map(([n, d]) => <li key={n} className="bg-surface p-4"><div className="font-medium">{n}</div><div className="text-sm text-muted">{d}</div></li>)}
+          {cards.list.map(([n, d]) => {
+            const live = liveRouteForItem(n);
+            return live
+              ? <li key={n} className="bg-surface"><Link to={live} className="block p-4 hover:bg-surface-2"><div className="flex flex-wrap items-center gap-2 font-medium text-primary">{n} <LiveBadge live /></div><div className="text-sm text-muted">{d}</div></Link></li>
+              : <li key={n} className="bg-surface p-4"><div className="font-medium">{n}</div><div className="text-sm text-muted">{d}</div></li>;
+          })}
         </ul>
         {cards.note && <p className="border-t border-line p-4 text-sm text-ink-2">{cards.note}</p>}
       </SectionCard>

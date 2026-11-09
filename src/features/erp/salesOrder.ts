@@ -5,7 +5,7 @@ import { rpc } from './api';
 
 /** Types and calls for the A2 sales order workflow (supabase/sql/17_sales_order.sql). The database is the authority. */
 export type WorkflowState = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
-export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost';
+export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount';
 
 export interface Code<T = string> { code: T; name: string }
 export interface SoSetup {
@@ -46,10 +46,10 @@ export interface SoInfo {
   approvals?: SoApproval[]; activity?: SoActivity[];
 }
 export interface InboxRow {
-  approval_id: number; company_code: string; kind: 'sales_order'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
-  card_code: string; card_name: string; total: number; currency: string; requested_by_name: string | null; requested_at: string;
+  approval_id: number; company_code: string; kind: 'sales_order' | 'journal'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
+  card_code: string | null; card_name: string | null; total: number; currency: string; requested_by_name: string | null; requested_at: string;
   reason: string | null; decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null;
-  state: WorkflowState; approver_position_name: string; superseded: boolean; message: string | null;
+  state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;
 }
 export interface Inbox { is_approver: boolean; waiting: InboxRow[]; sent: InboxRow[]; decided: InboxRow[] }
 

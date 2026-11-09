@@ -9,8 +9,9 @@ import { Card } from '@/features/migration/components/Card';
 import { StatusPill, RunStatusPill } from '@/features/migration/components/StatusPill';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { fmtMoney } from '@/features/erp/components/ui';
-import { useInbox, type InboxRow } from '@/features/erp/salesOrder';
+import { useInbox, type InboxRow, type WorkflowState } from '@/features/erp/salesOrder';
 import { StatePill } from '@/features/erp/pages/SalesOrderPages';
+import { JeStatePill } from '@/features/erp/pages/JournalPages';
 import type { RunStatus } from '@/lib/database.types';
 
 interface MigrationRow {
@@ -94,8 +95,17 @@ function DocumentApprovals() {
                 {rows.map((r) => (
                   <tr key={r.approval_id} className="border-t border-line align-top">
                     <td className="px-4 py-2.5">
-                      <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/docs/sales_order/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
-                      <div dir="auto" className="text-xs text-muted">{t('erp.doc.sales_order')} · {r.card_code} {r.card_name}</div>
+                      {r.kind === 'journal' ? (
+                        <>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/financials/journals/drafts/${r.company_code}/${r.doc_entry}`}>{t('je.titleDraft', { n: r.doc_no })}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t('je.manualJournal')}{r.card_name ? ` · ${r.card_name}` : ''}</div>
+                        </>
+                      ) : (
+                        <>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/docs/sales_order/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t('erp.doc.sales_order')} · {r.card_code} {r.card_name}</div>
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <div>{t(`so.rule.${r.rule_code}`)}</div>
@@ -110,7 +120,7 @@ function DocumentApprovals() {
                     <td className="px-4 py-2.5 text-end max-sm:hidden">
                       {view === 'waiting' ? <span className="num text-ink-2">{waited(r.requested_at)}</span>
                         : r.superseded && !r.decision ? <span className="pill pill-neutral">{t('inbox.closed')}</span>
-                        : <StatePill state={r.state} />}
+                        : r.kind === 'journal' ? <JeStatePill state={r.state === 'approved' ? 'posted' : r.state} /> : <StatePill state={r.state as WorkflowState} />}
                     </td>
                   </tr>
                 ))}

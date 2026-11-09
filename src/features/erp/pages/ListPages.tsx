@@ -10,6 +10,7 @@ import { RequireModule, useModuleLevel } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
 import { NewSalesOrderAction, StatePill } from './SalesOrderPages';
+import { DraftsLink, NewJournalAction } from './JournalPages';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -263,7 +264,7 @@ export function JournalsPage() {
     ],
   }), [t]);
   return (
-    <Frame module="financials" title={t('erp.page.journals')} desc={t('erp.page.journalsDesc')} actions={<NotYet module="financials" label={t('erp.new.journal')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="financials" title={t('erp.page.journals')} desc={t('erp.page.journalsDesc')} actions={<><DraftsLink /><NewJournalAction /></>}>
       <ListScreen config={cfg} />
     </Frame>
   );

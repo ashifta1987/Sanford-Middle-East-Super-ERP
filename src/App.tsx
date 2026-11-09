@@ -17,6 +17,8 @@ import {
 } from '@/features/erp/pages/ListPages';
 import { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } from '@/features/erp/pages/DetailPages';
 import { SalesOrderDetailPage, SalesOrderEditPage, SalesOrderNewPage } from '@/features/erp/pages/SalesOrderPages';
+import { JournalDraftPage, JournalDraftsPage, JournalNewPage } from '@/features/erp/pages/JournalPages';
+import { GlDeterminationPage, PostingPeriodsPage } from '@/features/erp/pages/FinanceSetupPages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -70,6 +72,12 @@ export default function App() {
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />
         <Route path="financials/journals" element={<JournalsPage />} />
+        {/* A3: manual journals, drafts and approvals, G/L account determination, posting periods */}
+        <Route path="financials/journals/new" element={<JournalNewPage />} />
+        <Route path="financials/journals/drafts" element={<JournalDraftsPage />} />
+        <Route path="financials/journals/drafts/:company/:id" element={<JournalDraftPage />} />
+        <Route path="financials/gl-determination" element={<GlDeterminationPage />} />
+        <Route path="financials/periods" element={<PostingPeriodsPage />} />
         <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
         <Route path="banking/payments/:dir" element={<PaymentsPage />} />
         <Route path="hr/employees" element={<EmployeesPage />} />

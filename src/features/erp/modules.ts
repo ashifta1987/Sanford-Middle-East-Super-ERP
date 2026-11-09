@@ -41,11 +41,25 @@ function toFunctions(raw: unknown): MenuFunction[] {
 }
 
 const D = data as unknown as Record<string, unknown> & { MENU: Record<string, { desc: string; primary?: string }> };
+
+/**
+ * A3 · Financials Setup (new in Super ERP). In SAP these two screens sit under Administration (System Initialization ›
+ * Posting Periods, Setup › Financials › G/L Account Determination); Finance users have no Administration access, so the
+ * same working screens are also listed here. Not part of design-data.json.
+ */
+const FIN_SETUP = (no: number): MenuFunction => ({
+  no, name: 'Financials Setup', submenu: true, flag: 'new',
+  desc: 'Where every posting goes and which dates are open for posting. Finance with full access can change them; every change is logged.',
+  items: [
+    { name: 'G/L Account Determination', desc: 'The account each kind of posting uses: receivables, revenue, VAT, inventory…' },
+    { name: 'Posting Periods', desc: 'Open, close or lock months. Nothing posts on dates in a closed or locked period.' },
+  ],
+});
 const menu = (k: string) => D.MENU[k] ?? { desc: '' };
 
 export const MODULES: ModuleDef[] = [
   { key: 'administration', num: '01', title: 'Administration', desc: 'Same 13 functions, same order as SAP Business One. System admin only.', access: ['admin', 'it'], functions: toFunctions(D.F) },
-  { key: 'financials', num: '02', title: 'Financials', ...menu('financials'), access: ['finance'], functions: toFunctions(D.FIN) },
+  { key: 'financials', num: '02', title: 'Financials', ...menu('financials'), access: ['finance'], functions: [...toFunctions(D.FIN), FIN_SETUP(toFunctions(D.FIN).length + 1)] },
   { key: 'sales', num: '03', title: 'Sales', ...menu('sales'), access: ['sales'], functions: toFunctions(D.SAL) },
   { key: 'purchasing', num: '04', title: 'Purchasing', ...menu('purchasing'), access: ['purchase'], functions: toFunctions(D.PUR) },
   { key: 'bp', num: '05', title: 'Business Partners', ...menu('bp'), access: ['bp', 'sales', 'purchase', 'finance'], functions: toFunctions(D.BPF) },
@@ -101,7 +115,9 @@ export const docKindByObj = (obj: number) => (Object.keys(DOC_KINDS) as DocKind[
 
 /** module › SAP function name → working screen */
 const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
-  financials: { 'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals' },
+  financials: {
+    'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
+  },
   sales: {
     'Sales Quotation': '/docs/sales_quotation', 'Sales Order': '/docs/sales_order', Delivery: '/docs/delivery', Return: '/docs/sales_return',
     'A/R Down Payment Invoice': '/docs/ar_down_payment', 'A/R Invoice': '/docs/ar_invoice', 'A/R Credit Memo': '/docs/ar_credit_note',
@@ -124,11 +140,16 @@ const LIVE_ITEMS: Record<string, string> = {
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '',
   'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
   'New sales order': '/docs/sales_order/new',
+  // A3 · posting engine
+  'New journal entry': '/financials/journals/new', 'Recent entries': '/financials/journals',
+  'G/L Account Determination': '/financials/gl-determination', 'G/L Account Determination ›': '/financials/gl-determination',
+  'Posting Periods': '/financials/periods',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
 const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   sales: { 'Sales Order': '/docs/sales_order/new' },
+  financials: { 'Journal Entry': '/financials/journals/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

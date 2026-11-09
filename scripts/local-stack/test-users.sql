@@ -32,3 +32,13 @@ INSERT INTO erp.user_company (user_id, company_code) VALUES
   ('00000000-0000-4000-8000-000000000004', 'ZZ99'), ('00000000-0000-4000-8000-000000000005', 'ZZ99'),
   ('00000000-0000-4000-8000-000000000006', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A2 · sales manager (approver for discount and credit-limit rules on ZZ99; see 17_sales_order.sql sample rules).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_SALES_MGR', 'QA · sales manager', '{sales}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000007', 'ZZ99', 'QA Sales Manager', 'qa.salesmgr@sample.test', 'QA_SALES_MGR', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000007', 'ZZ99')
+ON CONFLICT DO NOTHING;

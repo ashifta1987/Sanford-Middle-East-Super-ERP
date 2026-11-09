@@ -126,3 +126,4 @@ fs.writeFileSync(`${OUT}/a1-results.json`, JSON.stringify(results, null, 1));
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
 process.exit(failed.length ? 1 : 0);
+

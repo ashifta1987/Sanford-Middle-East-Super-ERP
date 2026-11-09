@@ -163,3 +163,4 @@ BEGIN
     EXECUTE format('CREATE POLICY %I ON erp.%I AS RESTRICTIVE FOR SELECT TO authenticated USING (%s)', 'a1_' || t || '_module', t, r.expr);
   END LOOP;
 END $$;
+

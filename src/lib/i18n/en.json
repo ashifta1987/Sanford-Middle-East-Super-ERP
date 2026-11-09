@@ -2172,7 +2172,8 @@
       "cancel": "cancelled it",
       "save": "saved counts ({{counted}} of {{of}})",
       "submit_posted": "submitted the count; it posted",
-      "submit_pending_approval": "submitted the count for approval"
+      "submit_pending_approval": "submitted the count for approval",
+      "count_create": "started the count ({{lines}} lines)"
     },
     "count": {
       "title": "Inventory Counting",
@@ -2216,7 +2217,8 @@
       "submit": "Submit count",
       "notAllCounted": "{{n}} line(s) are not counted yet.",
       "postedAt": "Posted, {{when}}.",
-      "noJournal": "No journal: no value changed."
+      "noJournal": "No journal: no value changed.",
+      "posting": "Posting"
     },
     "lots": {
       "serials": "Item Serial Numbers",

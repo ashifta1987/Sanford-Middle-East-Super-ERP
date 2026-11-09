@@ -1957,7 +1957,8 @@ BEGIN
       CONTINUE;
     END IF;
     v_now := erp._count_qty(p_company, r.item_code, c.whs_code, r.bin_id, v_bins);
-    IF v_now <> r.system_qty THEN
+    -- (A posted or cancelled count is history: the stock has moved on, so there is nothing to compare.)
+    IF c.state NOT IN ('posted', 'cancelled') AND v_now <> r.system_qty THEN
       v_err := v_err || jsonb_build_object('line', r.line_num, 'field', 'system_qty', 'message',
         format('Line %s: stock of %s%s changed since the count started (%s then, %s now). Cancel this count and start a new one.',
                r.line_num + 1, r.item_code, coalesce(' in bin ' || r.bin_code, ''), trim_scale(r.system_qty), trim_scale(v_now)));

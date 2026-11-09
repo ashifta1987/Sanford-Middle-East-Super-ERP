@@ -2188,7 +2188,8 @@
       "cancel": "ألغاه",
       "save": "حفظ العدّ ({{counted}} من {{of}})",
       "submit_posted": "أرسل الجرد وتم ترحيله",
-      "submit_pending_approval": "أرسل الجرد للموافقة"
+      "submit_pending_approval": "أرسل الجرد للموافقة",
+      "count_create": "بدأ الجرد ({{lines}} سطراً)"
     },
     "count": {
       "title": "جرد المخزون",
@@ -2232,7 +2233,8 @@
       "submit": "إرسال الجرد",
       "notAllCounted": "{{n}} سطر لم يُعدّ بعد.",
       "postedAt": "تم الترحيل، {{when}}.",
-      "noJournal": "لا قيد: لم تتغير أي قيمة."
+      "noJournal": "لا قيد: لم تتغير أي قيمة.",
+      "posting": "الترحيل"
     },
     "lots": {
       "serials": "الأرقام التسلسلية للأصناف",

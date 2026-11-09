@@ -77,7 +77,8 @@ function ActivityCard({ items }: { items: Array<{ at: string; action: string; ac
         <ol className="space-y-4 p-5" data-testid="inv-activity">
           {items.map((a, i) => {
             const det = (a.detail ?? {}) as R;
-            const verb = a.action.replace(/^(goods_receipt|goods_issue|inventory_transfer|transfer_request|inventory_count)_/, '');
+            const base = a.action.replace(/^(goods_receipt|goods_issue|inventory_transfer|transfer_request|inventory_count)_/, '');
+            const verb = a.action === 'inventory_count_create' ? 'count_create' : base;
             return (
               <li key={i} className="flex gap-3">
                 <span className={clsx('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', /approve/.test(a.action) || det.result === 'posted' ? 'bg-ok-fg' : /reject|cancel/.test(a.action) ? 'bg-crit-fg' : 'bg-primary')} aria-hidden />
@@ -940,7 +941,7 @@ export function CountPage() {
             </SectionCard>
           )}
           {C.state === 'posted' && (
-            <SectionCard title={t('so.approval.status')}><div className="space-y-2 p-5 text-sm" data-testid="count-posted">
+            <SectionCard title={t('inv.count.posting')}><div className="space-y-2 p-5 text-sm" data-testid="count-posted">
               <p className="flex items-center gap-2 font-semibold text-ok-fg"><CircleCheck className="h-4 w-4" aria-hidden />{t('inv.count.postedAt', { when: fmtWhen(C.posted_at) })}</p>
               {C.trans_id ? (C.can_read_journal ? <Link id="count-journal" className="font-mono text-primary hover:underline" to={`/financials/journals/${company}/${C.trans_id}`}>{t('inv.journalN', { n: C.trans_id })}</Link> : <p className="font-mono">{t('inv.journalN', { n: C.trans_id })}</p>) : <p className="text-muted">{t('inv.count.noJournal')}</p>}
             </div></SectionCard>

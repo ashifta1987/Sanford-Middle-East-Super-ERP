@@ -130,5 +130,11 @@
     "email": "qa.emp2@sample.test",
     "password": "local-only-22",
     "name": "QA Staff Priya (portal, E0003)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000023",
+    "email": "qa.it@sample.test",
+    "password": "local-only-23",
+    "name": "QA IT support (Administration read-only)"
   }
 ]

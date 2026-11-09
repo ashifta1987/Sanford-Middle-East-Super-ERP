@@ -162,3 +162,13 @@ INSERT INTO erp.user_company (user_id, company_code) VALUES
   ('00000000-0000-4000-8000-000000000020', 'ZZ99'), ('00000000-0000-4000-8000-000000000021', 'ZZ99'),
   ('00000000-0000-4000-8000-000000000022', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A10 · IT (Administration screens read-only: IT can look, only Administration full can change).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_IT', 'QA · IT support', '{it}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+INSERT INTO erp.app_user (user_id, company_code, emp_id, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000023', 'ZZ99', NULL, 'QA IT support', 'qa.it@sample.test', 'QA_IT', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000023', 'ZZ99')
+ON CONFLICT DO NOTHING;

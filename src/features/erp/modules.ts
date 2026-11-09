@@ -48,7 +48,7 @@ export const MODULES: ModuleDef[] = [
   { key: 'financials', num: '02', title: 'Financials', ...menu('financials'), access: ['finance'], functions: toFunctions(D.FIN) },
   { key: 'sales', num: '03', title: 'Sales', ...menu('sales'), access: ['sales'], functions: toFunctions(D.SAL) },
   { key: 'purchasing', num: '04', title: 'Purchasing', ...menu('purchasing'), access: ['purchase'], functions: toFunctions(D.PUR) },
-  { key: 'bp', num: '05', title: 'Business Partners', ...menu('bp'), access: ['sales', 'purchase', 'finance'], functions: toFunctions(D.BPF) },
+  { key: 'bp', num: '05', title: 'Business Partners', ...menu('bp'), access: ['bp', 'sales', 'purchase', 'finance'], functions: toFunctions(D.BPF) },
   { key: 'banking', num: '06', title: 'Banking', ...menu('banking'), access: ['finance', 'banking'], functions: toFunctions(D.BNK) },
   { key: 'inventory', num: '07', title: 'Inventory', ...menu('inventory'), access: ['inventory', 'purchase', 'sales'], functions: toFunctions(D.INV) },
   { key: 'production', num: '08', title: 'Production', ...menu('production'), access: ['production', 'inventory'], functions: toFunctions(D.PRD) },
@@ -59,10 +59,18 @@ export const MODULES: ModuleDef[] = [
 
 export const moduleByKey = (k: string | undefined) => MODULES.find((m) => m.key === k);
 
-/** Owner/CFO ('business') and system admin see every module; others by their position's modules. */
+/** Owner/CFO ('business') and system admin see every module; others by their position's modules (read or full). */
 export function canOpenModule(m: ModuleDef, userModules: string[]) {
   if (userModules.includes('business') || userModules.includes('admin')) return true;
   return m.access.some((a) => userModules.includes(a));
+}
+
+/**
+ * Full access to at least one of the module's position modules (same rule as erp.can_write in 16_module_access.sql).
+ * Owner and admin do not get write automatically. The database functions check again on every write.
+ */
+export function canWriteModule(m: ModuleDef, levels: Record<string, 'read' | 'full'>) {
+  return m.access.some((a) => levels[a] === 'full');
 }
 
 // ---------- Which functions are connected to real data (Stage 1) ----------

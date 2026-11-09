@@ -562,6 +562,7 @@
     "notFoundBody": "It may belong to a company you can't see, or the link is wrong.",
     "notYet": "Not built yet — planned for {{stage}}",
     "stage": "Stage {{n}}",
+    "readOnly": "Read-only access to {{module}}",
     "noModule": "Your position does not include {{module}}. Ask the system admin if you need it.",
     "balanced": "Debit = credit",
     "unbalanced": "Does not balance",

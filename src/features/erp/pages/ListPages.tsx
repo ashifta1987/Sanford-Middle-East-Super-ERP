@@ -6,7 +6,7 @@ import { Button } from '@/components/Button';
 import { erp } from '@/lib/supabase';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
 import { LiveBadge, PageTitle, StatusTag, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
-import { RequireModule } from '../components/Guard';
+import { RequireModule, useModuleLevel } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
 
@@ -28,9 +28,20 @@ function Frame({ module, title, desc, actions, children }: { module: ModuleKey; 
   );
 }
 
-/** "New …" is part of a later stage: shown, but disabled with the reason, so nobody mistakes it for a working action. */
-function NotYet({ label, stage }: { label: string; stage: string }) {
+/**
+ * "New …" is part of a later stage: shown, but disabled with the reason, so nobody mistakes it for a working action.
+ * A user with read-only access to the module sees the read-only reason instead (A1).
+ */
+function NotYet({ module, label, stage }: { module: ModuleKey; label: string; stage: string }) {
   const { t } = useTranslation();
+  const { canWrite, readOnlyReason } = useModuleLevel(module);
+  if (!canWrite && readOnlyReason) {
+    return (
+      <Button variant="primary" disabled id={`new-${module}`} disabledReason={readOnlyReason}>
+        <Plus className="h-4 w-4" aria-hidden /> {label}
+      </Button>
+    );
+  }
   return (
     <Button variant="primary" disabled title={t('erp.notYet', { stage })}>
       <Plus className="h-4 w-4" aria-hidden /> {label} <span className="text-xs font-normal">· {stage}</span>
@@ -66,7 +77,7 @@ export function BusinessPartnersPage() {
     ],
   }), [t]);
   return (
-    <Frame module="bp" title={t('erp.page.bp')} desc={t('erp.page.bpDesc')} actions={<NotYet label={t('erp.new.bp')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="bp" title={t('erp.page.bp')} desc={t('erp.page.bpDesc')} actions={<NotYet module="bp" label={t('erp.new.bp')} stage={t('erp.stage', { n: 3 })} />}>
       <ListScreen config={cfg} />
     </Frame>
   );
@@ -99,7 +110,7 @@ export function ItemsPage() {
     ],
   }), [t]);
   return (
-    <Frame module="inventory" title={t('erp.page.items')} desc={t('erp.page.itemsDesc')} actions={<NotYet label={t('erp.new.item')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="inventory" title={t('erp.page.items')} desc={t('erp.page.itemsDesc')} actions={<NotYet module="inventory" label={t('erp.new.item')} stage={t('erp.stage', { n: 3 })} />}>
       <ListScreen config={cfg} />
     </Frame>
   );
@@ -137,7 +148,7 @@ export function DocumentsPage() {
   const title = t(`erp.doc.${kind}`, { defaultValue: def.title });
   return (
     <Frame module={def.module as ModuleKey} title={title} desc={t('erp.page.docsDesc')}
-      actions={kind === 'sales_order' ? <NotYet label={t('erp.new.salesOrder')} stage={t('erp.stage', { n: 2 })} /> : undefined}>
+      actions={kind === 'sales_order' ? <NotYet module="sales" label={t('erp.new.salesOrder')} stage={t('erp.stage', { n: 2 })} /> : undefined}>
       <ListScreen key={kind} config={cfg} />
     </Frame>
   );
@@ -234,7 +245,7 @@ export function JournalsPage() {
     ],
   }), [t]);
   return (
-    <Frame module="financials" title={t('erp.page.journals')} desc={t('erp.page.journalsDesc')} actions={<NotYet label={t('erp.new.journal')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="financials" title={t('erp.page.journals')} desc={t('erp.page.journalsDesc')} actions={<NotYet module="financials" label={t('erp.new.journal')} stage={t('erp.stage', { n: 3 })} />}>
       <ListScreen config={cfg} />
     </Frame>
   );

@@ -4,11 +4,24 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { erp, supabase } from '@/lib/supabase';
 import type { AppUser, Company, Position } from '@/lib/database.types';
 
+export type ModuleLevel = 'read' | 'full';
+
 export interface Profile {
   user: AppUser | null;
   position: Position | null;
   companies: Company[];
+  /** every module the user can at least read (module_access + position_module rows) */
   modules: string[];
+  /** level per module, same rule as erp.module_level(): a position_module row wins, otherwise module_access = full */
+  levels: Record<string, ModuleLevel>;
+}
+
+/** Mirrors erp.module_level() in 16_module_access.sql (the server is the authority). */
+export function buildLevels(moduleAccess: string[], rows: Array<{ module: string; level: ModuleLevel }>) {
+  const levels: Record<string, ModuleLevel> = {};
+  for (const m of moduleAccess) levels[m] = 'full';
+  for (const r of rows) levels[r.module] = r.level;
+  return levels;
 }
 
 interface AuthCtx {
@@ -35,11 +48,17 @@ const ROLE_MODULES: Record<'finance' | 'it' | 'business', string[]> = {
 async function loadProfile(userId: string): Promise<Profile> {
   const { data: user, error } = await erp().from('app_user').select('*').eq('user_id', userId).maybeSingle();
   if (error) throw error;
-  if (!user) return { user: null, position: null, companies: [], modules: [] };
-  const [{ data: position }, { data: uc }] = await Promise.all([
+  if (!user) return { user: null, position: null, companies: [], modules: [], levels: {} };
+  const [{ data: position }, { data: uc }, { data: pm, error: pmError }] = await Promise.all([
     erp().from('position').select('position_code,name,module_access').eq('position_code', user.position_code).maybeSingle(),
     erp().from('user_company').select('company_code').eq('user_id', userId),
+    erp().from('position_module').select('module,level').eq('position_code', user.position_code),
   ]);
+  // Before 16_module_access.sql is applied the table does not exist: fall back to module_access (all 'full').
+  const levels = buildLevels(
+    (position as Position | null)?.module_access ?? [],
+    pmError ? [] : ((pm ?? []) as Array<{ module: string; level: ModuleLevel }>),
+  );
   const codes = (uc ?? []).map((r: { company_code: string }) => r.company_code);
   const { data: companies } = codes.length
     ? await erp().from('company').select('*').in('company_code', codes).order('company_code')
@@ -48,7 +67,8 @@ async function loadProfile(userId: string): Promise<Profile> {
     user: user as AppUser,
     position: (position as Position) ?? null,
     companies: (companies as Company[]) ?? [],
-    modules: (position as Position | null)?.module_access ?? [],
+    modules: Object.keys(levels),
+    levels,
   };
 }
 

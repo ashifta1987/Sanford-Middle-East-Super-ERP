@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
-import { canOpenModule, moduleByKey, type ModuleKey } from '../modules';
+import { canOpenModule, canWriteModule, moduleByKey, type ModuleKey } from '../modules';
 
 export function useModuleAccess() {
   const { profile } = useAuth();
@@ -12,6 +12,20 @@ export function useModuleAccess() {
     const m = moduleByKey(k);
     return Boolean(m && canOpenModule(m, mods));
   };
+}
+
+/**
+ * 'full' / 'read' / null for an app module, from the position's levels (16_module_access.sql).
+ * With 'read', screens hide or disable New, Edit and Approve and show readOnlyReason.
+ */
+export function useModuleLevel(k: ModuleKey) {
+  const { t } = useTranslation();
+  const { profile } = useAuth();
+  const m = moduleByKey(k);
+  const open = Boolean(m && canOpenModule(m, profile?.modules ?? []));
+  const write = Boolean(m && canWriteModule(m, profile?.levels ?? {}));
+  const level: 'full' | 'read' | null = write ? 'full' : open ? 'read' : null;
+  return { level, canWrite: write, readOnlyReason: level === 'read' ? t('erp.readOnly', { module: m?.title ?? k }) : undefined };
 }
 
 /** Hides a screen from users whose position does not include the module. The database rules still apply on top. */

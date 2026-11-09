@@ -52,5 +52,23 @@
     "email": "qa.bankread@sample.test",
     "password": "local-only-9",
     "name": "QA Banking read-only"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "email": "qa.purchase@sample.test",
+    "password": "local-only-10",
+    "name": "QA Purchasing (purchasing full)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000011",
+    "email": "qa.purchmgr@sample.test",
+    "password": "local-only-11",
+    "name": "QA Purchasing manager (PO approver)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000012",
+    "email": "qa.staff@sample.test",
+    "password": "local-only-12",
+    "name": "QA Staff (purchasing read-only, requests)"
   }
 ]

@@ -135,11 +135,13 @@ BEGIN
   r := pg_temp.call(sales, 'SELECT to_jsonb(count(*)) FROM erp.gl_determination');
   PERFORM pg_temp.check(r::text = '0', 'sales user reads no G/L determination rows', r::text);
   r := pg_temp.call(fin, 'SELECT to_jsonb(count(*)) FROM erp.gl_determination WHERE company_code = ''ZZ99''');
-  PERFORM pg_temp.check(r::text = '14', 'finance reads the 14 ZZ99 sample G/L rows', r::text);
+  -- A6 (21_purchasing.sql) adds 3 ZZ99 sample rows: down payments, goods received not invoiced, landed cost clearing.
+  PERFORM pg_temp.check(r::text = CASE WHEN to_regclass('erp.landed_cost') IS NULL THEN '14' ELSE '17' END, 'finance reads the ZZ99 sample G/L rows (14, 17 with A6)', r::text);
   r := pg_temp.call(fin, 'SELECT to_jsonb(count(*)) FROM erp.posting_period WHERE company_code = ''ZZ99''');
   PERFORM pg_temp.check(r::text = '24', 'finance reads 24 ZZ99 sample periods (2026–2027)', r::text);
   r := pg_temp.call(sales, 'SELECT to_jsonb(count(*)) FROM erp.gl_posting_key');
-  PERFORM pg_temp.check(r::text = '22', 'posting keys are reference data (22 rows, readable)', r::text);
+  -- A6 adds purchasing/grpo_clearing (goods received, not invoiced).
+  PERFORM pg_temp.check(r::text = CASE WHEN to_regclass('erp.landed_cost') IS NULL THEN '22' ELSE '23' END, 'posting keys are reference data (22 rows, 23 with A6, readable)', r::text);
   PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_determination g JOIN erp.company c USING (company_code) WHERE c.company_code <> 'ZZ99') = 0,
                         'real companies have no G/L determination rows', '');
 

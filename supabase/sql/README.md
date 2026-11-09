@@ -21,6 +21,7 @@ independent review (security, loader, SAP -1 values, history tables, speed).
 | 11 | `13_migration_console.sql` | The admin Migration console (tables, access rules, cross-check). Safe to run again. |
 | 12 | `CALL erp.sync_company('AE01');` then `SELECT * FROM erp.check_sync('AE01');` and `SELECT * FROM erp.check_deleted('AE01');` | Per company. Commits after each step; progress in `erp.sync_log`. Every check must say `ok`. |
 | 13 | `python migration_worker.py --dsn <db> --source storage --poll` | Runs on a server next to these files. Rebuilds a company each time the console queues a run (see below). |
+| 14 | `16_module_access.sql` (A1) | After 10–15. Module-level read rules (Full / Read / None per position): `erp.position_module`, `erp.module_level/can_read/can_write`, RESTRICTIVE read policies. Safe to run again. Tests: `supabase/tests/a1_module_access.sql` (local stack only). |
 
 Reload a company once links exist: `04z_drop_foreign_keys.sql`, the loader, then 02, 03, 04. If
 `apply_keys.py` has run, these files already use the real keys. The migration worker does exactly this for

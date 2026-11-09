@@ -592,7 +592,8 @@ function BpBankForm({ row, onClose, onDone }: { row: R | null; onClose: () => vo
     try {
       const r = await bpBankSave(company, card, { ...(row ? { bp_bank_id: row.bp_bank_id } : {}), ...f });
       qc.invalidateQueries({ queryKey: ['erp-list'] });
-      onDone(t('bk.flash.bpBank', { code: card, change: t(`bk.change_${r.change}`) }));
+      // A8: when an approval rule covers the user, the change waits for approval instead of applying at once
+      onDone(r.state === 'pending_approval' ? t('md.bank.pending', { code: card }) : t('bk.flash.bpBank', { code: card, change: t(`bk.change_${r.change}`) }));
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
   const input = (k: keyof typeof f, label: string, mono = false) => (

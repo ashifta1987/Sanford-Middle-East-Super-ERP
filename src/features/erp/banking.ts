@@ -129,7 +129,7 @@ export const unmatchLine = (company: string, line: number) => rpc<{ unmatched: b
 export const bankAccountSave = (company: string, a: Record<string, unknown>) => rpc<Record<string, unknown>>('bank_account_save', { p_company: company, p_acct: a });
 export const bankingSettingSet = (company: string, s: Record<string, unknown>) => rpc<Record<string, unknown>>('banking_setting_set', { p_company: company, p_setting: s });
 export const bpBankSave = (company: string, card: string, b: Record<string, unknown>) =>
-  rpc<{ bp_bank_id: number; change: string }>('bp_bank_account_save', { p_company: company, p_card: card, p_bank: b });
+  rpc<{ bp_bank_id: number | null; change: string; request_id?: number; state?: string }>('bp_bank_account_save', { p_company: company, p_card: card, p_bank: b });
 
 export interface BpHit { card_code: string; name: string; kind: string; currency: string | null; balance: number | null }
 const clean = (s: string) => s.replace(/[,()*%\\:"]/g, ' ').trim();

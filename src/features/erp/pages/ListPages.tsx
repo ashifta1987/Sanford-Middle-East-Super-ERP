@@ -1,12 +1,10 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/Button';
 import { erp } from '@/lib/supabase';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
 import { LiveBadge, PageTitle, StatusTag, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
-import { RequireModule, useModuleLevel } from '../components/Guard';
+import { RequireModule } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
 import { NewSalesOrderAction, StatePill } from './SalesOrderPages';
@@ -15,6 +13,7 @@ import { DraftsLink, NewJournalAction } from './JournalPages';
 import { DraftsLink as PaymentDraftsLink, NewPaymentAction, PaymentsList } from './BankingPages';
 import { NewPurchaseAction, isPurchaseKind } from './PurchasingPages';
 import { NewInventoryAction } from './InventoryPages';
+import { NewBpAction, NewItemAction } from './MasterDataPages';
 import { isInvKind } from '../inventory';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -35,38 +34,18 @@ function Frame({ module, title, desc, actions, children }: { module: ModuleKey; 
   );
 }
 
-/**
- * "New …" is part of a later stage: shown, but disabled with the reason, so nobody mistakes it for a working action.
- * A user with read-only access to the module sees the read-only reason instead (A1).
- */
-function NotYet({ module, label, stage }: { module: ModuleKey; label: string; stage: string }) {
-  const { t } = useTranslation();
-  const { canWrite, readOnlyReason } = useModuleLevel(module);
-  if (!canWrite && readOnlyReason) {
-    return (
-      <Button variant="primary" disabled id={`new-${module}`} disabledReason={readOnlyReason}>
-        <Plus className="h-4 w-4" aria-hidden /> {label}
-      </Button>
-    );
-  }
-  return (
-    <Button variant="primary" disabled title={t('erp.notYet', { stage })}>
-      <Plus className="h-4 w-4" aria-hidden /> {label} <span className="text-xs font-normal">· {stage}</span>
-    </Button>
-  );
-}
-
 // ---------- Business partners ----------
 export function BusinessPartnersPage() {
   const { t } = useTranslation();
   const cfg = useMemo<ListConfig<R>>(() => ({
     id: 'business_partner', table: 'business_partner',
-    select: 'company_code,card_code,kind,name,group_code,currency,credit_limit,balance,phone,email,city,country,active',
+    select: 'company_code,card_code,kind,name,group_code,currency,credit_limit,balance,phone,email,city,country,active,source',
     searchCols: ['card_code', 'name', 'foreign_name', 'phone', 'email', 'trn'], searchLabel: t('erp.search.bp'),
     filters: [
       { key: 'kind', label: t('erp.col.type'), options: [['customer', t('erp.kind.customer')], ['supplier', t('erp.kind.supplier')], ['lead', t('erp.kind.lead')]] },
       { key: 'group_code', label: t('erp.col.group'), from: { table: 'bp_group', value: 'group_code', label: 'name' }, type: 'number' },
       { key: 'active', label: t('erp.col.status'), options: [['true', t('erp.status.active')], ['false', t('erp.status.inactive')]], type: 'boolean' },
+      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
     ],
     defaultSort: { col: 'card_code', asc: true },
     rowKey: (r) => `${r.company_code}|${r.card_code}`,
@@ -84,7 +63,7 @@ export function BusinessPartnersPage() {
     ],
   }), [t]);
   return (
-    <Frame module="bp" title={t('erp.page.bp')} desc={t('erp.page.bpDesc')} actions={<NotYet module="bp" label={t('erp.new.bp')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="bp" title={t('erp.page.bp')} desc={t('erp.page.bpDesc')} actions={<><Link to="/bp/changes" className="inline-flex min-h-[44px] items-center rounded-btn border border-line bg-surface px-4 text-[15px] font-medium hover:bg-page">{t('md.req.listTitle')}</Link><NewBpAction /></>}>
       <ListScreen config={cfg} />
     </Frame>
   );
@@ -95,12 +74,13 @@ export function ItemsPage() {
   const { t } = useTranslation();
   const cfg = useMemo<ListConfig<R>>(() => ({
     id: 'item', table: 'item',
-    select: 'company_code,item_code,name,group_code,category,barcode,inventory_uom,is_stock,is_sold,is_bought,avg_cost,active',
+    select: 'company_code,item_code,name,group_code,category,barcode,inventory_uom,is_stock,is_sold,is_bought,avg_cost,active,source',
     searchCols: ['item_code', 'name', 'foreign_name', 'barcode', 'category'], searchLabel: t('erp.search.item'),
     filters: [
       { key: 'group_code', label: t('erp.col.itemGroup'), from: { table: 'item_group', value: 'group_code', label: 'name' }, type: 'number' },
       { key: 'is_stock', label: t('erp.col.inventoryItem'), options: [['true', t('erp.yes')], ['false', t('erp.no')]], type: 'boolean' },
       { key: 'active', label: t('erp.col.status'), options: [['true', t('erp.status.active')], ['false', t('erp.status.inactive')]], type: 'boolean' },
+      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
     ],
     defaultSort: { col: 'item_code', asc: true },
     rowKey: (r) => `${r.company_code}|${r.item_code}`,
@@ -117,7 +97,7 @@ export function ItemsPage() {
     ],
   }), [t]);
   return (
-    <Frame module="inventory" title={t('erp.page.items')} desc={t('erp.page.itemsDesc')} actions={<NotYet module="inventory" label={t('erp.new.item')} stage={t('erp.stage', { n: 3 })} />}>
+    <Frame module="inventory" title={t('erp.page.items')} desc={t('erp.page.itemsDesc')} actions={<NewItemAction />}>
       <ListScreen config={cfg} />
     </Frame>
   );

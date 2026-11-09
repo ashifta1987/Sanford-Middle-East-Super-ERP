@@ -130,7 +130,7 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     // A6 · China flow
     'Landed Costs': '/purchasing/landed-costs', 'PI Tracking Entry': '/docs/purchase_order?f_status=open',
   },
-  bp: { 'Business Partner Master Data': '/bp' },
+  bp: { 'Business Partner Master Data': '/bp', 'Trademark Master': '/bp/trademarks' },
   banking: {
     'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out', Deposits: '/banking/deposits',
     'Bank Statements and External Reconciliations': '/banking/statements', 'Banking Reports': '/banking/cash-position',
@@ -180,6 +180,10 @@ const LIVE_ITEMS: Record<string, string> = {
   'Inventory Counting Transactions ›': '/inventory/counts', 'Item Serial Numbers ›': '/inventory/serials', 'Batches ›': '/inventory/batches',
   'Batches and serials': '/inventory/serials', 'Bin Location Master Data': '/inventory/setup', 'Bin Location Management': '/inventory/setup',
   'Item history': '/items', 'Inventory ›': '/inventory/setup', 'Bin Locations': '/inventory/setup',
+  // A8 · master data
+  'New business partner': '/bp/new', Customers: '/bp?f_kind=customer', 'Suppliers and factories': '/bp?f_kind=supplier', Leads: '/bp?f_kind=lead',
+  'Credit limits and payment terms': '/bp/changes', '360° view': '/bp', 'Trademark registrations': '/bp/trademarks', 'Brand list': '/bp/trademarks',
+  'New item': '/items/new', 'Barcodes per item': '/items',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -191,7 +195,8 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Purchase Request': '/docs/purchase_request/new', 'Purchase Quotation': '/docs/purchase_quotation/new', 'Purchase Order': '/docs/purchase_order/new',
     'Landed Costs': '/purchasing/landed-costs/new',
   },
-  inventory: { 'Inventory Transactions': '/inventory/transfer/new' },
+  inventory: { 'Inventory Transactions': '/inventory/transfer/new', 'Item Master Data': '/items/new' },
+  bp: { 'Business Partner Master Data': '/bp/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

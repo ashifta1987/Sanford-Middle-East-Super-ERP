@@ -30,6 +30,7 @@ import {
   ApInvoiceNewPage, GrpoNewPage, LandedCostNewPage, LandedCostPage, LandedCostsPage, PurchaseDocEditPage, PurchaseDocNewPage, PurchaseDocPage,
   PurchaseViewPage, PurchasingSetupPage, QuotationComparePage,
 } from '@/features/erp/pages/PurchasingPages';
+import { BpChangesPage, BpFormPage, ItemFormPage, TrademarksPage } from '@/features/erp/pages/MasterDataPages';
 import {
   CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage,
 } from '@/features/erp/pages/InventoryPages';
@@ -75,6 +76,13 @@ export default function App() {
 
         {/* Working screens on live data (Stage 1: read, search, filter, export) */}
         <Route path="bp" element={<BusinessPartnersPage />} />
+        {/* A8 · master data: partner and item create / edit, change requests, Trademark Master (read-only) */}
+        <Route path="bp/new" element={<BpFormPage key="bp-new" mode="new" />} />
+        <Route path="bp/changes" element={<BpChangesPage />} />
+        <Route path="bp/trademarks" element={<TrademarksPage />} />
+        <Route path="bp/:company/:code/edit" element={<BpFormPage key="bp-edit" mode="edit" />} />
+        <Route path="items/new" element={<ItemFormPage key="item-new" mode="new" />} />
+        <Route path="items/:company/:code/edit" element={<ItemFormPage key="item-edit" mode="edit" />} />
         <Route path="bp/:company/:code" element={<BusinessPartnerDetail />} />
         <Route path="items" element={<ItemsPage />} />
         <Route path="items/:company/:code" element={<ItemDetail />} />

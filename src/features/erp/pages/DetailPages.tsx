@@ -10,6 +10,8 @@ import { DOC_KINDS, docKindByObj, moduleByKey, type DocKind, type ModuleKey } fr
 import { useJournalInfo } from '../journal';
 import { ReverseAction } from './JournalPages';
 import { ItemHistoryCard } from './InventoryPages';
+import { BpDetailExtras, BpEditAction, ItemChangesCard, ItemEditAction } from './MasterDataPages';
+import { Flash, useFlash } from './BankingPages';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -74,19 +76,24 @@ export function BusinessPartnerDetail() {
     },
   });
   const bp = q.data?.bp;
+  const [flash, setFlash] = useFlash();
   return (
-    <Shell module="bp" parent={[t('erp.page.bp'), '/bp']} title={bp ? `${bp.card_code} · ${bp.name}` : code} q={q}>
+    <Shell module="bp" parent={[t('erp.page.bp'), '/bp']} title={bp ? `${bp.card_code} · ${bp.name}` : code} q={q}
+      actions={<BpEditAction company={company} code={code} />}>
       {bp && (
         <div className="space-y-5">
+          <Flash text={flash} />
           <SectionCard title={t('erp.section.general')} right={<StatusTag value={bp.active ? 'active' : 'inactive'} />}>
             <Fields items={[
               [t('erp.col.type'), t(`erp.kind.${bp.kind}`, { defaultValue: bp.kind })], [t('erp.col.foreignName'), bp.foreign_name],
               [t('erp.col.currency'), bp.currency], [t('erp.col.trn'), bp.trn], [t('erp.col.phone'), bp.phone ?? bp.mobile], [t('erp.col.email'), bp.email],
               [t('erp.col.city'), [bp.city, bp.country].filter(Boolean).join(', ')], [t('erp.col.balance'), <span className="num">{fmtMoney(bp.balance, bp.currency)}</span>],
-              [t('erp.col.creditLimit'), <span className="num">{fmtMoney(bp.credit_limit, bp.currency)}</span>], [t('erp.col.created'), fmtDay(bp.created_on)],
+              [t('erp.col.creditLimit'), <span className="num" data-testid="bp-credit-limit">{fmtMoney(bp.credit_limit, bp.currency)}</span>], [t('erp.col.created'), fmtDay(bp.created_on)],
               [t('erp.col.source'), bp.source === 'sap' ? 'SAP Business One' : bp.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
             ]} />
           </SectionCard>
+          {/* A8 · change requests (credit limit, bank details) with approval, contacts, addresses, bank details, history */}
+          <BpDetailExtras company={company} code={code} onFlash={setFlash} />
           <SectionCard title={t('erp.section.documents')}>
             <Table empty={!q.data!.docs.length} head={[[t('erp.col.document')], [t('erp.col.docNo')], [t('erp.col.date')], [t('erp.col.status')], [t('erp.col.total'), true]]}>
               {q.data!.docs.map((d) => {
@@ -124,17 +131,22 @@ export function ItemDetail() {
     },
   });
   const it = q.data?.item;
+  const [flash] = useFlash();
   return (
-    <Shell module="inventory" parent={[t('erp.page.items'), '/items']} title={it ? `${it.item_code} · ${it.name}` : code} q={q}>
+    <Shell module="inventory" parent={[t('erp.page.items'), '/items']} title={it ? `${it.item_code} · ${it.name}` : code} q={q}
+      actions={<ItemEditAction company={company} code={code} />}>
       {it && (
         <div className="space-y-5">
+          <Flash text={flash} />
           <SectionCard title={t('erp.section.general')} right={<StatusTag value={it.active ? 'active' : 'inactive'} />}>
             <Fields items={[
               [t('erp.col.foreignName'), it.foreign_name], [t('erp.col.category'), [it.category, it.subcategory].filter(Boolean).join(' › ')],
               [t('erp.col.barcode'), it.barcode], [t('erp.col.hsCode'), it.hs_code], [t('erp.col.uom'), it.inventory_uom ?? it.sales_uom],
               [t('erp.col.inventoryItem'), <YesNo value={it.is_stock} />], [t('erp.col.salesItem'), <YesNo value={it.is_sold} />], [t('erp.col.purchaseItem'), <YesNo value={it.is_bought} />],
               [t('erp.col.avgCost'), <span className="num">{fmtMoney(it.avg_cost)}</span>], [t('erp.col.preferredSupplier'), it.preferred_supplier],
-              [t('erp.col.moq'), fmtQty(it.moq)], [t('erp.col.container'), [it.pcs_20gp, it.pcs_40gp, it.pcs_40hq].some(Boolean) ? `20GP ${fmtQty(it.pcs_20gp)} · 40GP ${fmtQty(it.pcs_40gp)} · 40HQ ${fmtQty(it.pcs_40hq)}` : null],
+              [t('erp.col.moq'), fmtQty(it.moq)], [t('md.f.sourcing_type'), it.sourcing_type], [t('md.f.supplier_part_no'), it.supplier_part_no],
+              [t('md.f.tax_code'), it.tax_code], [t('md.f.tracking'), it.serial_managed ? t('md.tracking.serial') : it.batch_managed ? t('md.tracking.batch') : t('md.tracking.none')],
+              [t('erp.col.source'), it.source === 'sap' ? 'SAP Business One' : it.source === 'sample' ? t('erp.sampleData') : 'Super ERP'], [t('erp.col.container'), [it.pcs_20gp, it.pcs_40gp, it.pcs_40hq].some(Boolean) ? `20GP ${fmtQty(it.pcs_20gp)} · 40GP ${fmtQty(it.pcs_40gp)} · 40HQ ${fmtQty(it.pcs_40hq)}` : null],
             ]} />
           </SectionCard>
           <div className="grid gap-5 lg:grid-cols-2">
@@ -158,6 +170,8 @@ export function ItemDetail() {
           </div>
           {/* A7 · Item history: every receipt, sale, transfer and count */}
           <ItemHistoryCard company={company} item={code} />
+          {/* A8 · master data change history */}
+          <ItemChangesCard company={company} code={code} />
         </div>
       )}
     </Shell>

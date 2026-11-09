@@ -99,7 +99,12 @@ function DocumentApprovals() {
                 {rows.map((r) => (
                   <tr key={r.approval_id} className="border-t border-line align-top">
                     <td className="px-4 py-2.5">
-                      {r.kind === 'payment' ? (
+                      {r.kind === 'bp_change' ? (
+                        <>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/bp/${r.company_code}/${encodeURIComponent(r.card_code ?? '')}`}>{r.card_code}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t('inbox.kind.bp_change')} · {r.card_name}</div>
+                        </>
+                      ) : r.kind === 'payment' ? (
                         <>
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/banking/payment-drafts/${r.company_code}/${r.doc_entry}`}>{t('bk.draftN', { n: r.doc_no })}</Link>
                           <div dir="auto" className="text-xs text-muted">{t('inbox.kind.payment')} · {r.card_code} {r.card_name}</div>
@@ -130,10 +135,11 @@ function DocumentApprovals() {
                         ? <><span className={clsx('pill', r.decision === 'approved' ? 'pill-ok' : 'pill-crit')}>{t(`erp.status.${r.decision}`)}</span> <span className="text-xs text-muted">{fmtDate(r.decided_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
                         : <>{r.requested_by_name ?? '—'}{r.reason && <div dir="auto" className="text-xs italic text-muted">“{r.reason}”</div>}</>}
                     </td>
-                    <td className="num px-4 py-2.5 text-end">{fmtMoney(r.total, r.currency)}</td>
+                    <td className="num px-4 py-2.5 text-end">{r.kind === 'bp_change' && r.total === null ? '—' : fmtMoney(r.total, r.currency)}</td>
                     <td className="px-4 py-2.5 text-end max-sm:hidden">
                       {view === 'waiting' ? <span className="num text-ink-2">{waited(r.requested_at)}</span>
                         : r.superseded && !r.decision ? <span className="pill pill-neutral">{t('inbox.closed')}</span>
+                        : r.kind === 'bp_change' ? <span className={clsx('pill', r.state === 'approved' ? 'pill-ok' : r.state === 'pending_approval' ? 'pill-warning' : r.state === 'rejected' ? 'pill-crit' : 'pill-neutral')}>{t(`md.req.pill.${r.state}`)}</span>
                         : r.kind === 'payment' ? <DraftStatePill state={r.state as DraftState} />
                         : r.kind === 'inventory_count' ? <CountStatePill state={r.state as CountState} />
                         : r.kind === 'journal' ? <JeStatePill state={r.state === 'approved' ? 'posted' : r.state} /> : <StatePill state={r.state as WorkflowState} />}

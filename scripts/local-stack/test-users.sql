@@ -52,3 +52,19 @@ INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_c
 ON CONFLICT (user_id) DO NOTHING;
 INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000008', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A5 · banking read-only (sees payments, deposits and statements; can't record or match anything).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_BANK_READ', 'QA · banking read-only', '{}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+DO $$ BEGIN
+  IF to_regclass('erp.position_module') IS NOT NULL THEN
+    INSERT INTO erp.position_module (position_code, module, level) VALUES ('QA_BANK_READ', 'banking', 'read')
+    ON CONFLICT (position_code, module) DO UPDATE SET level = EXCLUDED.level;
+  END IF;
+END $$;
+INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000009', 'ZZ99', 'QA Banking read-only', 'qa.bankread@sample.test', 'QA_BANK_READ', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000009', 'ZZ99')
+ON CONFLICT DO NOTHING;

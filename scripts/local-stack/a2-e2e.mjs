@@ -176,6 +176,8 @@ await pa.screenshot({ path: `${OUT}/a2-list-source-erp-en-light-1440.png`, fullP
   await pa.locator('[data-testid=so-line] input[id$="-discount_pct"]').first().fill('10');
   await pa.locator('[data-testid=so-preview]', { hasText: 'Goes straight to Open' }).waitFor({ timeout: 10000 }).catch(() => {});
   ok('edit: 10 % now "Goes straight to Open"', (await pa.locator('[data-testid=so-preview]', { hasText: 'Goes straight to Open' }).count()) === 1);
+  // A4: SMP-1040 has nothing Available-to-Promise in WH01, so the promise needs a confirming reason.
+  if (await pa.locator('#so-reason').count()) await pa.fill('#so-reason', 'Container due next week');
   await pa.click('#so-submit');
   await pa.waitForURL(new RegExp(`/docs/sales_order/ZZ99/${rej}$`), { timeout: 15000 }); await orderReady(pa);
   await pa.locator('h1 .pill', { hasText: 'Approved' }).waitFor({ timeout: 10000 }).catch(() => {});

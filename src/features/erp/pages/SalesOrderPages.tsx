@@ -178,10 +178,17 @@ export function SalesOrderEditPage({ kind = 'sales_order' }: { kind?: SalesKind 
         erp().rpc('sales_doc_info', { p_company: company, p_obj: obj, p_doc_entry: id }).then((r) => { if (r.error) throw new ApiError(r.error); return r.data as SoInfo | null; }),
       ]);
       if (le) throw new ApiError(le);
+      // Quotation numbers for lines copied from a quotation (A4).
+      const baseEntries = [...new Set(((ls ?? []) as R[]).map((l) => l.base_doc_entry).filter(Boolean))];
+      const baseNos = new Map<number, string>();
+      if (baseEntries.length) {
+        const { data: bw } = await erp().from('doc_workflow').select('doc_entry,doc_no').eq('company_code', company).eq('obj_type', 23).in('doc_entry', baseEntries);
+        for (const w of (bw ?? []) as R[]) baseNos.set(w.doc_entry, w.doc_no);
+      }
       const lines: FormLine[] = ((ls ?? []) as R[]).map((l) => ({
         key: `l${++lineSeq}`, item_code: l.item_code, qty: String(Number(l.quantity)), price: String(Number(l.price)), discount_pct: String(Number(l.discount_pct ?? 0)),
         tax_code: l.tax_code ?? '', text: `${l.item_code} · ${l.description ?? ''}`, name: l.description ?? '', uom: l.uom, hit: null,
-        base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line, baseNo: l.base_doc_entry ? String(l.base_doc_entry) : null,
+        base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line, baseNo: l.base_doc_entry ? baseNos.get(l.base_doc_entry) ?? String(l.base_doc_entry) : null,
       }));
       return {
         info,

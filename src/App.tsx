@@ -16,6 +16,7 @@ import {
   AccountsPage, BusinessPartnersPage, DocumentsPage, EmployeesPage, ItemsPage, JournalsPage, PaymentsPage, PricesPage, StockPage,
 } from '@/features/erp/pages/ListPages';
 import { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } from '@/features/erp/pages/DetailPages';
+import { SalesOrderDetailPage, SalesOrderEditPage, SalesOrderNewPage } from '@/features/erp/pages/SalesOrderPages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -61,6 +62,10 @@ export default function App() {
         <Route path="items/:company/:code" element={<ItemDetail />} />
         <Route path="inventory/stock" element={<StockPage />} />
         <Route path="inventory/prices" element={<PricesPage />} />
+        {/* A2: sales order document form (new, view for SAP + ERP orders, edit drafts) */}
+        <Route path="docs/sales_order/new" element={<SalesOrderNewPage />} />
+        <Route path="docs/sales_order/:company/:entry" element={<SalesOrderDetailPage />} />
+        <Route path="docs/sales_order/:company/:entry/edit" element={<SalesOrderEditPage />} />
         <Route path="docs/:kind" element={<DocumentsPage />} />
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />

@@ -10,11 +10,12 @@ import { erp } from '@/lib/supabase';
 import { ApiError, fmtInt } from '@/lib/format';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { rpc } from '../api';
+import { useInbox } from '../salesOrder';
 import { Kpi, LiveBadge, PageTitle, SectionCard, StatusTag, fmtMoney } from '../components/ui';
 import { RequireModule, useModuleAccess } from '../components/Guard';
 import { ModuleIcon } from '../icons';
 import {
-  DOC_KINDS, MODULES, PREVIEW_SCREENS, canOpenModule, docKindByObj, liveRouteForFunction, liveRouteForItem, moduleByKey,
+  DOC_KINDS, MODULES, PREVIEW_SCREENS, canOpenModule, canWriteModule, createRouteForFunction, docKindByObj, liveRouteForFunction, liveRouteForItem, moduleByKey,
   type MenuFunction, type MenuItem, type ModuleDef,
 } from '../modules';
 
@@ -35,12 +36,15 @@ export function HomePage() {
   const cur = profile?.companies.find((c) => c.company_code === company)?.currency ?? 'AED';
   const k = useQuery({ queryKey: ['home-kpis', company], queryFn: () => rpc<Kpis>('home_kpis', { p_company: pc(company) }) });
   const first = profile?.user?.display_name?.split(/\s+/)[0];
+  const inbox = useInbox();
+  const waitingMe = inbox.data?.waiting.length ?? 0;
 
   return (
     <div>
       <PageTitle eyebrow={t('erp.home.eyebrow')} title={first ? t('erp.home.hello', { name: first }) : t('nav.dashboard')} desc={t('erp.home.desc')} />
       {k.error ? <div className="card mb-6"><ErrorState error={k.error} onRetry={() => k.refetch()} /></div> : (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {inbox.data?.is_approver && <Kpi label={t('erp.home.waitingMe')} value={fmtInt(waitingMe)} sub={t('erp.home.waitingMeSub')} tone={waitingMe ? 'warn' : undefined} to="/approvals" />}
           {can('sales') && <Kpi label={t('erp.home.openSO')} value={k.data ? fmtInt(k.data.open_sales_orders.n) : '…'} sub={k.data && fmtMoney(k.data.open_sales_orders.value, cur)} to="/docs/sales_order?f_status=open" />}
           {can('purchasing') && <Kpi label={t('erp.home.openPO')} value={k.data ? fmtInt(k.data.open_purchase_orders.n) : '…'} sub={k.data && fmtMoney(k.data.open_purchase_orders.value, cur)} to="/docs/purchase_order?f_status=open" />}
           {can('sales') && <Kpi label={t('erp.home.overdueAR')} value={k.data ? fmtInt(k.data.overdue_ar.n) : '…'} sub={k.data && fmtMoney(k.data.overdue_ar.value, cur)} tone={k.data?.overdue_ar.n ? 'crit' : undefined} to="/docs/ar_invoice?f_status=open" />}
@@ -95,12 +99,15 @@ export function ModulePage({ moduleKey }: { moduleKey: string }) {
   const [sp, setSp] = useSearchParams();
   const [q, setQ] = useState('');
   const sel = Math.max(0, Number(sp.get('fn') ?? 0) || 0);
+  const levels = useAuth().profile?.levels ?? {};
   const ql = q.trim().toLowerCase();
   const list = useMemo(() => (m?.functions ?? []).map((f, i) => ({ f, i })).filter(({ f }) => !ql
     || f.name.toLowerCase().includes(ql) || f.desc.toLowerCase().includes(ql) || f.items.some((it) => it.name.toLowerCase().includes(ql))), [m, ql]);
   if (!m) return <PageTitle title={t('erp.notFound')} />;
+  const canCreate = canWriteModule(m, levels);
   const fn = m.functions[sel] ?? m.functions[0];
   const fnLive = liveRouteForFunction(m.key, fn.name);
+  const fnCreate = createRouteForFunction(m.key, fn.name);
 
   return (
     <RequireModule module={m.key}>
@@ -146,7 +153,12 @@ export function ModulePage({ moduleKey }: { moduleKey: string }) {
               </div>
               <p dir="auto" className="mt-2 text-[15px] text-ink-2">{fn.desc}</p>
               {fn.note && <p dir="auto" className="mt-3 rounded-btn border border-primary-line bg-primary-soft px-3 py-2 text-sm text-primary-text"><b>{t('erp.mod.note')}</b> {fn.note}</p>}
-              {fnLive && <Link to={fnLive} className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 font-medium text-white hover:bg-primary-hover">{t('erp.open', { name: fn.name })} <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden /></Link>}
+              {fnLive && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to={fnLive} className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 font-medium text-white hover:bg-primary-hover">{t('erp.open', { name: fn.name })} <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden /></Link>
+                  {fnCreate && canCreate && <Link to={fnCreate} className="inline-flex min-h-[44px] items-center gap-2 rounded-btn border border-line bg-surface px-4 font-medium text-ink hover:bg-page">{t('erp.createNew', { name: fn.name })}</Link>}
+                </div>
+              )}
               {!fnLive && fn.items.length === 0 && <p className="mt-4 text-sm text-muted">{t('erp.mod.planned')}</p>}
             </div>
           </SectionCard>

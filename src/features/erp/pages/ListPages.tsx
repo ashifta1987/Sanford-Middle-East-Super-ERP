@@ -9,6 +9,7 @@ import { LiveBadge, PageTitle, StatusTag, YesNo, fmtDay, fmtMoney, fmtQty } from
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
+import { NewSalesOrderAction, StatePill } from './SalesOrderPages';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -121,34 +122,51 @@ export function DocumentsPage() {
   const { t } = useTranslation();
   const { kind = '' } = useParams();
   const def = DOC_KINDS[kind as DocKind];
+  const so = kind === 'sales_order';
   const cfg = useMemo<ListConfig<R> | null>(() => def ? ({
-    id: `document-${kind}`, table: 'document',
-    select: 'company_code,obj_type,doc_entry,doc_num,doc_kind,status,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,paid,from_whs,to_whs',
-    searchCols: ['card_code', 'card_name', 'customer_ref', 'comments'], numberSearchCols: ['doc_num'], searchLabel: t('erp.search.doc'),
+    id: `document-${kind}`,
+    // Sales orders read the view with the Super ERP workflow state and number (17_sales_order.sql); other kinds read erp.document.
+    table: so ? 'sales_order_list' : 'document',
+    select: so
+      ? 'company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source'
+      : 'company_code,obj_type,doc_entry,doc_num,doc_kind,status,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,paid,from_whs,to_whs',
+    searchCols: so ? ['card_code', 'card_name', 'customer_ref', 'comments', 'doc_no'] : ['card_code', 'card_name', 'customer_ref', 'comments'],
+    numberSearchCols: ['doc_num'], searchLabel: t('erp.search.doc'),
     fixed: { doc_kind: kind },
-    filters: [{ key: 'status', label: t('erp.col.status'), options: [['open', t('erp.status.open')], ['closed', t('erp.status.closed')], ['cancelled', t('erp.status.cancelled')]] }],
+    filters: [
+      { key: 'status', label: t('erp.col.status'), options: [
+        ...(so ? [['draft', t('erp.status.draft')] as [string, string]] : []),
+        ['open', t('erp.status.open')], ['closed', t('erp.status.closed')], ['cancelled', t('erp.status.cancelled')]] },
+      ...(so ? [
+        { key: 'source', label: t('so.filter.source'), options: [['sap', 'SAP'], ['erp', 'Super ERP'], ['sample', t('erp.sampleData')]] as Array<[string, string]> },
+        { key: 'state', label: t('so.filter.approval'), options: [['pending_approval', t('so.state.pending_approval')], ['rejected', t('so.state.rejected')], ['draft', t('so.state.draft')]] as Array<[string, string]> },
+      ] : []),
+    ],
     defaultSort: { col: 'doc_date', asc: false },
     rowKey: (r) => `${r.company_code}|${r.obj_type}|${r.doc_entry}`,
     rowLink: (r) => `/docs/${kind}/${r.company_code}/${r.doc_entry}`,
     columns: [
-      { key: 'doc_num', header: t('erp.col.docNo'), mono: true },
+      so ? { key: 'doc_no', header: t('erp.col.docNo'), mono: true } : { key: 'doc_num', header: t('erp.col.docNo'), mono: true },
       { key: 'doc_date', header: t('erp.col.date'), cell: (r) => fmtDay(r.doc_date), csv: (r) => r.doc_date },
       ...(def.side === 'none'
         ? [{ key: 'from_whs', header: t('erp.col.warehouses'), cell: (r: R) => [r.from_whs, r.to_whs].filter(Boolean).join(' → ') || '—' }]
         : [{ key: 'card_name', header: def.side === 'customer' ? t('erp.col.customer') : t('erp.col.supplier'),
              cell: (r: R) => <span><span className="font-mono text-[13px] text-muted">{r.card_code}</span> {r.card_name}</span>, csv: (r: R) => `${r.card_code} ${r.card_name ?? ''}` }]),
       { key: 'due_date', header: t('erp.col.dueDate'), cell: (r) => fmtDay(r.due_date), csv: (r) => r.due_date, hideBelow: 'md' },
-      { key: 'status', header: t('erp.col.status'), cell: (r) => <StatusTag value={r.status} /> },
+      { key: 'status', header: t('erp.col.status'),
+        cell: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? <StatePill state={r.state} /> : <StatusTag value={r.status} />),
+        csv: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? r.state : r.status) },
+      ...(so ? [{ key: 'source', header: t('erp.col.source'), hideBelow: 'lg' as const, cell: (r: R) => (r.source === 'erp' ? 'Super ERP' : r.source === 'sap' ? 'SAP' : t('erp.sampleData')) }] : []),
       { key: 'total', header: t('erp.col.total'), align: 'end', cell: (r) => fmtMoney(r.total, r.currency) },
       ...(kind.endsWith('invoice') ? [{ key: 'paid', header: t('erp.col.openAmount'), align: 'end' as const, sortable: false,
         cell: (r: R) => fmtMoney(Number(r.total) - Number(r.paid ?? 0)), csv: (r: R) => Number(r.total) - Number(r.paid ?? 0) }] : []),
     ],
-  }) : null, [t, kind, def]);
+  }) : null, [t, kind, def, so]);
   if (!def || !cfg) return <PageTitle title={t('erp.notFound')} />;
   const title = t(`erp.doc.${kind}`, { defaultValue: def.title });
   return (
     <Frame module={def.module as ModuleKey} title={title} desc={t('erp.page.docsDesc')}
-      actions={kind === 'sales_order' ? <NotYet module="sales" label={t('erp.new.salesOrder')} stage={t('erp.stage', { n: 2 })} /> : undefined}>
+      actions={so ? <NewSalesOrderAction /> : undefined}>
       <ListScreen key={kind} config={cfg} />
     </Frame>
   );

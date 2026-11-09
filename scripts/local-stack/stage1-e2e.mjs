@@ -162,7 +162,8 @@ const browser = await chromium.launch();
   ok('Financials module blocked for sales user', (await page.locator('[role=alert]').count()) > 0);
   await page.goto(`${BASE}/docs/sales_order`); await settle(page);
   ok('sales user can read sales orders', (await rowsCount(page)) > 0);
-  ok('"New sales order" is disabled (Stage 2)', await page.locator('button:has-text("New sales order")').isDisabled());
+  // A2 made "New sales order" a working action for users with full Sales access (it was disabled "Stage 2" in Stage 1).
+  ok('"New sales order" is enabled for full Sales access (A2)', await page.locator('a#new-sales:has-text("New sales order")').isVisible());
   await page.screenshot({ path: `${OUT}/40-sales-user-orders.png`, fullPage: true });
   await ctx.close();
 }

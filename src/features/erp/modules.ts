@@ -73,7 +73,7 @@ export function canWriteModule(m: ModuleDef, levels: Record<string, 'read' | 'fu
   return m.access.some((a) => levels[a] === 'full');
 }
 
-// ---------- Which functions are connected to real data (Stage 1) ----------
+// ---------- Which functions are connected to real data (Stage 1 read; A2 adds Sales Order create + approval) ----------
 /** SAP document types as stored in erp.document (obj_type + doc_kind, see 11_erp_sync.sql). */
 export const DOC_KINDS = {
   sales_quotation: { obj: 23, title: 'Sales quotations', side: 'customer', module: 'sales' },
@@ -122,9 +122,17 @@ const LIVE_ITEMS: Record<string, string> = {
   'Inventory Transfer': '/docs/inventory_transfer', 'Inventory Status': '/inventory/stock', 'Items List': '/items',
   'Inventory in Warehouse Report': '/inventory/stock', 'Find an item': '/items', 'Stock per warehouse': '/inventory/stock', 'Price Report': '/inventory/prices',
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '',
+  'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
+  'New sales order': '/docs/sales_order/new',
+};
+
+/** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
+const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
+  sales: { 'Sales Order': '/docs/sales_order/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];
+export const createRouteForFunction = (m: ModuleKey, fn: string) => CREATE_FUNCTIONS[m]?.[fn];
 export const liveRouteForItem = (name: string) => LIVE_ITEMS[name] || undefined;
 
 /** Sub-screens drawn in the canvas (shown as labelled design previews until built). */

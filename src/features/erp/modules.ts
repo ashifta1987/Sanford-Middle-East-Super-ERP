@@ -121,6 +121,7 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   sales: {
     'Sales Quotation': '/docs/sales_quotation', 'Sales Order': '/docs/sales_order', Delivery: '/docs/delivery', Return: '/docs/sales_return',
     'A/R Down Payment Invoice': '/docs/ar_down_payment', 'A/R Invoice': '/docs/ar_invoice', 'A/R Credit Memo': '/docs/ar_credit_note',
+    'Available-to-Promise Check': '/sales/atp',
   },
   purchasing: {
     'Purchase Request': '/docs/purchase_request', 'Purchase Quotation': '/docs/purchase_quotation', 'Purchase Order': '/docs/purchase_order',
@@ -140,6 +141,11 @@ const LIVE_ITEMS: Record<string, string> = {
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '',
   'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
   'New sales order': '/docs/sales_order/new',
+  // A4 · sales cycle
+  'New quotation': '/docs/sales_quotation/new', 'Open quotations': '/docs/sales_quotation?f_status=open', 'Copy to sales order': '/docs/sales_quotation?f_status=open',
+  'Copy to delivery': '/docs/sales_order?f_status=open', 'New delivery': '/docs/sales_order?f_status=open',
+  'Delivery note': '/docs/delivery', 'New invoice': '/docs/ar_invoice/new', 'UAE tax invoice': '/docs/ar_invoice',
+  'Check an item': '/sales/atp', 'Promise a date': '/sales/atp', 'Sales ›': '/sales/atp-rules',
   // A3 · posting engine
   'New journal entry': '/financials/journals/new', 'Recent entries': '/financials/journals',
   'G/L Account Determination': '/financials/gl-determination', 'G/L Account Determination ›': '/financials/gl-determination',
@@ -148,7 +154,7 @@ const LIVE_ITEMS: Record<string, string> = {
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
 const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
-  sales: { 'Sales Order': '/docs/sales_order/new' },
+  sales: { 'Sales Quotation': '/docs/sales_quotation/new', 'Sales Order': '/docs/sales_order/new', 'A/R Invoice': '/docs/ar_invoice/new' },
   financials: { 'Journal Entry': '/financials/journals/new' },
 };
 

@@ -10,6 +10,7 @@ import { RequireModule, useModuleLevel } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
 import { NewSalesOrderAction, StatePill } from './SalesOrderPages';
+import { NewCycleAction } from './SalesCyclePages';
 import { DraftsLink, NewJournalAction } from './JournalPages';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -123,13 +124,15 @@ export function DocumentsPage() {
   const { t } = useTranslation();
   const { kind = '' } = useParams();
   const def = DOC_KINDS[kind as DocKind];
-  const so = kind === 'sales_order';
+  // Sales orders read sales_order_list (17); quotations, deliveries, invoices and credit memos read sales_doc_list (19): both carry
+  // the Super ERP workflow state and number. Other kinds read erp.document.
+  const cycle = ['sales_quotation', 'delivery', 'ar_invoice', 'ar_credit_note'].includes(kind);
+  const so = kind === 'sales_order' || cycle;
   const cfg = useMemo<ListConfig<R> | null>(() => def ? ({
     id: `document-${kind}`,
-    // Sales orders read the view with the Super ERP workflow state and number (17_sales_order.sql); other kinds read erp.document.
-    table: so ? 'sales_order_list' : 'document',
+    table: kind === 'sales_order' ? 'sales_order_list' : cycle ? 'sales_doc_list' : 'document',
     select: so
-      ? 'company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source'
+      ? `company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source${cycle ? ',paid' : ''}`
       : 'company_code,obj_type,doc_entry,doc_num,doc_kind,status,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,paid,from_whs,to_whs',
     searchCols: so ? ['card_code', 'card_name', 'customer_ref', 'comments', 'doc_no'] : ['card_code', 'card_name', 'customer_ref', 'comments'],
     numberSearchCols: ['doc_num'], searchLabel: t('erp.search.doc'),
@@ -140,6 +143,8 @@ export function DocumentsPage() {
         ['open', t('erp.status.open')], ['closed', t('erp.status.closed')], ['cancelled', t('erp.status.cancelled')]] },
       ...(so ? [
         { key: 'source', label: t('so.filter.source'), options: [['sap', 'SAP'], ['erp', 'Super ERP'], ['sample', t('erp.sampleData')]] as Array<[string, string]> },
+      ] : []),
+      ...(kind === 'sales_order' || kind === 'sales_quotation' ? [
         { key: 'state', label: t('so.filter.approval'), options: [['pending_approval', t('so.state.pending_approval')], ['rejected', t('so.state.rejected')], ['draft', t('so.state.draft')]] as Array<[string, string]> },
       ] : []),
     ],
@@ -162,12 +167,12 @@ export function DocumentsPage() {
       ...(kind.endsWith('invoice') ? [{ key: 'paid', header: t('erp.col.openAmount'), align: 'end' as const, sortable: false,
         cell: (r: R) => fmtMoney(Number(r.total) - Number(r.paid ?? 0)), csv: (r: R) => Number(r.total) - Number(r.paid ?? 0) }] : []),
     ],
-  }) : null, [t, kind, def, so]);
+  }) : null, [t, kind, def, so, cycle]);
   if (!def || !cfg) return <PageTitle title={t('erp.notFound')} />;
   const title = t(`erp.doc.${kind}`, { defaultValue: def.title });
   return (
     <Frame module={def.module as ModuleKey} title={title} desc={t('erp.page.docsDesc')}
-      actions={so ? <NewSalesOrderAction /> : undefined}>
+      actions={kind === 'sales_order' ? <NewSalesOrderAction /> : cycle ? <NewCycleAction kind={kind as DocKind} /> : undefined}>
       <ListScreen key={kind} config={cfg} />
     </Frame>
   );

@@ -102,8 +102,8 @@ function DocumentApprovals() {
                         </>
                       ) : (
                         <>
-                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/docs/sales_order/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
-                          <div dir="auto" className="text-xs text-muted">{t('erp.doc.sales_order')} · {r.card_code} {r.card_name}</div>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/docs/${r.kind}/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t(`inbox.kind.${r.kind}`)} · {r.card_code} {r.card_name}</div>
                         </>
                       )}
                     </td>

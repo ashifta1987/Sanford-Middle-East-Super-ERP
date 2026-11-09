@@ -142,7 +142,8 @@ ok('4. sales user sees "Approved"', (await pa.locator('h1 .pill', { hasText: 'Ap
 ok('totals updated to 1,258.36 (10 %)', (await pa.locator('[data-testid=so-total]').innerText()).includes('1,258.36'), await pa.locator('[data-testid=so-total]').innerText());
 ok('discount shows 10%', (await pa.locator('[data-testid=so-disc]').first().innerText()).includes('10%'));
 ok('activity: created, sent for approval, approved', (await pa.locator('[data-testid=so-activity] li').count()) === 3);
-ok('Copy to delivery disabled with the reason', (await pa.locator('#so-copy').isDisabled()) && (await pa.locator('text=Delivery comes in a later stage').count()) > 0);
+// A4 made Copy to delivery real: once the order is approved and open it is a link to the delivery form.
+ok('Copy to delivery enabled once approved (A4)', (await pa.locator('a#so-copy', { hasText: 'Copy to delivery' }).count()) === 1);
 await pa.screenshot({ path: `${OUT}/a2-order-approved-sales-en-light-1440.png`, fullPage: true });
 await pa.goto(`${BASE}/docs/sales_order?f_source=erp`); await settle(pa);
 const listRow = pa.locator('main table tbody tr', { hasText: docNo ?? 'SO-26-' });

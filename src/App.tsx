@@ -17,6 +17,9 @@ import {
 } from '@/features/erp/pages/ListPages';
 import { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } from '@/features/erp/pages/DetailPages';
 import { SalesOrderDetailPage, SalesOrderEditPage, SalesOrderNewPage } from '@/features/erp/pages/SalesOrderPages';
+import {
+  AtpCheckPage, AtpRulesPage, CreditMemoNewPage, DeliveryNewPage, InvoiceNewPage, SalesDocPage, SalesPrintPage,
+} from '@/features/erp/pages/SalesCyclePages';
 import { JournalDraftPage, JournalDraftsPage, JournalNewPage } from '@/features/erp/pages/JournalPages';
 import { GlDeterminationPage, PostingPeriodsPage } from '@/features/erp/pages/FinanceSetupPages';
 
@@ -42,6 +45,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* A4 · Print / PDF: a clean A4 page without the app shell */}
+      <Route path="/print/:kind/:company/:entry" element={<RequireAccess access="signedIn"><SalesPrintPage /></RequireAccess>} />
       <Route
         element={
           <RequireAccess access="signedIn">
@@ -68,6 +73,18 @@ export default function App() {
         <Route path="docs/sales_order/new" element={<SalesOrderNewPage />} />
         <Route path="docs/sales_order/:company/:entry" element={<SalesOrderDetailPage />} />
         <Route path="docs/sales_order/:company/:entry/edit" element={<SalesOrderEditPage />} />
+        {/* A4 · sales cycle */}
+        <Route path="docs/sales_quotation/new" element={<SalesOrderNewPage kind="sales_quotation" />} />
+        <Route path="docs/sales_quotation/:company/:entry" element={<SalesOrderDetailPage kind="sales_quotation" />} />
+        <Route path="docs/sales_quotation/:company/:entry/edit" element={<SalesOrderEditPage kind="sales_quotation" />} />
+        <Route path="docs/delivery/new" element={<DeliveryNewPage />} />
+        <Route path="docs/delivery/:company/:entry" element={<SalesDocPage key="delivery" kind="delivery" />} />
+        <Route path="docs/ar_invoice/new" element={<InvoiceNewPage />} />
+        <Route path="docs/ar_invoice/:company/:entry" element={<SalesDocPage key="ar_invoice" kind="ar_invoice" />} />
+        <Route path="docs/ar_credit_note/new" element={<CreditMemoNewPage />} />
+        <Route path="docs/ar_credit_note/:company/:entry" element={<SalesDocPage key="ar_credit_note" kind="ar_credit_note" />} />
+        <Route path="sales/atp" element={<AtpCheckPage />} />
+        <Route path="sales/atp-rules" element={<AtpRulesPage />} />
         <Route path="docs/:kind" element={<DocumentsPage />} />
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />

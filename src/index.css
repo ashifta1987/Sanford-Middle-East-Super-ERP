@@ -88,3 +88,19 @@
 @keyframes indeterminate { 0% { inset-inline-start: -35%; } 100% { inset-inline-start: 100%; } }
 .bar-indeterminate { position: absolute; top: 0; bottom: 0; width: 35%; animation: indeterminate 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .bar-indeterminate { animation: none; width: 100%; opacity: .5; } }
+
+/* A4 · Print / PDF sheet (sales documents). The paper is always light, also when the app is dark, so the tokens are
+   re-declared with their light values here. */
+.paper {
+  --c-surface: 255 255 255; --c-surface-2: 248 249 251; --c-line: 228 231 236; --c-line-strong: 208 213 221;
+  --c-ink: 16 24 40; --c-ink-2: 71 84 103; --c-muted: 93 107 130; --c-primary: 67 56 202; --c-primary-text: 55 48 163;
+  --c-neutral-bg: 242 244 247; --c-neutral-fg: 52 64 84; --c-warn-bg: 255 250 235; --c-warn-fg: 181 71 8;
+  color-scheme: light;
+}
+@media print {
+  @page { size: A4; margin: 12mm; }
+  .no-print { display: none !important; }
+  html, body { background: rgb(255 255 255) !important; }
+  .paper { box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; }
+  .paper tr { break-inside: avoid; }
+}

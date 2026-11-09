@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { AlertCircle, AlertTriangle, ArrowLeft, Check, ChevronRight, CircleCheck, CircleX, Pencil, Plus, Printer, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeft, Check, CircleCheck, CircleX, Pencil, Plus, Printer, Sparkles, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { useCompany } from '@/layout/CompanyContext';
 import { erp } from '@/lib/supabase';
@@ -16,9 +16,11 @@ import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
 import { moduleByKey } from '../modules';
+import { DocFlow } from '../components/DocFlow';
+import { copySource } from '../salesCycle';
 import {
-  itemPrice, itemStock, lineTotal, round2, searchCustomers, searchItems, soCancel, soChecks, soDecide, soSave, soSubmit, useSoInfo, useSoSetup,
-  type CustomerHit, type ItemHit, type SoCheck, type SoEval, type SoHeaderInput, type SoInfo, type SoLineInput, type SoSetup, type WorkflowState,
+  SALES_OBJ, itemPrice, itemStock, lineTotal, round2, searchCustomers, searchItems, soCancel, soChecks, soDecide, soSave, soSubmit, useSoInfo, useSoSetup,
+  type CustomerHit, type ItemHit, type SalesKind, type SoCheck, type SoEval, type SoHeaderInput, type SoInfo, type SoLineInput, type SoSetup, type WorkflowState,
 } from '../salesOrder';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -31,50 +33,34 @@ export function StatePill({ state }: { state: WorkflowState }) {
   const { t } = useTranslation();
   return <span className={clsx('pill', STATE_TONE[state])}>{t(`so.state.${state}`)}</span>;
 }
-function sourceLabel(source: string) {
+export function sourceLabel(source: string) {
   return source === 'erp' ? 'Super ERP' : source === 'sap' ? 'SAP Business One' : i18n.t('erp.sampleData');
 }
-function SourcePill({ source }: { source: string }) {
+export function SourcePill({ source }: { source: string }) {
   return <span className={clsx('pill', source === 'erp' ? 'pill-info' : 'pill-neutral')}>{sourceLabel(source)}</span>;
 }
-const fmtWhen = (iso: string | null | undefined) =>
+export const fmtWhen = (iso: string | null | undefined) =>
   !iso ? '—' : new Intl.DateTimeFormat(i18n.language === 'ar' ? 'ar-AE' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 const pct = (n: unknown) => `${fmtQty(n)}%`;
-function today() {
+export function today() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
 }
+/** i18n key for the document kind: quotations use their own wording (sq.*) where it differs, else the order's (so.*). */
+const tk = (kind: SalesKind, key: string): string | string[] => (kind === 'sales_quotation' ? [`sq.${key}`, `so.${key}`] : `so.${key}`);
 
-/** Quotation → Order → Delivery → Invoice → Payment. The order is the current step until delivery exists (A4). */
-function FlowStrip() {
-  const { t } = useTranslation();
-  const steps = ['quotation', 'order', 'delivery', 'invoice', 'payment'] as const;
-  return (
-    <ol className="mb-5 flex flex-wrap items-center gap-1.5" aria-label={t('so.flow.label')}>
-      {steps.map((s, i) => (
-        <li key={s} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted rtl:rotate-180" aria-hidden />}
-          <span aria-current={s === 'order' ? 'step' : undefined}
-            className={clsx('inline-flex min-h-[32px] items-center rounded-full border px-3 text-[13px] font-medium',
-              s === 'order' ? 'border-primary bg-primary-soft text-primary-text' : 'border-line bg-surface text-muted')}>
-            {t(`so.flow.${s}`)}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function DocHeader({ title, pills, sub, actions, onBack }: { title: string; pills?: ReactNode; sub?: ReactNode; actions?: ReactNode; onBack?: (e: React.MouseEvent) => void }) {
+export function DocHeader({ title, pills, sub, actions, onBack, kind = 'sales_order' }: {
+  title: string; pills?: ReactNode; sub?: ReactNode; actions?: ReactNode; onBack?: (e: React.MouseEvent) => void; kind?: string;
+}) {
   const { t } = useTranslation();
   const m = moduleByKey('sales')!;
   return (
     <header className="mb-4">
-      <Link to="/docs/sales_order" onClick={onBack} className="mb-2 inline-flex min-h-[32px] items-center gap-1 text-sm font-medium text-primary hover:underline">
+      <Link to={`/docs/${kind}`} onClick={onBack} className="mb-2 inline-flex min-h-[32px] items-center gap-1 text-sm font-medium text-primary hover:underline">
         <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden /> {t('so.back')}
       </Link>
-      <Crumbs items={[[t('nav.home'), '/'], [`${m.num} ${m.title}`, '/m/sales'], [t('erp.doc.sales_order'), '/docs/sales_order'], [title, undefined]]} />
+      <Crumbs items={[[t('nav.home'), '/'], [`${m.num} ${m.title}`, '/m/sales'], [t(`erp.doc.${kind}`), `/docs/${kind}`], [title, undefined]]} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 dir="auto" className="flex flex-wrap items-center gap-3 text-[26px] font-semibold leading-tight sm:text-[28px]">{title} {pills}</h1>
@@ -86,7 +72,7 @@ function DocHeader({ title, pills, sub, actions, onBack }: { title: string; pill
   );
 }
 
-function Totals({ before, discount, vat, total, currency }: { before: number; discount: number; vat: number; total: number; currency: string }) {
+export function Totals({ before, discount, vat, total, currency }: { before: number; discount: number; vat: number; total: number; currency: string }) {
   const { t } = useTranslation();
   return (
     <dl className="num ms-auto grid w-full max-w-xs grid-cols-2 gap-x-6 gap-y-1 border-t border-line p-5 text-[15px] sm:border-t-0">
@@ -98,7 +84,7 @@ function Totals({ before, discount, vat, total, currency }: { before: number; di
   );
 }
 
-function CheckNote({ message }: { message: string }) {
+export function CheckNote({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <p className="mt-1 flex items-start gap-1.5 text-[13px] text-warn-fg">
@@ -118,47 +104,84 @@ function checkText(c: SoCheck, info: SoInfo | null | undefined) {
   return i18n.t('so.checkDiscountOther', { line: c.line, value: fmtQty(c.value), limit: fmtQty(c.limit), name: info.submitted_by_name ?? '—' });
 }
 
-function AskAiCard() {
+function AskAiCard({ kind = 'sales_order' }: { kind?: SalesKind }) {
   const { t } = useTranslation();
   return (
-    <SectionCard title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4" aria-hidden />{t('so.askAi')}</span>} right={<span className="pill pill-neutral">{t('erp.planned')}</span>}>
-      <p className="p-5 text-sm text-muted">{t('so.askAiBody')}</p>
+    <SectionCard title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4" aria-hidden />{t(tk(kind, 'askAi'))}</span>} right={<span className="pill pill-neutral">{t('erp.planned')}</span>}>
+      <p className="p-5 text-sm text-muted">{t(tk(kind, 'askAiBody'))}</p>
     </SectionCard>
   );
 }
 
 // ---------- Form (new / edit) ----------
-interface FormLine extends SoLineInput { key: string; text: string; name: string; uom: string | null; hit: ItemHit | null }
+interface FormLine extends SoLineInput { key: string; text: string; name: string; uom: string | null; hit: ItemHit | null; baseNo?: string | null; baseOpen?: number | null }
 let lineSeq = 0;
 const newLine = (tax: string): FormLine => ({ key: `l${++lineSeq}`, item_code: '', qty: '1', price: '', discount_pct: '0', tax_code: tax, text: '', name: '', uom: null, hit: null });
 
-interface FormInitial { entry: number; docNo: string; header: SoHeaderInput; customer: CustomerHit | null; lines: FormLine[] }
+interface FormInitial { entry: number | null; docNo: string | null; header: SoHeaderInput; customer: CustomerHit | null; lines: FormLine[]; baseNo?: string }
 
-export function SalesOrderNewPage() {
-  return <RequireModule module="sales"><SalesOrderForm /></RequireModule>;
+const bpSelect = 'card_code,name,city,phone,trn,balance,credit_limit,price_list,payment_terms,slp_code,currency';
+
+/** New quotation or order. An order can start from an approved quotation (?company=&from=<quotation entry>): Copy to sales order. */
+export function SalesOrderNewPage({ kind = 'sales_order' }: { kind?: SalesKind }) {
+  const { t } = useTranslation();
+  const [params] = useSearchParams();
+  const from = Number(params.get('from')) || null;
+  const company = params.get('company') ?? '';
+  const q = useQuery({
+    queryKey: ['so-copy', company, from],
+    enabled: kind === 'sales_order' && Boolean(from && company),
+    queryFn: async (): Promise<FormInitial> => {
+      const src = await copySource(company, 23, from);
+      const h = src.header!;
+      const { data: bp } = await erp().from('business_partner').select(bpSelect).match({ company_code: company, card_code: h.card_code }).maybeSingle();
+      return {
+        entry: null, docNo: null, customer: (bp as CustomerHit | null) ?? null, baseNo: h.doc_no,
+        header: {
+          card_code: h.card_code, doc_date: today(), due_date: '', price_list: h.price_list ?? '', payment_terms: h.payment_terms ?? '',
+          slp_code: h.slp_code ?? '', whs_code: h.whs_code ?? '', customer_ref: h.customer_ref ?? '', comments: h.comments ?? '',
+        },
+        lines: src.lines.map((l) => ({
+          key: `l${++lineSeq}`, item_code: l.item_code, qty: String(Number(l.open_qty)), price: String(Number(l.price)), discount_pct: String(Number(l.discount_pct ?? 0)),
+          tax_code: l.tax_code ?? '', text: `${l.item_code} · ${l.description ?? ''}`, name: l.description ?? '', uom: l.uom, hit: null,
+          base_obj_type: 23, base_doc_entry: l.base_doc_entry, base_line: l.base_line, baseNo: l.base_doc_no, baseOpen: Number(l.open_qty),
+        })),
+      };
+    },
+  });
+  if (kind === 'sales_order' && from) {
+    let body: ReactNode;
+    if (q.isLoading) body = <PageLoading />;
+    else if (q.error) body = <div className="card"><ErrorState error={q.error} onRetry={() => q.refetch()} /></div>;
+    else if (!q.data?.lines.length) body = <div className="card"><EmptyState title={t('sc.nothingToCopy')} body={t('sc.nothingToCopyBody')} /></div>;
+    else body = <SalesOrderForm kind={kind} company={company} initial={q.data} />;
+    return <RequireModule module="sales">{body}</RequireModule>;
+  }
+  return <RequireModule module="sales"><SalesOrderForm kind={kind} /></RequireModule>;
 }
 
-export function SalesOrderEditPage() {
+export function SalesOrderEditPage({ kind = 'sales_order' }: { kind?: SalesKind }) {
   const { t } = useTranslation();
   const { company = '', entry = '' } = useParams();
   const id = Number(entry);
+  const obj = SALES_OBJ[kind];
   const q = useQuery({
-    queryKey: ['so-edit', company, id],
+    queryKey: ['so-edit', company, id, obj],
     queryFn: async (): Promise<{ init: FormInitial; info: SoInfo | null } | null> => {
-      const { data: d, error } = await erp().from('document').select('*').match({ company_code: company, obj_type: 17, doc_entry: id }).maybeSingle();
+      const { data: d, error } = await erp().from('document').select('*').match({ company_code: company, obj_type: obj, doc_entry: id }).maybeSingle();
       if (error) throw new ApiError(error);
       if (!d) return null;
       const doc = d as R;
       const [{ data: ls, error: le }, { data: bp }, info] = await Promise.all([
-        erp().from('document_line').select('*').match({ company_code: company, obj_type: 17, doc_entry: id }).order('line_num'),
-        erp().from('business_partner').select('card_code,name,city,phone,trn,balance,credit_limit,price_list,payment_terms,slp_code,currency')
-          .match({ company_code: company, card_code: doc.card_code ?? '' }).maybeSingle(),
-        erp().rpc('sales_order_info', { p_company: company, p_doc_entry: id }).then((r) => { if (r.error) throw new ApiError(r.error); return r.data as SoInfo | null; }),
+        erp().from('document_line').select('*').match({ company_code: company, obj_type: obj, doc_entry: id }).order('line_num'),
+        erp().from('business_partner').select(bpSelect).match({ company_code: company, card_code: doc.card_code ?? '' }).maybeSingle(),
+        erp().rpc('sales_doc_info', { p_company: company, p_obj: obj, p_doc_entry: id }).then((r) => { if (r.error) throw new ApiError(r.error); return r.data as SoInfo | null; }),
       ]);
       if (le) throw new ApiError(le);
       const lines: FormLine[] = ((ls ?? []) as R[]).map((l) => ({
         key: `l${++lineSeq}`, item_code: l.item_code, qty: String(Number(l.quantity)), price: String(Number(l.price)), discount_pct: String(Number(l.discount_pct ?? 0)),
         tax_code: l.tax_code ?? '', text: `${l.item_code} · ${l.description ?? ''}`, name: l.description ?? '', uom: l.uom, hit: null,
+        base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line, baseNo: l.base_doc_entry ? String(l.base_doc_entry) : null,
       }));
       return {
         info,
@@ -180,16 +203,18 @@ export function SalesOrderEditPage() {
     body = (
       <div className="card p-8 text-center" role="alert">
         <AlertCircle className="mx-auto h-8 w-8 text-muted" aria-hidden />
-        <p className="mt-3 font-medium">{t('so.cantEdit')}</p>
-        <p className="mt-1 text-sm text-muted">{q.data.info?.state === 'pending_approval' ? t('so.cantEditPending') : t('so.cantEditBody')}</p>
-        <Link to={`/docs/sales_order/${company}/${id}`} className="mt-5 inline-flex min-h-[44px] items-center rounded-btn border border-line px-4 font-medium hover:bg-page">{t('so.viewOrder')}</Link>
+        <p className="mt-3 font-medium">{t(tk(kind, 'cantEdit'))}</p>
+        <p className="mt-1 text-sm text-muted">{q.data.info?.state === 'pending_approval' ? t('so.cantEditPending') : t(tk(kind, 'cantEditBody'))}</p>
+        <Link to={`/docs/${kind}/${company}/${id}`} className="mt-5 inline-flex min-h-[44px] items-center rounded-btn border border-line px-4 font-medium hover:bg-page">{t(tk(kind, 'viewOrder'))}</Link>
       </div>
     );
-  } else body = <SalesOrderForm company={company} initial={q.data.init} />;
+  } else body = <SalesOrderForm kind={kind} company={company} initial={q.data.init} />;
   return <RequireModule module="sales">{body}</RequireModule>;
 }
 
-function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; initial?: FormInitial }) {
+function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }: { company?: string; initial?: FormInitial; kind?: SalesKind }) {
+  const obj = SALES_OBJ[kind];
+  const isQ = kind === 'sales_quotation';
   const { t } = useTranslation();
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -198,7 +223,7 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
   const { canWrite, readOnlyReason } = useModuleLevel('sales');
   const companies = profile?.companies ?? [];
   const [company, setCompany] = useState<string>(fixedCompany ?? (top !== 'GRP' ? top : profile?.user?.company_code ?? companies[0]?.company_code ?? ''));
-  const setup = useSoSetup(company || null);
+  const setup = useSoSetup(company || null, obj);
   const S: SoSetup | undefined = setup.data;
 
   const [entry, setEntry] = useState<number | null>(initial?.entry ?? null);
@@ -244,7 +269,7 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
     if (!company || !header.card_code || !filled.length) { setPreview(null); return; }
     let live = true;
     const h = setTimeout(() => {
-      soChecks(company, entry, header, filled).then((r) => { if (live) setPreview(r); }).catch(() => { if (live) setPreview(null); });
+      soChecks(company, entry, header, filled, obj).then((r) => { if (live) setPreview(r); }).catch(() => { if (live) setPreview(null); });
     }, 450);
     return () => { live = false; clearTimeout(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +293,11 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
   const checks = preview?.errors.length ? [] : preview?.checks ?? [];
   const lineChecks = (i: number) => checks.filter((c) => c.line === i + 1);
   const needsApproval = checks.length > 0;
+  // Available-to-Promise (orders): what each line can promise, and the lines that promise more.
+  const atpShort = preview?.errors.length ? [] : preview?.atp ?? [];
+  const atpLine = (i: number) => preview?.lines?.find((x) => x.line_num === i)?.atp ?? null;
+  const atpShortFor = (i: number) => atpShort.find((a) => a.line === i + 1);
+  const needsReason = needsApproval || atpShort.length > 0;
   const rules = [...new Set(checks.map((c) => ruleLabel(c.rule_code, c.rule_code === 'discount_pct' ? c.limit : null)))];
 
   function addLine(focus = true) {
@@ -298,24 +328,25 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
     setAttempted(true);
     setServerError(null);
     setReasonErr(null);
-    if (submit && needsApproval && !reason.trim()) { setReasonErr(t('so.reasonNeeded')); document.getElementById('so-reason')?.focus(); return; }
+    if (submit && needsReason && !reason.trim()) { setReasonErr(needsApproval ? t('so.reasonNeeded') : t('sc.atp.reasonNeeded')); document.getElementById('so-reason')?.focus(); return; }
     setBusy(submit ? 'submit' : 'save');
     let saved = entry;
     try {
-      const res = await soSave(company, entry, header, filled);
+      const res = await soSave(company, entry, header, filled, obj);
       saved = res.doc_entry;
       setEntry(res.doc_entry); setDocNo(res.doc_no);
       let state = res.state;
-      if (submit) state = (await soSubmit(company, res.doc_entry, reason.trim() || null)).state;
+      if (submit) state = (await soSubmit(company, res.doc_entry, reason.trim() || null, obj)).state;
       setDirty(false);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       qc.invalidateQueries({ queryKey: ['approval-inbox'] });
       // Drop cached copies so the order page never shows the old state while it reloads.
       qc.removeQueries({ queryKey: ['so-info', company, res.doc_entry] });
       qc.removeQueries({ queryKey: ['so-edit', company, res.doc_entry] });
-      qc.removeQueries({ queryKey: ['doc', 'sales_order', company, String(res.doc_entry)] });
-      const flash = !submit ? t('so.flash.saved') : state === 'approved' ? t('so.flash.open') : t('so.flash.pending');
-      nav(`/docs/sales_order/${company}/${res.doc_entry}`, { state: { flash } });
+      qc.removeQueries({ queryKey: ['doc', kind, company, String(res.doc_entry)] });
+      qc.invalidateQueries({ queryKey: ['sales-flow'] });
+      const flash = !submit ? t('so.flash.saved') : state === 'approved' ? t(tk(kind, 'flash.open')) : t('so.flash.pending');
+      nav(`/docs/${kind}/${company}/${res.doc_entry}`, { state: { flash } });
     } catch (e) {
       if (saved !== entry) setDirty(false);
       setServerError(errorMessage(e));
@@ -325,8 +356,8 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
     }
   }
 
-  const blocked = !canWrite ? readOnlyReason : S && !S.numbering && !entry ? t('so.noNumbering', { company }) : undefined;
-  const title = docNo ? t('so.titleNo', { no: docNo }) : t('so.titleNew');
+  const blocked = !canWrite ? readOnlyReason : S && !S.numbering && !entry ? t(tk(kind, 'noNumbering'), { company }) : undefined;
+  const title = docNo ? t(tk(kind, 'titleNo'), { no: docNo }) : t(tk(kind, 'titleNew'));
 
   const custOpts = async (q: string): Promise<Array<ComboOption<CustomerHit>>> => (await searchCustomers(company, q)).map((c) => ({
     value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c,
@@ -339,13 +370,13 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
 
   return (
     <div>
-      <DocHeader title={title} onBack={back}
+      <DocHeader kind={kind} title={title} onBack={back}
         pills={<><StatePill state="draft" /><SourcePill source="erp" /></>}
-        sub={customer ? [customer.name, customer.city].filter(Boolean).join(' · ') : t('so.subNew')}
+        sub={customer ? [customer.name, customer.city, initial?.baseNo ? t('sc.copiedFrom', { no: initial.baseNo }) : null].filter(Boolean).join(' · ') : t('so.subNew')}
         actions={
-          <Button variant="secondary" disabled disabledReason={t('so.copyLater')} id="so-copy">{t('so.copyToDelivery')}</Button>
+          <Button variant="secondary" disabled disabledReason={t('sc.copyAfterApproval')} id="so-copy">{isQ ? t('sc.copyToOrder') : t('so.copyToDelivery')}</Button>
         } />
-      <FlowStrip />
+      <DocFlow company={company} obj={obj} entry={entry} />
 
       {(serverError || problems.length > 0) && (
         <div role="alert" className="mb-5 rounded-card border border-crit-fg/30 bg-crit-bg p-4 text-crit-fg">
@@ -378,7 +409,7 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
                 <input id="so-doc_date" type="date" className="input num mt-1 text-[15px] text-ink" value={header.doc_date} onChange={(e) => setH({ doc_date: e.target.value })} aria-invalid={Boolean(fieldErr('doc_date'))} />
                 {fieldErr('doc_date') && <span className="mt-1 block text-crit-fg">{fieldErr('doc_date')}</span>}
               </label>
-              <label className="block text-xs font-medium text-muted">{t('so.deliveryDate')}
+              <label className="block text-xs font-medium text-muted">{t(tk(kind, 'deliveryDate'))}
                 <input id="so-due_date" type="date" className="input num mt-1 text-[15px] text-ink" value={header.due_date} onChange={(e) => setH({ due_date: e.target.value })} aria-invalid={Boolean(fieldErr('due_date'))} />
                 {fieldErr('due_date') && <span className="mt-1 block text-crit-fg">{fieldErr('due_date')}</span>}
               </label>
@@ -418,17 +449,29 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
                 const stock = l.hit ? itemStock(l.hit, header.whs_code) : null;
                 const listPrice = l.hit ? itemPrice(l.hit, priceList) : null;
                 return (
-                  <li key={l.key} data-testid="so-line" className={clsx('px-4 py-3', lc.length > 0 && 'bg-warn-bg')}>
+                  <li key={l.key} data-testid="so-line" className={clsx('px-4 py-3', (lc.length > 0 || atpShortFor(i)) && 'bg-warn-bg')}>
                     <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-[96px_128px_96px_128px_minmax(0,1fr)_44px]">
                       <div className="col-span-2 min-w-0 md:col-span-6">
-                        <Combobox<ItemHit> id={`line-${l.key}-item`} label={t('so.itemN', { n: i + 1 })}
-                          text={l.text} onText={(s) => setL(l.key, { text: s, ...(l.item_code ? { item_code: '', hit: null, name: '' } : {}) })}
-                          search={itemOpts} placeholder={t('so.itemPh')} noMatch={t('so.combo.noItem')}
-                          onSelect={(o) => setL(l.key, { item_code: o.value, text: o.label, name: o.data.name, uom: o.data.sales_uom, hit: o.data, price: '' })} />
+                        {l.base_doc_entry != null ? (
+                          <div>
+                            <span className="block text-xs font-medium text-muted">{t('so.itemN', { n: i + 1 })}</span>
+                            <p id={`line-${l.key}-item`} dir="auto" className="mt-1 flex min-h-[44px] items-center rounded-btn border border-line bg-surface-2 px-3 text-[15px] font-semibold">{l.name || l.item_code}</p>
+                          </div>
+                        ) : (
+                          <Combobox<ItemHit> id={`line-${l.key}-item`} label={t('so.itemN', { n: i + 1 })}
+                            text={l.text} onText={(s) => setL(l.key, { text: s, ...(l.item_code ? { item_code: '', hit: null, name: '' } : {}) })}
+                            search={itemOpts} placeholder={t('so.itemPh')} noMatch={t('so.combo.noItem')}
+                            onSelect={(o) => setL(l.key, { item_code: o.value, text: o.label, name: o.data.name, uom: o.data.sales_uom, hit: o.data, price: '' })} />
+                        )}
                         {l.item_code && (
                           <p className="mt-1 text-xs text-muted">
                             <span className="font-mono">{l.item_code}</span>
                             {l.hit && <> · <span className="num">{t('so.inStock', { n: fmtQty(stock ?? 0) })}</span></>}
+                            {l.base_doc_entry != null && <> · {t('sc.fromBase', { no: l.baseNo ?? l.base_doc_entry, line: (l.base_line ?? 0) + 1 })}{l.baseOpen != null ? ` · ${t('sc.openOnBase', { n: fmtQty(l.baseOpen) })}` : ''}</>}
+                            {atpLine(i)?.available != null && (
+                              <> · <span className={clsx('num', atpShortFor(i) ? 'font-semibold text-warn-fg' : '')} data-testid="atp-note">
+                                {t('sc.atp.canPromise', { n: fmtQty(Math.max(Number(atpLine(i)!.available), 0)), date: fmtDay(atpLine(i)!.date) })}</span></>
+                            )}
                           </p>
                         )}
                       </div>
@@ -465,6 +508,7 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
                       </div>
                     </div>
                     {lc.map((c, k) => <CheckNote key={k} message={c.message} />)}
+                    {atpShortFor(i) && <CheckNote message={atpShortFor(i)!.message} />}
                     {lineProblems.map((p, k) => <p key={k} className="mt-1 flex items-start gap-1 text-[13px] text-crit-fg"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{p.message}</p>)}
                   </li>
                 );
@@ -499,12 +543,18 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
                     {[...new Set(checks.map((c) => c.approver_name))].map((n) => <li key={n}>{t('so.approver', { name: n })}</li>)}
                   </ul>
                 </div>
+              ) : atpShort.length > 0 ? (
+                <div data-testid="so-preview" className="rounded-btn border border-warn-fg/30 bg-warn-bg p-3 text-sm text-warn-fg">
+                  <p className="font-semibold">{t('so.straightToOpen')}</p>
+                  <p className="mt-1">{t('sc.atp.confirm', { count: atpShort.length })}</p>
+                </div>
               ) : (
                 <p data-testid="so-preview" className="flex items-center gap-2 rounded-btn bg-ok-bg p-3 text-sm font-medium text-ok-fg"><Check className="h-4 w-4" aria-hidden />{t('so.straightToOpen')}</p>
               )}
-              {needsApproval && (
-                <label className="block text-xs font-medium text-muted">{t('so.reason')} <span className="text-crit-fg">*</span>
-                  <textarea id="so-reason" rows={3} dir="auto" className="input mt-1 py-2 text-[15px] text-ink" value={reason} placeholder={t('so.reasonPh')}
+              {needsApproval && atpShort.length > 0 && <p className="text-sm text-warn-fg">{t('sc.atp.confirm', { count: atpShort.length })}</p>}
+              {needsReason && (
+                <label className="block text-xs font-medium text-muted">{needsApproval ? t('so.reason') : t('sc.atp.reason')} <span className="text-crit-fg">*</span>
+                  <textarea id="so-reason" rows={3} dir="auto" className="input mt-1 py-2 text-[15px] text-ink" value={reason} placeholder={needsApproval ? t(tk(kind, 'reasonPh')) : t('sc.atp.reasonPh')}
                     onChange={(e) => { setReason(e.target.value); setReasonErr(null); }} aria-invalid={Boolean(reasonErr)} aria-describedby={reasonErr ? 'so-reason-err' : undefined} />
                   {reasonErr && <span id="so-reason-err" className="mt-1 block text-crit-fg">{reasonErr}</span>}
                 </label>
@@ -516,12 +566,12 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
                 <Button variant="secondary" id="so-save" className="w-full" onClick={() => save(false)} disabled={Boolean(blocked) || busy !== null || !company}>
                   {busy === 'save' ? t('so.saving') : t('so.saveDraft')}
                 </Button>
-                <Link to={entry ? `/docs/sales_order/${company}/${entry}` : '/docs/sales_order'} onClick={back} className="inline-flex min-h-[44px] items-center justify-center rounded-btn px-4 text-[15px] font-medium text-ink hover:bg-page">{t('so.cancelEdit')}</Link>
+                <Link to={entry ? `/docs/${kind}/${company}/${entry}` : `/docs/${kind}`} onClick={back} className="inline-flex min-h-[44px] items-center justify-center rounded-btn px-4 text-[15px] font-medium text-ink hover:bg-page">{t('so.cancelEdit')}</Link>
               </div>
             </div>
           </SectionCard>
 
-          {customer && (
+          {customer && !isQ && (
             <SectionCard title={t('so.creditTitle')}>
               <dl className="num grid grid-cols-2 gap-x-4 gap-y-1 p-5 text-sm">
                 <dt className="text-muted">{t('erp.col.creditLimit')}</dt><dd className="text-end">{customer.credit_limit != null ? fmtMoney(customer.credit_limit, currency) : t('so.notSet')}</dd>
@@ -535,43 +585,45 @@ function SalesOrderForm({ company: fixedCompany, initial }: { company?: string; 
               </dl>
             </SectionCard>
           )}
-          <AskAiCard />
+          <AskAiCard kind={kind} />
         </aside>
       </div>
     </div>
   );
 }
 
-// ---------- Order page (SAP, sample and Super ERP orders) ----------
-export function SalesOrderDetailPage() {
+// ---------- Quotation / order page (SAP, sample and Super ERP documents) ----------
+export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKind }) {
   const { t } = useTranslation();
   const { company = '', entry = '' } = useParams();
   const id = Number(entry);
+  const obj = SALES_OBJ[kind];
   const loc = useLocation();
   const qc = useQueryClient();
   const [flash, setFlash] = useState<string | null>((loc.state as { flash?: string } | null)?.flash ?? null);
   const q = useQuery({
-    queryKey: ['doc', 'sales_order', company, entry],
+    queryKey: ['doc', kind, company, entry],
     queryFn: async () => {
-      const { data, error } = await erp().from('document').select('*').match({ company_code: company, obj_type: 17, doc_entry: id }).maybeSingle();
+      const { data, error } = await erp().from('document').select('*').match({ company_code: company, obj_type: obj, doc_entry: id }).maybeSingle();
       if (error) throw new ApiError(error);
       if (!data) return null;
-      const { data: ls, error: le } = await erp().from('document_line').select('*').match({ company_code: company, obj_type: 17, doc_entry: id }).order('line_num');
+      const { data: ls, error: le } = await erp().from('document_line').select('*').match({ company_code: company, obj_type: obj, doc_entry: id }).order('line_num');
       if (le) throw new ApiError(le);
       return { doc: data as R, lines: (ls ?? []) as R[] };
     },
   });
   const isErp = q.data?.doc.source === 'erp';
-  const info = useSoInfo(company, id, Boolean(isErp));
-  const setup = useSoSetup(q.data ? company : null);
+  const info = useSoInfo(company, id, Boolean(isErp), obj);
+  const setup = useSoSetup(q.data ? company : null, obj);
   const I = info.data;
   const d = q.data?.doc;
 
   useEffect(() => { if (flash) { const h = setTimeout(() => setFlash(null), 6000); return () => clearTimeout(h); } }, [flash]);
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['doc', 'sales_order', company, entry] });
+    qc.invalidateQueries({ queryKey: ['doc', kind, company, entry] });
     qc.invalidateQueries({ queryKey: ['so-info', company, id] });
+    qc.invalidateQueries({ queryKey: ['sales-flow'] });
     qc.invalidateQueries({ queryKey: ['approval-inbox'] });
     qc.invalidateQueries({ queryKey: ['erp-list'] });
   };
@@ -580,12 +632,13 @@ export function SalesOrderDetailPage() {
   if (q.isLoading || (isErp && info.isLoading)) body = <PageLoading />;
   else if (q.error || info.error) body = <div className="card"><ErrorState error={q.error ?? info.error} onRetry={() => { q.refetch(); info.refetch(); }} /></div>;
   else if (!d) body = <div className="card"><EmptyState title={t('erp.notFound')} body={t('erp.notFoundBody')} /></div>;
-  if (body) return <RequireModule module="sales"><DocHeader title={t('erp.doc.sales_order')} />{body}</RequireModule>;
+  if (body) return <RequireModule module="sales"><DocHeader kind={kind} title={t(`erp.doc.${kind}`)} />{body}</RequireModule>;
 
   const S = setup.data;
   const lines = q.data!.lines;
   const docNo = I?.doc_no ?? String(d!.doc_num);
-  const title = t('so.titleNo', { no: docNo });
+  const title = t(tk(kind, 'titleNo'), { no: docNo });
+  const showOpen = isErp && (d!.status === 'open' || d!.status === 'closed');
   const pending = (I?.approvals ?? []).filter((a) => a.current);
   const flagged = new Map<number, SoCheck[]>();
   for (const a of pending) for (const c of a.detail?.checks ?? []) if (c.line) flagged.set(c.line, [...(flagged.get(c.line) ?? []), c]);
@@ -596,11 +649,11 @@ export function SalesOrderDetailPage() {
 
   return (
     <RequireModule module="sales">
-      <DocHeader title={title}
-        pills={<>{I?.workflow && I.state ? <StatePill state={I.state} /> : <StatusTag value={d!.status} />}<SourcePill source={d!.source} /><LiveBadge live /></>}
+      <DocHeader kind={kind} title={title}
+        pills={<>{I?.workflow && I.state ? (I.state === 'approved' && d!.status !== 'open' ? <StatusTag value={d!.status} /> : <StatePill state={I.state} />) : <StatusTag value={d!.status} />}<SourcePill source={d!.source} /><LiveBadge live /></>}
         sub={sub}
-        actions={<OrderActions company={company} id={id} info={I} docNo={docNo} onDone={refresh} />} />
-      <FlowStrip />
+        actions={<OrderActions kind={kind} company={company} id={id} info={I} docNo={docNo} onDone={refresh} />} />
+      <DocFlow company={company} obj={obj} entry={id} />
       {flash && <p role="status" className="mb-4 flex items-center gap-2 rounded-btn border border-ok-fg/30 bg-ok-bg px-4 py-3 text-sm font-medium text-ok-fg"><CircleCheck className="h-4 w-4" aria-hidden />{flash}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -609,7 +662,7 @@ export function SalesOrderDetailPage() {
             <Fields items={[
               [t('erp.col.customer'), <Link className="text-primary hover:underline" to={`/bp/${company}/${encodeURIComponent(d!.card_code ?? '')}`}>{d!.card_code} · {d!.card_name}</Link>],
               [t('erp.col.postingDate'), fmtDay(d!.doc_date)],
-              [t('so.deliveryDate'), fmtDay(d!.due_date)],
+              [t(tk(kind, 'deliveryDate')), fmtDay(d!.due_date)],
               [t('erp.col.priceList'), I?.price_list != null ? S?.price_lists.find((p) => p.code === I.price_list)?.name ?? I.price_list : null],
               [t('so.paymentTerms'), I?.payment_terms != null ? S?.payment_terms.find((p) => p.code === I.payment_terms)?.name ?? I.payment_terms : null],
               [t('erp.col.warehouse'), I?.whs_code ?? ([...new Set(lines.map((l) => l.whs_code).filter(Boolean))].join(', ') || null)],
@@ -628,6 +681,7 @@ export function SalesOrderDetailPage() {
                     <th scope="col" className="px-4 py-2.5 text-end">{t('erp.col.qty')}</th>
                     <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{t('so.unitPrice')}</th>
                     <th scope="col" className="px-4 py-2.5 text-end">{t('so.disc')}</th>
+                    {showOpen && <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{t(kind === 'sales_quotation' ? 'sc.col.notOrdered' : 'sc.col.notDelivered')}</th>}
                     <th scope="col" className="px-4 py-2.5 text-end">{t('erp.col.lineTotal')}</th>
                   </tr></thead>
                   <tbody>
@@ -643,6 +697,7 @@ export function SalesOrderDetailPage() {
                           <td className="num px-4 py-2.5 text-end">{fmtQty(l.quantity)} <span className="text-muted">{l.uom}</span></td>
                           <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(l.price)}</td>
                           <td className="px-4 py-2.5 text-end">{Number(l.discount_pct) ? <span className={clsx('pill num', fc.some((c) => c.rule_code === 'discount_pct') ? 'pill-warning' : 'pill-neutral')} data-testid="so-disc">{pct(l.discount_pct)}</span> : '—'}</td>
+                          {showOpen && <td className="num px-4 py-2.5 text-end max-sm:hidden" data-testid="so-open-qty">{fmtQty(l.line_status === 'C' ? 0 : l.open_qty)}</td>}
                           <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(l.line_total)}</td>
                         </tr>
                       );
@@ -656,46 +711,55 @@ export function SalesOrderDetailPage() {
         </div>
 
         <aside className="min-w-0 space-y-5">
-          {I?.workflow ? <ApprovalPanel company={company} id={id} info={I} docNo={docNo} onDone={(msg) => { setFlash(msg); refresh(); }} /> : (
-            <SectionCard title={t('so.sourceTitle')}><p className="p-5 text-sm text-muted">{d!.source === 'sap' ? t('so.sapReadOnly') : t('so.sampleReadOnly')}</p></SectionCard>
+          {I?.workflow ? <ApprovalPanel kind={kind} company={company} id={id} info={I} docNo={docNo} onDone={(msg) => { setFlash(msg); refresh(); }} /> : (
+            <SectionCard title={t('so.sourceTitle')}><p className="p-5 text-sm text-muted">{d!.source === 'sap' ? t(tk(kind, 'sapReadOnly')) : t('so.sampleReadOnly')}</p></SectionCard>
           )}
-          {I?.workflow && <ActivityCard info={I} />}
-          <AskAiCard />
+          {I?.workflow && <ActivityCard kind={kind} info={I} />}
+          <AskAiCard kind={kind} />
         </aside>
       </div>
     </RequireModule>
   );
 }
 
-function OrderActions({ company, id, info, docNo, onDone }: { company: string; id: number; info: SoInfo | undefined | null; docNo: string; onDone: () => void }) {
+function OrderActions({ company, id, info, docNo, onDone, kind }: { company: string; id: number; info: SoInfo | undefined | null; docNo: string; onDone: () => void; kind: SalesKind }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const approved = info?.state === 'approved';
+  const isQ = kind === 'sales_quotation';
+  const copyLabel = isQ ? t('sc.copyToOrder') : t('so.copyToDelivery');
+  const copyTo = isQ ? `/docs/sales_order/new?company=${company}&from=${id}` : `/docs/delivery/new?company=${company}&order=${id}`;
+  const copyReason = !info?.workflow ? t('sc.copyErpOnly') : info.copy_block ? t(`sc.copyBlock.${info.copy_block}`) : undefined;
   async function cancel() {
     setErr(null);
-    if (!note.trim()) { setErr(t('so.cancelNoteNeeded')); return; }
+    if (!note.trim()) { setErr(t(tk(kind, 'cancelNoteNeeded'))); return; }
     setBusy(true);
-    try { await soCancel(company, id, note.trim()); setOpen(false); onDone(); } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
+    try { await soCancel(company, id, note.trim(), SALES_OBJ[kind]); setOpen(false); onDone(); } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
   return (
     <>
       {info?.can_edit && (
-        <Link to={`/docs/sales_order/${company}/${id}/edit`} id="so-edit" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-medium text-white hover:bg-primary-hover">
+        <Link to={`/docs/${kind}/${company}/${id}/edit`} id="so-edit" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-medium text-white hover:bg-primary-hover">
           <Pencil className="h-4 w-4" aria-hidden />{info.state === 'rejected' ? t('so.editResubmit') : t('so.editDraft')}
         </Link>
       )}
-      <Button variant="secondary" onClick={() => window.print()} icon={<Printer className="h-4 w-4" aria-hidden />}>{t('so.print')}</Button>
-      <Button variant="secondary" id="so-copy" disabled disabledReason={approved || !info?.workflow ? t('so.copyLater') : t('so.copyAfterApproval')}>{t('so.copyToDelivery')}</Button>
-      {info?.can_cancel && <Button variant="danger" id="so-cancel" onClick={() => { setOpen(true); setErr(null); }}>{t('so.cancelOrder')}</Button>}
-      <Dialog open={open} title={t('so.cancelTitle', { no: docNo })} onClose={() => setOpen(false)}
+      <Link to={`/print/${kind}/${company}/${id}`} id="so-print" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn border border-line bg-surface px-4 text-[15px] font-medium text-ink hover:bg-page">
+        <Printer className="h-4 w-4" aria-hidden />{t('so.print')}
+      </Link>
+      {info?.can_copy ? (
+        <Link to={copyTo} id="so-copy" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-medium text-white hover:bg-primary-hover">{copyLabel}</Link>
+      ) : (
+        <Button variant="secondary" id="so-copy" disabled disabledReason={copyReason}>{copyLabel}</Button>
+      )}
+      {info?.can_cancel && <Button variant="danger" id="so-cancel" onClick={() => { setOpen(true); setErr(null); }}>{t(tk(kind, 'cancelOrder'))}</Button>}
+      <Dialog open={open} title={t(tk(kind, 'cancelTitle'), { no: docNo })} onClose={() => setOpen(false)}
         footer={<>
           <Button variant="secondary" onClick={() => setOpen(false)}>{t('so.keep')}</Button>
-          <Button variant="danger" id="so-cancel-confirm" onClick={cancel} disabled={busy}>{t('so.cancelOrder')}</Button>
+          <Button variant="danger" id="so-cancel-confirm" onClick={cancel} disabled={busy}>{t(tk(kind, 'cancelOrder'))}</Button>
         </>}>
-        <p className="text-sm text-ink-2">{t('so.cancelBody')}</p>
+        <p className="text-sm text-ink-2">{t(tk(kind, 'cancelBody'))}</p>
         <label className="block text-xs font-medium text-muted">{t('so.note')} <span className="text-crit-fg">*</span>
           <textarea id="so-cancel-note" rows={3} dir="auto" className="input mt-1 py-2 text-[15px] text-ink" value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
@@ -705,7 +769,7 @@ function OrderActions({ company, id, info, docNo, onDone }: { company: string; i
   );
 }
 
-function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; id: number; info: SoInfo; docNo: string; onDone: (msg: string) => void }) {
+function ApprovalPanel({ company, id, info, docNo, onDone, kind }: { company: string; id: number; info: SoInfo; docNo: string; onDone: (msg: string) => void; kind: SalesKind }) {
   const { t } = useTranslation();
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -723,12 +787,12 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
 
   async function decide(decision: 'approved' | 'rejected', n: number | null = null) {
     setErr(null);
-    if (decision === 'rejected' && !note.trim()) { setNoteErr(t('so.rejectNoteNeeded')); return; }
+    if (decision === 'rejected' && !note.trim()) { setNoteErr(t(tk(kind, 'rejectNoteNeeded'))); return; }
     setBusy(true);
     try {
-      const r = await soDecide(company, id, decision, decision === 'rejected' ? note.trim() : null, n);
+      const r = await soDecide(company, id, decision, decision === 'rejected' ? note.trim() : null, n, SALES_OBJ[kind]);
       setRejOpen(false);
-      onDone(decision === 'rejected' ? t('so.flash.rejected') : r.state === 'approved' ? t('so.flash.approved') : t('so.flash.stepApproved'));
+      onDone(decision === 'rejected' ? t('so.flash.rejected') : r.state === 'approved' ? t(tk(kind, 'flash.approved')) : t(tk(kind, 'flash.stepApproved')));
     } catch (e) {
       const m = errorMessage(e);
       if (decision === 'rejected') setNoteErr(m); else setErr(m);
@@ -761,7 +825,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
             <Button variant="danger" id="so-reject" className="w-full" disabled={busy} onClick={() => { setRejOpen(true); setNoteErr(null); }} icon={<X className="h-4 w-4" aria-hidden />}>{t('so.approval.reject')}</Button>
           </div>
         </div>
-        <Dialog open={rejOpen} title={t('so.approval.rejectTitle', { no: docNo })} onClose={() => setRejOpen(false)}
+        <Dialog open={rejOpen} title={t(tk(kind, 'approval.rejectTitle'), { no: docNo })} onClose={() => setRejOpen(false)}
           footer={<>
             <Button variant="secondary" onClick={() => setRejOpen(false)}>{t('so.keep')}</Button>
             <Button variant="danger" id="so-reject-confirm" disabled={busy} onClick={() => decide('rejected')}>{t('so.approval.reject')}</Button>
@@ -784,7 +848,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
         <p className="flex items-center gap-2 font-semibold">{ok ? <CircleCheck className="h-5 w-5" aria-hidden /> : <CircleX className="h-5 w-5" aria-hidden />}
           {t(ok ? 'so.approval.approvedByYou' : 'so.approval.rejectedByYou', { when: fmtWhen(myLast.decided_at) })}</p>
         {myLast.note && <p dir="auto" className="mt-2 text-sm">“{myLast.note}”</p>}
-        <p className="mt-2 text-sm">{t('so.approval.requesterSees', { name: info.submitted_by_name ?? info.created_by_name ?? '—' })}</p>
+        <p className="mt-2 text-sm">{t(tk(kind, 'approval.requesterSees'), { name: info.submitted_by_name ?? info.created_by_name ?? '—' })}</p>
       </section>
     );
   }
@@ -801,7 +865,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
             <p className="font-semibold text-warn-fg">{t('so.approval.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>
             {current.map((a) => (a.detail?.checks ?? []).map((c, k) => <p key={`${a.approval_id}-${k}`} dir="auto" className="text-ink-2">{checkText(c, info)}</p>))}
             {info.reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{info.reason}”</blockquote>}
-            {info.is_submitter && <p className="text-muted">{t('so.approval.youCantApprove')}</p>}
+            {info.is_submitter && <p className="text-muted">{t(tk(kind, 'approval.youCantApprove'))}</p>}
           </>
         )}
         {info.state === 'approved' && (
@@ -813,7 +877,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
           <>
             <p className="flex items-center gap-2 font-semibold text-crit-fg"><CircleX className="h-4 w-4" aria-hidden />{t('so.approval.rejectedBy', { name: lastRej.decided_by_name ?? '—', when: fmtWhen(lastRej.decided_at) })}</p>
             {lastRej.note && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{lastRej.note}”</blockquote>}
-            {info.can_edit && <p className="text-muted">{t('so.approval.fixAndResubmit')}</p>}
+            {info.can_edit && <p className="text-muted">{t(tk(kind, 'approval.fixAndResubmit'))}</p>}
           </>
         )}
         {info.state === 'cancelled' && (
@@ -827,7 +891,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone }: { company: string; 
   );
 }
 
-function ActivityCard({ info }: { info: SoInfo }) {
+function ActivityCard({ info, kind }: { info: SoInfo; kind: SalesKind }) {
   const { t } = useTranslation();
   const items = info.activity ?? [];
   return (
@@ -836,12 +900,15 @@ function ActivityCard({ info }: { info: SoInfo }) {
         <ol className="space-y-4 p-5" data-testid="so-activity">
           {items.map((a, i) => {
             const det = (a.detail ?? {}) as R;
-            const result = a.action === 'sales_order_submit' ? (det.result === 'approved' ? 'submitOpen' : 'submitPending') : a.action.replace('sales_order_', '');
+            const verb = a.action.replace(/^(sales_order|sales_quotation)_/, '');
+            const result = verb === 'submit' ? (det.result === 'approved' ? 'submitOpen' : 'submitPending') : verb;
+            const atp = Array.isArray(det.atp) ? (det.atp as Array<{ message: string }>) : [];
             return (
               <li key={i} className="relative flex gap-3">
                 <span className={clsx('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', a.action.endsWith('approve') ? 'bg-ok-fg' : a.action.endsWith('reject') || a.action.endsWith('cancel') ? 'bg-crit-fg' : 'bg-primary')} aria-hidden />
                 <div className="min-w-0 text-sm">
-                  <p><span className="font-medium">{a.actor_name}</span> {t(`so.activity.${result}`, { defaultValue: a.action })}</p>
+                  <p><span className="font-medium">{a.actor_name}</span> {t(tk(kind, `activity.${result}`), { defaultValue: a.action })}</p>
+                  {atp.length > 0 && <p className="text-warn-fg">{t('sc.atp.logged', { count: atp.length })}</p>}
                   {det.approved_at != null && <p className="text-ink-2">{t('so.approval.approvedAtNote', { n: fmtQty(det.approved_at) })}</p>}
                   {(det.reason || det.note) && <p dir="auto" className="text-ink-2">“{String(det.reason ?? det.note)}”</p>}
                   <p className="num text-xs text-muted">{fmtWhen(a.at)}</p>

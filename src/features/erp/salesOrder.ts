@@ -3,7 +3,12 @@ import { erp } from '@/lib/supabase';
 import { ApiError } from '@/lib/format';
 import { rpc } from './api';
 
-/** Types and calls for the A2 sales order workflow (supabase/sql/17_sales_order.sql). The database is the authority. */
+/**
+ * Types and calls for the sales quotation / order workflow (A2 17_sales_order.sql, generalised in A4 19_sales_cycle.sql).
+ * The database is the authority.
+ */
+export type SalesKind = 'sales_order' | 'sales_quotation';
+export const SALES_OBJ: Record<SalesKind, number> = { sales_order: 17, sales_quotation: 23 };
 export type WorkflowState = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
 export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount';
 
@@ -19,6 +24,7 @@ export interface SoSetup {
   default_whs_code: string | null;
   numbering: { prefix: string; next_num: number } | null;
   my_discount_limit: number | null;
+  atp_on?: boolean;
   can_write: boolean;
 }
 export interface SoProblem { line: number | null; field: string; message: string }
@@ -28,7 +34,10 @@ export interface SoCheck {
 }
 export interface SoTotals { before_discount: number; discount: number; net: number; vat: number; total: number; currency: string }
 export interface SoCredit { limit: number | null; balance: number; open_orders: number; this_order: number; left: number | null }
-export interface SoEval { errors: SoProblem[]; checks: SoCheck[]; totals: SoTotals; credit: SoCredit | null }
+export interface AtpInfo { available: number | null; date: string; rule_code: string; no_check: boolean; on_hand?: number; committed?: number; purchase_orders?: number; transfers?: number }
+export interface AtpShort { line: number; item_code: string; whs_code: string; qty: number; available: number; date: string; message: string }
+export interface SoEvalLine { line_num: number; item_code: string; atp: AtpInfo | null; is_stock: boolean }
+export interface SoEval { errors: SoProblem[]; checks: SoCheck[]; totals: SoTotals; credit: SoCredit | null; atp?: AtpShort[]; lines?: SoEvalLine[] }
 export interface SoApproval {
   approval_id: number; step: number; rule_code: RuleCode; approver_position: string; approver_position_name: string;
   decision: 'approved' | 'rejected' | null; note: string | null; decided_at: string | null; decided_by_name: string | null; decided_by_me: boolean;
@@ -44,9 +53,10 @@ export interface SoInfo {
   is_creator?: boolean; is_submitter?: boolean; can_edit?: boolean; can_submit?: boolean; can_cancel?: boolean; can_decide?: boolean;
   my_discount_limit?: number | null; requester_discount_limit?: number | null;
   approvals?: SoApproval[]; activity?: SoActivity[];
+  obj_type?: number; status?: string; can_copy?: boolean; copy_block?: 'not_approved' | 'closed' | 'read_only' | null;
 }
 export interface InboxRow {
-  approval_id: number; company_code: string; kind: 'sales_order' | 'journal'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
+  approval_id: number; company_code: string; kind: 'sales_order' | 'sales_quotation' | 'journal'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
   card_code: string | null; card_name: string | null; total: number; currency: string; requested_by_name: string | null; requested_at: string;
   reason: string | null; decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null;
   state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;
@@ -57,30 +67,37 @@ export interface SoHeaderInput {
   card_code: string; doc_date: string; due_date: string; price_list: number | ''; payment_terms: number | ''; slp_code: number | '';
   whs_code: string; customer_ref: string; comments: string;
 }
-export interface SoLineInput { item_code: string; qty: string; price: string; discount_pct: string; tax_code: string }
+export interface SoLineInput {
+  item_code: string; qty: string; price: string; discount_pct: string; tax_code: string;
+  /** Copied from a quotation (A4): the quotation line this order line uses up. */
+  base_obj_type?: number | null; base_doc_entry?: number | null; base_line?: number | null;
+}
 
 /** Lines as the database expects them (empty price = take it from the price list). */
 export const toLinesPayload = (lines: SoLineInput[]) =>
-  lines.map((l) => ({ item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, discount_pct: l.discount_pct || '0', tax_code: l.tax_code }));
+  lines.map((l) => ({
+    item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, discount_pct: l.discount_pct || '0', tax_code: l.tax_code,
+    ...(l.base_doc_entry != null ? { base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line } : {}),
+  }));
 export const toHeaderPayload = (h: SoHeaderInput) => ({
   ...h, price_list: h.price_list === '' ? null : h.price_list, payment_terms: h.payment_terms === '' ? null : h.payment_terms,
   slp_code: h.slp_code === '' ? null : h.slp_code, due_date: h.due_date || null,
 });
 
-export function useSoSetup(company: string | null) {
+export function useSoSetup(company: string | null, obj = 17) {
   return useQuery({
-    queryKey: ['so-setup', company],
+    queryKey: ['so-setup', company, obj],
     enabled: Boolean(company),
     staleTime: 5 * 60_000,
-    queryFn: () => rpc<SoSetup>('sales_order_setup', { p_company: company }),
+    queryFn: () => rpc<SoSetup>('sales_doc_setup', { p_company: company, p_obj: obj }),
   });
 }
 
-export function useSoInfo(company: string, entry: number, enabled = true) {
+export function useSoInfo(company: string, entry: number, enabled = true, obj = 17) {
   return useQuery({
-    queryKey: ['so-info', company, entry],
+    queryKey: ['so-info', company, entry, obj],
     enabled,
-    queryFn: () => rpc<SoInfo | null>('sales_order_info', { p_company: company, p_doc_entry: entry }),
+    queryFn: () => rpc<SoInfo | null>('sales_doc_info', { p_company: company, p_obj: obj, p_doc_entry: entry }),
   });
 }
 
@@ -88,20 +105,20 @@ export function useInbox() {
   return useQuery({ queryKey: ['approval-inbox'], queryFn: () => rpc<Inbox>('approval_inbox', {}), refetchInterval: 30_000 });
 }
 
-export const soSave = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[]) =>
-  rpc<{ doc_entry: number; doc_no: string; state: WorkflowState; totals: SoTotals; checks: SoCheck[] }>('sales_order_save', {
-    p_company: company, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines),
+export const soSave = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[], obj = 17) =>
+  rpc<{ doc_entry: number; doc_no: string; state: WorkflowState; totals: SoTotals; checks: SoCheck[] }>('sales_doc_save', {
+    p_company: company, p_obj: obj, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines),
   });
-export const soChecks = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[]) =>
-  rpc<SoEval>('sales_order_checks', { p_company: company, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines) });
-export const soSubmit = (company: string, entry: number, reason: string | null) =>
-  rpc<{ state: WorkflowState; status: string; checks: SoCheck[] }>('sales_order_submit', { p_company: company, p_doc_entry: entry, p_reason: reason });
-export const soDecide = (company: string, entry: number, decision: 'approved' | 'rejected', note: string | null, newDiscount: number | null = null) =>
-  rpc<{ state: WorkflowState; status: string; total: number }>('sales_order_decide', {
-    p_company: company, p_doc_entry: entry, p_decision: decision, p_note: note, p_new_discount: newDiscount,
+export const soChecks = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[], obj = 17) =>
+  rpc<SoEval>('sales_doc_checks', { p_company: company, p_obj: obj, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines) });
+export const soSubmit = (company: string, entry: number, reason: string | null, obj = 17) =>
+  rpc<{ state: WorkflowState; status: string; checks: SoCheck[] }>('sales_doc_submit', { p_company: company, p_obj: obj, p_doc_entry: entry, p_reason: reason });
+export const soDecide = (company: string, entry: number, decision: 'approved' | 'rejected', note: string | null, newDiscount: number | null = null, obj = 17) =>
+  rpc<{ state: WorkflowState; status: string; total: number }>('sales_doc_decide', {
+    p_company: company, p_obj: obj, p_doc_entry: entry, p_decision: decision, p_note: note, p_new_discount: newDiscount,
   });
-export const soCancel = (company: string, entry: number, note: string) =>
-  rpc<{ state: WorkflowState }>('sales_order_cancel', { p_company: company, p_doc_entry: entry, p_note: note });
+export const soCancel = (company: string, entry: number, note: string, obj = 17) =>
+  rpc<{ state: WorkflowState }>('sales_doc_cancel', { p_company: company, p_obj: obj, p_doc_entry: entry, p_note: note });
 
 // ---------- Combobox searches (RLS decides what the user may read) ----------
 const clean = (s: string) => s.replace(/[,()*%\\:"]/g, ' ').trim();

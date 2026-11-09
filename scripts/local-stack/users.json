@@ -70,5 +70,23 @@
     "email": "qa.staff@sample.test",
     "password": "local-only-12",
     "name": "QA Staff (purchasing read-only, requests)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000013",
+    "email": "qa.stock@sample.test",
+    "password": "local-only-13",
+    "name": "QA Inventory (inventory full)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000014",
+    "email": "qa.stockmgr@sample.test",
+    "password": "local-only-14",
+    "name": "QA Stock manager (stock approver)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000015",
+    "email": "qa.stockread@sample.test",
+    "password": "local-only-15",
+    "name": "QA Inventory read-only"
   }
 ]

@@ -91,3 +91,26 @@ INSERT INTO erp.user_company (user_id, company_code) VALUES
   ('00000000-0000-4000-8000-000000000010', 'ZZ99'), ('00000000-0000-4000-8000-000000000011', 'ZZ99'),
   ('00000000-0000-4000-8000-000000000012', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A7 · inventory (full), stock manager (approver for the ZZ99 sample goods receipt / issue and count rules in 22_inventory.sql), and a
+-- storekeeper with read-only Inventory access.
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_STOCK', 'QA · inventory', '{inventory}'),
+  ('QA_STOCK_MGR', 'QA · stock manager', '{inventory}'),
+  ('QA_STOCK_READ', 'QA · inventory read-only', '{}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+DO $$ BEGIN
+  IF to_regclass('erp.position_module') IS NOT NULL THEN
+    INSERT INTO erp.position_module (position_code, module, level) VALUES ('QA_STOCK_READ', 'inventory', 'read')
+    ON CONFLICT (position_code, module) DO UPDATE SET level = EXCLUDED.level;
+  END IF;
+END $$;
+INSERT INTO erp.app_user (user_id, company_code, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000013', 'ZZ99', 'QA Inventory', 'qa.stock@sample.test', 'QA_STOCK', 'en', true),
+  ('00000000-0000-4000-8000-000000000014', 'ZZ99', 'QA Stock Manager', 'qa.stockmgr@sample.test', 'QA_STOCK_MGR', 'en', true),
+  ('00000000-0000-4000-8000-000000000015', 'ZZ99', 'QA Inventory read-only', 'qa.stockread@sample.test', 'QA_STOCK_READ', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES
+  ('00000000-0000-4000-8000-000000000013', 'ZZ99'), ('00000000-0000-4000-8000-000000000014', 'ZZ99'),
+  ('00000000-0000-4000-8000-000000000015', 'ZZ99')
+ON CONFLICT DO NOTHING;

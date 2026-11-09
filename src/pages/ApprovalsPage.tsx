@@ -114,6 +114,11 @@ function DocumentApprovals() {
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/inventory/counts/${r.company_code}/${r.doc_entry}`}>{r.doc_no}</Link>
                           <div dir="auto" className="text-xs text-muted">{t('inbox.kind.inventory_count')} · {r.card_code} {r.card_name}</div>
                         </>
+                      ) : r.kind === 'leave' ? (
+                        <>
+                          <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/hr/leave/${r.company_code}/${r.doc_entry}`}>{t('hr.leave.titleN', { n: r.doc_no })}</Link>
+                          <div dir="auto" className="text-xs text-muted">{t('inbox.kind.leave')} · {r.card_code} {r.card_name}</div>
+                        </>
                       ) : r.kind === 'journal' ? (
                         <>
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/financials/journals/drafts/${r.company_code}/${r.doc_entry}`}>{t('je.titleDraft', { n: r.doc_no })}</Link>
@@ -135,7 +140,7 @@ function DocumentApprovals() {
                         ? <><span className={clsx('pill', r.decision === 'approved' ? 'pill-ok' : 'pill-crit')}>{t(`erp.status.${r.decision}`)}</span> <span className="text-xs text-muted">{fmtDate(r.decided_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
                         : <>{r.requested_by_name ?? '—'}{r.reason && <div dir="auto" className="text-xs italic text-muted">“{r.reason}”</div>}</>}
                     </td>
-                    <td className="num px-4 py-2.5 text-end">{r.kind === 'bp_change' && r.total === null ? '—' : fmtMoney(r.total, r.currency)}</td>
+                    <td className="num px-4 py-2.5 text-end">{r.kind === 'leave' ? t('hr.nDays', { n: r.total }) : r.kind === 'bp_change' && r.total === null ? '—' : fmtMoney(r.total, r.currency)}</td>
                     <td className="px-4 py-2.5 text-end max-sm:hidden">
                       {view === 'waiting' ? <span className="num text-ink-2">{waited(r.requested_at)}</span>
                         : r.superseded && !r.decision ? <span className="pill pill-neutral">{t('inbox.closed')}</span>

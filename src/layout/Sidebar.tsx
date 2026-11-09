@@ -77,6 +77,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
           <ul className="space-y-0.5">
             <Item to="/" label={t('nav.home')} icon="home" onNavigate={onClose} />
+            <Item to="/portal" label={t('nav.portal')} icon="hr" onNavigate={onClose} />
           </ul>
           {mods.length > 0 && <h2 className="eyebrow px-3 pb-1 pt-4">{t('nav.modules')}</h2>}
           <ul className="space-y-0.5">

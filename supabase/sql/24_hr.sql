@@ -1003,7 +1003,8 @@ BEGIN
     'can_edit', lvl = 'full' AND e.source = 'erp',
     'can_edit_hr', lvl = 'full',
     'edit_reason', CASE WHEN lvl IS DISTINCT FROM 'full' THEN 'read_only' WHEN e.source <> 'erp' THEN 'sap' END,
-    'salary_visible', v_sal);
+    'salary_visible', v_sal,
+    'currency', (SELECT currency FROM erp.company WHERE company_code = p_company));
   IF v_sal THEN
     r := r || jsonb_build_object(
       'bank', jsonb_build_object('iban', x.iban, 'bank_routing', x.bank_routing, 'mol_person_id', x.mol_person_id, 'wps_bank', x.wps_bank),

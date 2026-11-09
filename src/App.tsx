@@ -31,6 +31,8 @@ import {
   PurchaseViewPage, PurchasingSetupPage, QuotationComparePage,
 } from '@/features/erp/pages/PurchasingPages';
 import { BpChangesPage, BpFormPage, ItemFormPage, TrademarksPage } from '@/features/erp/pages/MasterDataPages';
+import { AttendancePage, ExpiryPage, LeaveListPage, LeavePage, PayslipPage, PortalPage } from '@/features/erp/pages/HrPages';
+import { EmployeeDetailPage, EmployeeFormPage, HrSetupPage, PayrollListPage, PayrollRunPage } from '@/features/erp/pages/HrAdminPages';
 import {
   CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage,
 } from '@/features/erp/pages/InventoryPages';
@@ -160,6 +162,19 @@ export default function App() {
         <Route path="banking/bp-bank-accounts" element={<BpBankAccountsPage />} />
         <Route path="banking/setup" element={<BankingSetupPage />} />
         <Route path="hr/employees" element={<EmployeesPage />} />
+        {/* A9 · HR and Staff Portal */}
+        <Route path="hr/employees/new" element={<EmployeeFormPage key="emp-new" mode="new" />} />
+        <Route path="hr/employees/:company/:id" element={<EmployeeDetailPage />} />
+        <Route path="hr/employees/:company/:id/edit" element={<EmployeeFormPage key="emp-edit" mode="edit" />} />
+        <Route path="hr/leave" element={<LeaveListPage />} />
+        <Route path="hr/leave/:company/:id" element={<LeavePage />} />
+        <Route path="hr/attendance" element={<AttendancePage />} />
+        <Route path="hr/expiry" element={<ExpiryPage />} />
+        <Route path="hr/payroll" element={<PayrollListPage />} />
+        <Route path="hr/payroll/:company/:id" element={<PayrollRunPage />} />
+        <Route path="hr/setup" element={<HrSetupPage />} />
+        <Route path="portal" element={<PortalPage />} />
+        <Route path="portal/payslip/:company/:run" element={<PayslipPage />} />
 
         {legacy.map(([from, to]) => <Route key={from} path={from} element={<Navigate to={to} replace />} />)}
         <Route path="approvals" element={<ApprovalsPage />} />

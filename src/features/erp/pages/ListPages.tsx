@@ -14,6 +14,7 @@ import { DraftsLink as PaymentDraftsLink, NewPaymentAction, PaymentsList } from 
 import { NewPurchaseAction, isPurchaseKind } from './PurchasingPages';
 import { NewInventoryAction } from './InventoryPages';
 import { NewBpAction, NewItemAction } from './MasterDataPages';
+import { HrLinks, NewEmployeeAction } from './HrAdminPages';
 import { isInvKind } from '../inventory';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -288,6 +289,7 @@ export function EmployeesPage() {
     filters: [{ key: 'active', label: t('erp.col.status'), options: [['true', t('erp.status.active')], ['false', t('erp.status.inactive')]], type: 'boolean' }],
     defaultSort: { col: 'emp_id', asc: true },
     rowKey: (r) => `${r.company_code}|${r.emp_id}`,
+    rowLink: (r) => `/hr/employees/${r.company_code}/${r.emp_id}`,
     emptyTitle: t('erp.list.emptyHr'), emptyBody: t('erp.list.emptyHrBody'),
     columns: [
       { key: 'hr_code', header: t('erp.col.code'), mono: true },
@@ -299,7 +301,7 @@ export function EmployeesPage() {
       { key: 'active', header: t('erp.col.status'), cell: (r) => <StatusTag value={r.active ? 'active' : 'inactive'} />, csv: (r) => (r.active ? 'active' : 'inactive') },
     ],
   }), [t]);
-  return <Frame module="hr" title={t('erp.page.employees')} desc={t('erp.page.employeesDesc')}><ListScreen config={cfg} /></Frame>;
+  return <Frame module="hr" title={t('erp.page.employees')} desc={t('erp.page.employeesDesc')} actions={<><HrLinks /><NewEmployeeAction /></>}><ListScreen config={cfg} /></Frame>;
 }
 
 /** Used by detail pages: one-off reads with company scoping by RLS. */

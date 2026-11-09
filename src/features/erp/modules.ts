@@ -140,7 +140,12 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     // A7 · inventory transactions
     'Bin Locations': '/inventory/setup', 'Inventory Transactions': '/docs/inventory_transfer',
   },
-  hr: { 'Employee Master Data': '/hr/employees' },
+  hr: {
+    'Employee Master Data': '/hr/employees',
+    // A9 · HR and Staff Portal
+    'Human Resources Reports': '/hr/expiry', 'Roles and Duties': '/hr/setup', 'Attendance and Check-in': '/hr/attendance', Leave: '/hr/leave',
+    Payroll: '/hr/payroll', 'Staff Portal': '/portal',
+  },
 };
 /** sub-function (item) name → working screen, wherever it appears */
 const LIVE_ITEMS: Record<string, string> = {
@@ -184,6 +189,12 @@ const LIVE_ITEMS: Record<string, string> = {
   'New business partner': '/bp/new', Customers: '/bp?f_kind=customer', 'Suppliers and factories': '/bp?f_kind=supplier', Leads: '/bp?f_kind=lead',
   'Credit limits and payment terms': '/bp/changes', '360° view': '/bp', 'Trademark registrations': '/bp/trademarks', 'Brand list': '/bp/trademarks',
   'New item': '/items/new', 'Barcodes per item': '/items',
+  // A9 · HR and Staff Portal
+  'Find an employee': '/hr/employees', 'New employee': '/hr/employees/new', 'Document expiry dates': '/hr/expiry', 'Employee List': '/hr/employees',
+  'Absence Report': '/hr/leave?f_state=approved', 'Duty templates per role': '/hr/setup', 'Today\u2019s attendance': '/hr/attendance', 'Phone check-in': '/portal',
+  'Late and absent': '/hr/attendance?f_flagged=true', Shifts: '/hr/setup', 'Leave requests': '/hr/leave', 'Leave balances': '/portal', 'Holiday calendar': '/hr/setup',
+  'Monthly payroll run': '/hr/payroll', 'WPS salary file': '/hr/payroll', Payslips: '/portal', 'End-of-service': '/hr/employees', 'My day': '/portal',
+  'Check in and out': '/portal', 'Leave and payslips': '/portal',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -197,6 +208,7 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   },
   inventory: { 'Inventory Transactions': '/inventory/transfer/new', 'Item Master Data': '/items/new' },
   bp: { 'Business Partner Master Data': '/bp/new' },
+  hr: { 'Employee Master Data': '/hr/employees/new', Leave: '/portal' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

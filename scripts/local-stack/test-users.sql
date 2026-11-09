@@ -134,3 +134,31 @@ ON CONFLICT (user_id) DO NOTHING;
 INSERT INTO erp.user_company (user_id, company_code) VALUES
   ('00000000-0000-4000-8000-000000000016', 'ZZ99'), ('00000000-0000-4000-8000-000000000017', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A9 · HR: HR officer with full access (linked to sample employee E0008), HR read-only, and three staff members with no module
+-- access who use the Staff Portal: qa.emp (E0006, manager E0007), qa.teamlead (E0007, manages E0006 and E0009) and qa.emp2
+-- (E0003, manager E0002 who has no sign-in). Leave approvals on ZZ99: manager → QA · HR → QA · owner above 14 days (24_hr.sql).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_HR', 'QA · HR officer', '{hr}'),
+  ('QA_HR_READ', 'QA · HR read-only', '{}'),
+  ('QA_STAFF', 'QA · staff (portal only)', '{}'),
+  ('QA_TEAM_LEAD', 'QA · team lead (portal only)', '{}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+DO $$ BEGIN
+  IF to_regclass('erp.position_module') IS NOT NULL THEN
+    INSERT INTO erp.position_module (position_code, module, level) VALUES ('QA_HR_READ', 'hr', 'read')
+    ON CONFLICT (position_code, module) DO UPDATE SET level = EXCLUDED.level;
+  END IF;
+END $$;
+INSERT INTO erp.app_user (user_id, company_code, emp_id, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000018', 'ZZ99', 8, 'QA HR', 'qa.hr@sample.test', 'QA_HR', 'en', true),
+  ('00000000-0000-4000-8000-000000000019', 'ZZ99', NULL, 'QA HR read-only', 'qa.hrread@sample.test', 'QA_HR_READ', 'en', true),
+  ('00000000-0000-4000-8000-000000000020', 'ZZ99', 6, 'QA Staff (Faisal)', 'qa.emp@sample.test', 'QA_STAFF', 'en', true),
+  ('00000000-0000-4000-8000-000000000021', 'ZZ99', 7, 'QA Team lead (Ravi)', 'qa.teamlead@sample.test', 'QA_TEAM_LEAD', 'en', true),
+  ('00000000-0000-4000-8000-000000000022', 'ZZ99', 3, 'QA Staff (Priya)', 'qa.emp2@sample.test', 'QA_STAFF', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES
+  ('00000000-0000-4000-8000-000000000018', 'ZZ99'), ('00000000-0000-4000-8000-000000000019', 'ZZ99'),
+  ('00000000-0000-4000-8000-000000000020', 'ZZ99'), ('00000000-0000-4000-8000-000000000021', 'ZZ99'),
+  ('00000000-0000-4000-8000-000000000022', 'ZZ99')
+ON CONFLICT DO NOTHING;

@@ -100,5 +100,35 @@
     "email": "qa.bpread@sample.test",
     "password": "local-only-17",
     "name": "QA Business Partners read-only"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000018",
+    "email": "qa.hr@sample.test",
+    "password": "local-only-18",
+    "name": "QA HR (HR full, E0008)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000019",
+    "email": "qa.hrread@sample.test",
+    "password": "local-only-19",
+    "name": "QA HR read-only"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000020",
+    "email": "qa.emp@sample.test",
+    "password": "local-only-20",
+    "name": "QA Staff Faisal (portal, E0006)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000021",
+    "email": "qa.teamlead@sample.test",
+    "password": "local-only-21",
+    "name": "QA Team lead Ravi (portal, E0007)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000022",
+    "email": "qa.emp2@sample.test",
+    "password": "local-only-22",
+    "name": "QA Staff Priya (portal, E0003)"
   }
 ]

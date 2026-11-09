@@ -88,5 +88,17 @@
     "email": "qa.stockread@sample.test",
     "password": "local-only-15",
     "name": "QA Inventory read-only"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000016",
+    "email": "qa.bp@sample.test",
+    "password": "local-only-16",
+    "name": "QA Business Partners (BP full)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000017",
+    "email": "qa.bpread@sample.test",
+    "password": "local-only-17",
+    "name": "QA Business Partners read-only"
   }
 ]

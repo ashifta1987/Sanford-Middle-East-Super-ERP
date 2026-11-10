@@ -19,3 +19,4 @@ python3 supabase/sql/src/32_gl_setup/build.py --check   # exit 0 when the commit
 The earlier SQL files never change (A0 rule), so the copies are stable. Paths are relative to this folder; no absolute paths.
 
 Verified in B4: `--check` reports `identical` against the committed B3 file.
+

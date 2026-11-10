@@ -13,3 +13,4 @@
 python3 supabase/sql/src/33_multicurrency/build.py           # writes supabase/sql/33_multicurrency.sql
 python3 supabase/sql/src/33_multicurrency/build.py --check   # exit 0 when the committed file is identical
 ```
+

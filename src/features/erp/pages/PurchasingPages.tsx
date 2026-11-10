@@ -1779,7 +1779,7 @@ function SetupList({ title, rows, canWrite, withMethod, onSave }: { title: strin
           {withMethod && (
             <label className="block text-xs font-medium text-muted">{t('pu.lc.splitBy')}
               <select className="input mt-1 text-[15px] text-ink" value={n.extra} onChange={(e) => setN({ ...n, extra: e.target.value })}>
-                {['cbm', 'qty', 'value', 'weight'].map((x) => <option key={x} value={x}>{t(`pu.lc.method.${x}`)}</option>)}
+                {['qty', 'weight', 'cbm', 'value', 'equal'].map((x) => <option key={x} value={x}>{t(`pu.lc.method.${x}`)}</option>)}
               </select>
             </label>
           )}

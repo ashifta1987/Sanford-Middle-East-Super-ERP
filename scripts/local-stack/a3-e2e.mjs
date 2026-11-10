@@ -213,17 +213,21 @@ await pa.locator('[data-period="2026-12"] .pill', { hasText: 'Open' }).waitFor({
 
 // ---------- 6. G/L Account Determination ----------
 await pa.goto(`${BASE}/financials/gl-determination`); await settle(pa);
-ok('G/L screen: 23 posting keys in 5 areas (22 + A6 goods received not invoiced)', (await pa.locator('[data-testid=gl-row]').count()) === 23);
-ok('G/L screen: Revenue → 4100 for ZZ99', (await pa.locator('[data-testid=gl-row][data-key=revenue]').innerText()).includes('4100'));
-ok('G/L screen: Rounding not set (warning)', (await pa.locator('[data-testid=gl-row][data-key=rounding] .pill', { hasText: 'Not set' }).count()) === 1);
-await pa.click('#gl-edit-rounding');
-await pickCombo(pa, pa.locator('#gl-rounding'), '6800', '6800 ·');
-await pa.locator('[data-testid=fs-flash]', { hasText: 'Saved: Rounding → 6800.' }).waitFor({ timeout: 10000 }).catch(() => {});
-ok('finance sets Rounding → 6800', (await pa.locator('[data-testid=gl-row][data-key=rounding]').innerText()).includes('6800'));
+// B3 (32_gl_setup.sql) rebuilt this screen as SAP B1 tabs with an editable grid and one Save (decisions C2), so the checks follow it.
+await pa.locator('[data-testid=gld-table]').waitFor({ timeout: 15000 }).catch(() => {});
+ok('G/L screen: 9 tabs; the Sales tab lists its 6 posting keys', (await pa.locator('#gld-tab [role=tab]').count()) === 9 && (await pa.locator('[data-testid=gld-row]').count()) === 6);
+ok('G/L screen: Revenue → 4100 for ZZ99', (await pa.locator('#gld-sales-revenue').inputValue()).startsWith('4100'));
+await pa.click('#gld-tab-general'); await settle(pa);
+ok('G/L screen: Rounding not set (warning)', (await pa.locator('[data-testid=gld-row][data-key="general/rounding"] .pill', { hasText: 'Not set' }).count()) === 1);
+await pickCombo(pa, pa.locator('#gld-general-rounding'), '6800', '6800 ·');
+await pa.click('#gld-save');
+await pa.locator('[data-testid=stp-flash]', { hasText: 'Saved.' }).waitFor({ timeout: 10000 }).catch(() => {});
+ok('finance sets Rounding → 6800', (await pa.locator('#gld-general-rounding').inputValue()).startsWith('6800'));
 await pa.screenshot({ path: `${OUT}/a3-gl-determination-en-light-1440.png`, fullPage: true });
-await pa.click('#gl-clear-rounding');
-await pa.locator('[data-testid=fs-flash]', { hasText: 'Cleared: Rounding.' }).waitFor({ timeout: 10000 }).catch(() => {});
-ok('finance clears Rounding again', (await pa.locator('[data-testid=gl-row][data-key=rounding] .pill', { hasText: 'Not set' }).count()) === 1);
+await pa.click('#gld-general-rounding-clear');
+await pa.click('#gld-save');
+await pa.locator('[data-testid=gld-row][data-key="general/rounding"] .pill', { hasText: 'Not set' }).waitFor({ timeout: 10000 }).catch(() => {});
+ok('finance clears Rounding again', (await pa.locator('[data-testid=gld-row][data-key="general/rounding"] .pill', { hasText: 'Not set' }).count()) === 1);
 await pa.goto(`${BASE}/preview/gldet?from=administration`); await settle(pa);
 ok('old design preview /preview/gldet opens the working screen', new URL(pa.url()).pathname === '/financials/gl-determination');
 await pa.goto(`${BASE}/m/financials`); await settle(pa);
@@ -248,7 +252,8 @@ await A.close();
   await page.goto(`${BASE}/financials/periods`); await settle(page);
   ok('owner: periods visible, no change buttons', (await page.locator('[data-testid=per-row]').count()) > 0 && (await page.locator('[id^=per-close-]').count()) === 0);
   await page.goto(`${BASE}/financials/gl-determination`); await settle(page);
-  ok('owner: G/L visible, no change buttons', (await page.locator('[data-testid=gl-row]').count()) === 23 && (await page.locator('[id^=gl-edit-]').count()) === 0);
+  await page.locator('[data-testid=gld-table]').waitFor({ timeout: 15000 }).catch(() => {});
+  ok('owner: G/L visible, no change buttons', (await page.locator('[data-testid=gld-row]').count()) === 6 && (await page.locator('#gld-save').count()) === 0);
   await ctx.close();
 }
 {

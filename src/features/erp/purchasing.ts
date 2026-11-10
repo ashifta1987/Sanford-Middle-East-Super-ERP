@@ -27,7 +27,7 @@ export interface PuSetup {
   offices: Code[];
   pi_statuses: Code[];
   qc_checklist: Code[];
-  landed_cost_codes: Array<Code & { split_method: 'cbm' | 'qty' | 'value' | 'weight' }>;
+  landed_cost_codes: Array<Code & { split_method: 'cbm' | 'qty' | 'value' | 'weight' | 'equal' }>;
   default_tax_code: string | null;
   default_whs_code: string | null;
   require_qc_pass: boolean;

@@ -1,0 +1,24 @@
+# Order for Supabase (branch, test project, then live). Never 15_sample_company.sql or test-users.sql.
+# 10–14 are already live; 15_stage1_overview.sql onwards is what docs/go-live.md applies.
+supabase/sql/10_erp_schema.sql
+supabase/sql/11_erp_sync.sql
+supabase/sql/12_erp_security.sql
+supabase/sql/13_migration_console.sql
+supabase/sql/14_realtime.sql
+supabase/sql/14_console_views.sql
+supabase/sql/14_signoff_inbox.sql
+supabase/sql/15_stage1_overview.sql
+supabase/sql/16_module_access.sql
+supabase/sql/17_sales_order.sql
+supabase/sql/18_posting.sql
+supabase/sql/19_sales_cycle.sql
+supabase/sql/20_banking.sql
+supabase/sql/21_purchasing.sql
+supabase/sql/22_inventory.sql
+supabase/sql/23_master_data.sql
+supabase/sql/24_hr.sql
+supabase/sql/25_admin.sql
+supabase/sql/26_reports.sql
+supabase/sql/27_migration_more.sql
+supabase/sql/28_production_service.sql
+supabase/sql/29_go_live.sql

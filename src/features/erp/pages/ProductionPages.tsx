@@ -8,7 +8,8 @@ import { errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, fmtDay, fmtMoney, fmtQty } from '../components/ui';
-import { RequireModule, useModuleLevel } from '../components/Guard';
+import { RequireModule } from '../components/Guard';
+import { useAuth } from '@/auth/AuthProvider';
 import { Combobox } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
@@ -31,6 +32,17 @@ const th = 'px-4 py-2 text-start font-medium';
 const thEnd = 'px-4 py-2 text-end font-medium';
 
 // ---------- Shared pieces ----------
+/**
+ * Write access for Production / Service screens: the position needs that module with full access (erp.can_write('production' |
+ * 'service') in 28_production_service.sql). Inventory (or Sales) users open these modules read-only.
+ */
+export function usePsLevel(module: 'production' | 'service') {
+  const { t } = useTranslation();
+  const { profile } = useAuth();
+  const canWrite = profile?.levels?.[module] === 'full';
+  return { canWrite, readOnlyReason: canWrite ? undefined : t('erp.readOnly', { module: moduleByKey(module)!.title }) };
+}
+
 /** Header for production and service screens: back link, breadcrumb (Home › 08 Production › list › record), title with pills, one line, actions. */
 export function PsHeader({ module, title, pills, sub, actions, listTo, listLabel }: {
   module: ModuleKey; title: string; pills?: ReactNode; sub?: ReactNode; actions?: ReactNode; listTo: string; listLabel: string;
@@ -60,7 +72,7 @@ export function PsListFrame({ module, title, desc, newTo, newLabel, newId, child
 }) {
   const { t } = useTranslation();
   const m = moduleByKey(module)!;
-  const { canWrite, readOnlyReason } = useModuleLevel(module);
+  const { canWrite, readOnlyReason } = usePsLevel(module as 'production' | 'service');
   return (
     <RequireModule module={module}>
       <header className="mb-6">
@@ -175,7 +187,7 @@ export function BomFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const dflt = useDefaultCompany();
   const company = mode === 'edit' ? params.company ?? '' : dflt;
   const editItem = mode === 'edit' ? decodeURIComponent(params.item ?? '') : '';
-  const { canWrite, readOnlyReason } = useModuleLevel('production');
+  const { canWrite, readOnlyReason } = usePsLevel('production');
   const setup = usePrdSetup(company || null);
   const info = useBomInfo(mode === 'edit' ? company : '', editItem);
   const [item, setItem] = useState(editItem);
@@ -351,7 +363,7 @@ export function ProdOrderNewPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const company = useDefaultCompany();
-  const { canWrite, readOnlyReason } = useModuleLevel('production');
+  const { canWrite, readOnlyReason } = usePsLevel('production');
   const setup = usePrdSetup(company || null);
   const pre = new URLSearchParams(window.location.search).get('item') ?? '';
   const [item, setItem] = useState(pre);
@@ -581,7 +593,7 @@ export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
   const dflt = useDefaultCompany();
   const company = mode === 'view' ? params.company ?? '' : dflt;
   const code = mode === 'view' ? decodeURIComponent(params.code ?? '') : '';
-  const { canWrite, readOnlyReason } = useModuleLevel('production');
+  const { canWrite, readOnlyReason } = usePsLevel('production');
   const setup = usePrdSetup(company || null);
   const q = useMould(company, code);
   const [flash, setFlash] = useFlash();

@@ -1,6 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { erp } from '@/lib/supabase';
-import { ApiError } from '@/lib/format';
 import { rpc } from './api';
 
 /** Types and calls for A13 service (supabase/sql/28_production_service.sql). The database checks every write. */
@@ -90,9 +88,9 @@ export const svcSettingSet = (company: string, s: Record<string, unknown>) => rp
 export const warrantyRuleSave = (company: string, r: Record<string, unknown>) => rpc<unknown>('warranty_rule_save', { p_company: company, p_rule: r });
 
 /** A/R invoices of a customer that have the item (any source; the warranty starts on the invoice date). */
-export async function invoicesFor(company: string, card: string, item: string) {
-  const { data, error } = await erp().from('document').select('doc_entry,doc_num,doc_date,source,document_line!inner(item_code)')
-    .eq('company_code', company).eq('obj_type', 13).eq('card_code', card).eq('document_line.item_code', item).order('doc_date', { ascending: false }).limit(20);
-  if (error) throw new ApiError(error);
-  return (data ?? []) as unknown as Array<{ doc_entry: number; doc_num: number; doc_date: string; source: string }>;
-}
+export const invoicesFor = (company: string, card: string, item: string) =>
+  rpc<Array<{ doc_entry: number; doc_num: number; doc_date: string; source: string }>>('ps_lookup', { p_company: company, p: { kind: 'invoice', card_code: card, item_code: item } });
+
+/** Customers for the service screens (through ps_lookup: Service positions can't read Business Partners directly). */
+export interface SvcCustomer { card_code: string; name: string; city: string | null; phone: string | null }
+export const searchSvcCustomers = (company: string, q: string) => rpc<SvcCustomer[]>('ps_lookup', { p_company: company, p: { kind: 'customer', q } });

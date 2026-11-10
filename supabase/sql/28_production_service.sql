@@ -331,21 +331,25 @@ BEGIN
 END $$;
 
 -- ============ Views ============
-CREATE OR REPLACE VIEW erp.bom_list WITH (security_invoker = true) AS
+-- The list views run with the owner's rights and carry the module rule in WHERE (as A9's HR views do): Production and Service
+-- users see item and customer names on their own records even when their position does not include Inventory or Business Partners.
+CREATE OR REPLACE VIEW erp.bom_list WITH (security_invoker = false) AS
 SELECT b.company_code, b.item_code, i.name AS item_name, b.bom_type, b.qty, b.whs_code, b.active, b.source, b.updated_at,
        (SELECT count(*) FROM erp.bom_line l WHERE l.company_code = b.company_code AND l.item_code = b.item_code AND l.comp_kind = 'item') AS n_items,
        (SELECT count(*) FROM erp.bom_line l WHERE l.company_code = b.company_code AND l.item_code = b.item_code AND l.comp_kind = 'resource') AS n_resources,
        (SELECT string_agg(l.comp_code, ', ' ORDER BY l.line_num) FROM erp.bom_line l
          WHERE l.company_code = b.company_code AND l.item_code = b.item_code AND l.comp_kind = 'resource') AS resources
   FROM erp.bom b
-  LEFT JOIN erp.item i ON i.company_code = b.company_code AND i.item_code = b.item_code;
+  LEFT JOIN erp.item i ON i.company_code = b.company_code AND i.item_code = b.item_code
+ WHERE erp.can_see(b.company_code) AND ((SELECT erp.can_read('production')) OR (SELECT erp.can_read('inventory')));
 
-CREATE OR REPLACE VIEW erp.prod_order_list WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW erp.prod_order_list WITH (security_invoker = false) AS
 SELECT o.company_code, o.order_id, o.doc_no, o.item_code, i.name AS item_name, o.planned_qty, o.completed_qty, o.whs_code, o.post_date,
        o.due_date, o.state, (o.state IN ('planned', 'released') AND o.due_date < current_date) AS late,
        o.issued_value, o.resource_value, o.received_value, o.variance_value, o.comments, o.created_at
   FROM erp.prod_order o
-  LEFT JOIN erp.item i ON i.company_code = o.company_code AND i.item_code = o.item_code;
+  LEFT JOIN erp.item i ON i.company_code = o.company_code AND i.item_code = o.item_code
+ WHERE erp.can_see(o.company_code) AND ((SELECT erp.can_read('production')) OR (SELECT erp.can_read('inventory')));
 
 CREATE OR REPLACE VIEW erp.mould_schedule WITH (security_invoker = true) AS
 SELECT r.company_code, r.res_code, r.name, r.kind, r.unit, r.unit_cost, r.cavities, r.rated_life_shots, r.shots_done, r.location, r.asset_no,
@@ -363,23 +367,25 @@ SELECT r.company_code, r.res_code, r.name, r.kind, r.unit, r.unit_cost, r.caviti
   FROM erp.prod_resource r
   LEFT JOIN erp.production_setting s ON s.company_code = r.company_code;
 
-CREATE OR REPLACE VIEW erp.service_call_list WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW erp.service_call_list WITH (security_invoker = false) AS
 SELECT c.company_code, c.call_id, c.doc_no, c.card_code, bp.name AS card_name, c.item_code, i.name AS item_name, c.serial_no, c.subject,
        c.priority, c.status, c.technician, c.technician_name, c.warranty_status, c.warranty_end, c.flagged, c.opened_at, c.due_by,
        (c.status IN ('open', 'in_progress') AND c.due_by IS NOT NULL AND c.due_by < now()) AS overdue, c.resolved_at, c.closed_at
   FROM erp.service_call c
   LEFT JOIN erp.business_partner bp ON bp.company_code = c.company_code AND bp.card_code = c.card_code
-  LEFT JOIN erp.item i ON i.company_code = c.company_code AND i.item_code = c.item_code;
+  LEFT JOIN erp.item i ON i.company_code = c.company_code AND i.item_code = c.item_code
+ WHERE erp.can_see(c.company_code) AND ((SELECT erp.can_read('service')) OR (SELECT erp.can_read('sales')));
 
-CREATE OR REPLACE VIEW erp.service_contract_list WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW erp.service_contract_list WITH (security_invoker = false) AS
 SELECT k.company_code, k.contract_id, k.doc_no, k.card_code, bp.name AS card_name, k.starts_on, k.ends_on, k.response_hours,
        k.covers_parts, k.covers_labour, k.covers_travel, k.all_items, k.state,
        (k.state = 'active' AND k.ends_on < current_date) AS expired,
        (SELECT count(*) FROM erp.service_contract_line l WHERE l.company_code = k.company_code AND l.contract_id = k.contract_id) AS n_lines
   FROM erp.service_contract k
-  LEFT JOIN erp.business_partner bp ON bp.company_code = k.company_code AND bp.card_code = k.card_code;
+  LEFT JOIN erp.business_partner bp ON bp.company_code = k.company_code AND bp.card_code = k.card_code
+ WHERE erp.can_see(k.company_code) AND ((SELECT erp.can_read('service')) OR (SELECT erp.can_read('sales')));
 
-CREATE OR REPLACE VIEW erp.equipment_card_list WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW erp.equipment_card_list WITH (security_invoker = false) AS
 SELECT e.company_code, e.card_id, e.item_code, i.name AS item_name, e.serial_no, e.card_code, bp.name AS card_name, e.invoice_entry,
        e.sold_on, e.warranty_start, e.warranty_end,
        CASE WHEN e.warranty_end IS NULL THEN 'unknown' WHEN e.warranty_end >= current_date THEN 'in_warranty' ELSE 'out_of_warranty' END AS warranty_status,
@@ -387,7 +393,8 @@ SELECT e.company_code, e.card_id, e.item_code, i.name AS item_name, e.serial_no,
        e.source
   FROM erp.equipment_card e
   LEFT JOIN erp.item i ON i.company_code = e.company_code AND i.item_code = e.item_code
-  LEFT JOIN erp.business_partner bp ON bp.company_code = e.company_code AND bp.card_code = e.card_code;
+  LEFT JOIN erp.business_partner bp ON bp.company_code = e.company_code AND bp.card_code = e.card_code
+ WHERE erp.can_see(e.company_code) AND ((SELECT erp.can_read('service')) OR (SELECT erp.can_read('sales')));
 
 REVOKE ALL ON erp.bom_list, erp.prod_order_list, erp.mould_schedule, erp.service_call_list, erp.service_contract_list, erp.equipment_card_list FROM PUBLIC, anon;
 GRANT SELECT ON erp.bom_list, erp.prod_order_list, erp.mould_schedule, erp.service_call_list, erp.service_contract_list, erp.equipment_card_list TO authenticated;
@@ -2143,6 +2150,51 @@ BEGIN
     'can_write', erp.can_write('service'),
     'can_inventory', erp.can_write('inventory'));
 END $$;
+
+-- ============ Lookups for the production and service screens ============
+-- Comboboxes on these screens need customers, items and invoices that a Production- or Service-only position can't read directly
+-- (A1 module policies). p: {kind: customer | item | invoice, q, card_code, item_code}. Read only, at most 8 rows (invoices 20).
+CREATE OR REPLACE FUNCTION erp.ps_lookup(p_company varchar, p jsonb) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  v_q    text := '%' || coalesce(btrim(p->>'q'), '') || '%';
+  v_kind text := p->>'kind';
+BEGIN
+  IF erp.current_user_id() IS NULL THEN
+    RAISE EXCEPTION 'Sign in first.' USING ERRCODE = '42501';
+  END IF;
+  IF p_company IS NULL OR NOT erp.can_see(p_company) THEN
+    RAISE EXCEPTION 'You don''t have access to company %.', coalesce(p_company, '(none)') USING ERRCODE = '42501';
+  END IF;
+  IF NOT (erp.can_read('production') OR erp.can_read('service') OR erp.can_read('inventory') OR erp.can_read('sales')) THEN
+    RAISE EXCEPTION 'Your position does not include Production or Service. Ask the system admin if you need it.' USING ERRCODE = '42501';
+  END IF;
+  IF v_kind = 'customer' THEN
+    IF NOT (erp.can_read('service') OR erp.can_read('sales')) THEN
+      RAISE EXCEPTION 'Your position does not include Service. Ask the system admin if you need it.' USING ERRCODE = '42501';
+    END IF;
+    RETURN coalesce((SELECT jsonb_agg(jsonb_build_object('card_code', card_code, 'name', name, 'city', city, 'phone', phone) ORDER BY card_code)
+                       FROM (SELECT * FROM erp.business_partner WHERE company_code = p_company AND kind = 'customer' AND active
+                               AND (card_code ILIKE v_q OR name ILIKE v_q OR phone ILIKE v_q) ORDER BY card_code LIMIT 8) b), '[]'::jsonb);
+  ELSIF v_kind = 'item' THEN
+    RETURN coalesce((SELECT jsonb_agg(jsonb_build_object('item_code', item_code, 'name', name, 'inventory_uom', inventory_uom, 'is_stock', coalesce(is_stock, false),
+                                                         'serial_managed', coalesce(serial_managed, false), 'batch_managed', coalesce(batch_managed, false)) ORDER BY item_code)
+                       FROM (SELECT * FROM erp.item WHERE company_code = p_company AND active
+                               AND (item_code ILIKE v_q OR name ILIKE v_q OR barcode ILIKE v_q) ORDER BY item_code LIMIT 8) i), '[]'::jsonb);
+  ELSIF v_kind = 'invoice' THEN
+    IF NOT (erp.can_read('service') OR erp.can_read('sales')) THEN
+      RAISE EXCEPTION 'Your position does not include Service. Ask the system admin if you need it.' USING ERRCODE = '42501';
+    END IF;
+    RETURN coalesce((SELECT jsonb_agg(jsonb_build_object('doc_entry', doc_entry, 'doc_num', doc_num, 'doc_date', doc_date, 'source', source) ORDER BY doc_date DESC, doc_entry DESC)
+                       FROM (SELECT d.* FROM erp.document d WHERE d.company_code = p_company AND d.obj_type = 13 AND d.card_code = p->>'card_code'
+                               AND EXISTS (SELECT 1 FROM erp.document_line l WHERE l.company_code = d.company_code AND l.obj_type = 13 AND l.doc_entry = d.doc_entry
+                                             AND l.item_code = p->>'item_code')
+                              ORDER BY d.doc_date DESC LIMIT 20) x), '[]'::jsonb);
+  END IF;
+  RAISE EXCEPTION 'Unknown lookup %.', coalesce(v_kind, '(none)') USING ERRCODE = 'P0001';
+END $$;
+REVOKE ALL ON FUNCTION erp.ps_lookup(varchar, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION erp.ps_lookup(varchar, jsonb) TO authenticated;
 
 -- ============ Replaced: document types with numbering (A10) ============
 CREATE OR REPLACE FUNCTION erp._adm_doc_types() RETURNS TABLE (obj_type integer, label text, module text, sort integer)

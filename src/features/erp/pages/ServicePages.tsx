@@ -8,18 +8,17 @@ import { errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Fields, SectionCard, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
-import { RequireModule, useModuleLevel } from '../components/Guard';
+import { RequireModule } from '../components/Guard';
 import { Combobox } from '../components/Combobox';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
 import { FormError, Flash, fmtWhen, useDefaultCompany, useFlash } from './BankingPages';
 import { SourcePill, today } from './SalesOrderPages';
-import { ActivityList, NoteDialog, PsHeader, PsListFrame, inputCls, label, primaryLink, secondaryLink } from './ProductionPages';
+import { ActivityList, NoteDialog, PsHeader, PsListFrame, inputCls, label, primaryLink, secondaryLink, usePsLevel } from './ProductionPages';
 import { parseLots, searchStockItems, type StockItemHit } from '../inventory';
-import { searchCustomers, type CustomerHit } from '../salesOrder';
 import { searchAllItems } from '../production';
 import {
   callParts, callSave, callStatus, cardSave, contractSave, contractStatus, invoicesFor, svcSettingSet, useCallInfo, useCardInfo, useContractInfo,
-  useSvcSetup, warrantyCheck, warrantyRuleSave, type CallStatus, type Warranty, type WarrantyStatus,
+  searchSvcCustomers, useSvcSetup, warrantyCheck, warrantyRuleSave, type CallStatus, type SvcCustomer, type Warranty, type WarrantyStatus,
 } from '../service';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -94,7 +93,7 @@ export function ServiceCallFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const dflt = useDefaultCompany();
   const company = mode === 'edit' ? params.company ?? '' : dflt;
   const cid = mode === 'edit' ? Number(params.id) : 0;
-  const { canWrite, readOnlyReason } = useModuleLevel('service');
+  const { canWrite, readOnlyReason } = usePsLevel('service');
   const setup = useSvcSetup(company || null);
   const info = useCallInfo(company, cid);
   const [f, setF] = useState<Record<string, string>>({ priority: 'medium' });
@@ -139,9 +138,9 @@ export function ServiceCallFormPage({ mode }: { mode: 'new' | 'edit' }) {
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('ps.call.customerProduct')}>
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-              <Combobox<CustomerHit> id="call-customer" label={t('ps.call.customer')} required text={custText} onText={(s) => { setCustText(s); set('card_code', ''); }}
+              <Combobox<SvcCustomer> id="call-customer" label={t('ps.call.customer')} required text={custText} onText={(s) => { setCustText(s); set('card_code', ''); }}
                 onSelect={(o) => { setCustText(o.label); setF((x) => ({ ...x, card_code: o.value, phone: x.phone || (o.data.phone ?? ''), invoice_entry: '' })); }}
-                search={async (q) => (await searchCustomers(company, q)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c, meta: <span className="text-xs text-muted">{[c.city, c.phone].filter(Boolean).join(' · ')}</span> }))} />
+                search={async (q) => (await searchSvcCustomers(company, q)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c, meta: <span className="text-xs text-muted">{[c.city, c.phone].filter(Boolean).join(' · ')}</span> }))} />
               <label className={label}>{t('ps.call.contact')}<input id="call-contact" dir="auto" className={inputCls} value={f.contact ?? ''} onChange={(e) => set('contact', e.target.value)} /></label>
               <Combobox<ItemRow> id="call-item" label={t('ps.call.item')} text={itemText} onText={(s) => { setItemText(s); set('item_code', ''); }}
                 onSelect={(o) => { setItemText(o.label); setSerialItem(o.data.serial_managed); setF((x) => ({ ...x, item_code: o.value, invoice_entry: '' })); }}
@@ -323,7 +322,7 @@ export function EquipmentCardPage({ mode }: { mode: 'new' | 'view' }) {
   const dflt = useDefaultCompany();
   const company = mode === 'view' ? params.company ?? '' : dflt;
   const id = mode === 'view' ? Number(params.id) : 0;
-  const { canWrite, readOnlyReason } = useModuleLevel('service');
+  const { canWrite, readOnlyReason } = usePsLevel('service');
   const q = useCardInfo(company, id);
   const [flash, setFlash] = useFlash();
   const [err, setErr] = useState<string | null>(null);
@@ -363,7 +362,7 @@ export function EquipmentCardPage({ mode }: { mode: 'new' | 'view' }) {
                 search={async (s) => (await searchAllItems(company, s)).map((i) => ({ value: i.item_code, label: `${i.item_code} · ${i.name}`, data: i }))} />
               <label className={label}>{t('ps.call.serial')} <span className="text-crit-fg">*</span><input id="eq-serial" className={`${inputCls} font-mono`} value={f.serial_no ?? ''} onChange={(e) => set('serial_no', e.target.value)} /></label>
               <Combobox id="eq-customer" label={t('ps.call.customer')} required text={custText} onText={(s) => { setCustText(s); set('card_code', ''); }} onSelect={(o) => { setCustText(o.label); set('card_code', o.value); }}
-                search={async (s) => (await searchCustomers(company, s)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c }))} />
+                search={async (s) => (await searchSvcCustomers(company, s)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c }))} />
               <label className={label}>{t('ps.call.invoice')}<select id="eq-invoice" className={inputCls} value={f.invoice_entry ?? ''} onChange={(e) => set('invoice_entry', e.target.value)}><option value="">{t('ps.call.noInvoice')}</option>{(inv.data ?? []).map((d) => <option key={d.doc_entry} value={d.doc_entry}>{d.doc_num} · {fmtDay(d.doc_date)}</option>)}</select></label>
               <label className={label}>{t('ps.eq.soldOn')}<input id="eq-sold" type="date" disabled={Boolean(f.invoice_entry)} className={`${inputCls} num`} value={f.sold_on ?? ''} onChange={(e) => set('sold_on', e.target.value)} /></label>
               <label className={label}>{t('ps.eq.endOverride')}<input id="eq-end" type="date" className={`${inputCls} num`} value={f.warranty_end ?? ''} onChange={(e) => set('warranty_end', e.target.value)} /><span className="mt-1 block text-xs text-muted">{t('ps.eq.endHelp')}</span></label>
@@ -447,7 +446,7 @@ export function ContractFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const dflt = useDefaultCompany();
   const company = mode === 'edit' ? params.company ?? '' : dflt;
   const id = mode === 'edit' ? Number(params.id) : 0;
-  const { canWrite, readOnlyReason } = useModuleLevel('service');
+  const { canWrite, readOnlyReason } = usePsLevel('service');
   const info = useContractInfo(company, id);
   const [f, setF] = useState<Record<string, string>>({ starts_on: today() });
   const [flags, setFlags] = useState({ covers_parts: true, covers_labour: true, covers_travel: false, all_items: false });
@@ -483,7 +482,7 @@ export function ContractFormPage({ mode }: { mode: 'new' | 'edit' }) {
         <SectionCard title={t('erp.section.header')}>
           <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">
             <Combobox id="ct-customer" label={t('ps.call.customer')} required text={custText} onText={(s) => { setCustText(s); set('card_code', ''); }} onSelect={(o) => { setCustText(o.label); set('card_code', o.value); }}
-              search={async (s) => (await searchCustomers(company, s)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c }))} />
+              search={async (s) => (await searchSvcCustomers(company, s)).map((c) => ({ value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c }))} />
             <label className={label}>{t('ps.ct.starts')} <span className="text-crit-fg">*</span><input id="ct-from" type="date" className={`${inputCls} num`} value={f.starts_on ?? ''} onChange={(e) => set('starts_on', e.target.value)} /></label>
             <label className={label}>{t('ps.ct.ends')} <span className="text-crit-fg">*</span><input id="ct-to" type="date" className={`${inputCls} num`} value={f.ends_on ?? ''} onChange={(e) => set('ends_on', e.target.value)} /></label>
             <label className={label}>{t('ps.ct.responseHours')}<input id="ct-resp" inputMode="decimal" className={`${inputCls} num`} value={f.response_hours ?? ''} onChange={(e) => set('response_hours', e.target.value)} /></label>

@@ -80,6 +80,19 @@ BEGIN
   r := pg_temp.call(prod, $q$SELECT to_jsonb(count(*)) FROM erp.prod_order$q$);
   PERFORM pg_temp.check(r::text = '0', 'no production orders before the tests', r::text);
 
+  r := pg_temp.call(prod, $q$SELECT to_jsonb(item_name) FROM erp.bom_list WHERE company_code = 'ZZ99' AND item_code = 'SMP-PRD-100'$q$);
+  PERFORM pg_temp.check(r #>> '{}' = 'Kettle body 1.7 L (moulded in-house)', 'production-only user sees item names in the BOM list', r::text);
+  r := pg_temp.call(sales, $q$SELECT to_jsonb(count(*)) FROM erp.bom_list$q$);
+  PERFORM pg_temp.check(r::text = '0', 'BOM list view keeps the module rule (sales sees none)', r::text);
+  r := pg_temp.call(svc, $q$SELECT erp.ps_lookup('ZZ99', '{"kind":"customer","q":"C0003"}')$q$);
+  PERFORM pg_temp.check(r->0->>'name' = 'Desert Rose Trading', 'service user looks up customers through ps_lookup', left(r::text, 200));
+  r := pg_temp.call(tech, $q$SELECT to_jsonb(count(*)) FROM erp.business_partner$q$);
+  PERFORM pg_temp.check(r::text = '0', 'service-only user still can''t read business partners directly', r::text);
+  PERFORM pg_temp.expect(pg_temp.call(prod, $q$SELECT erp.ps_lookup('ZZ99', '{"kind":"customer","q":"C"}')$q$),
+    'Your position does not include Service. Ask the system admin if you need it.', 'production user can''t look up customers');
+  r := pg_temp.call(prod, $q$SELECT erp.ps_lookup('ZZ99', '{"kind":"item","q":"SMP-RAW"}')$q$);
+  PERFORM pg_temp.check(jsonb_array_length(r) = 2, 'production user looks up items through ps_lookup', left(r::text, 200));
+
   -- ---------- Settings and resources ----------
   r := pg_temp.call(prod, $q$SELECT erp.production_setting_set('ZZ99', '{"wip_acct":"1300"}')$q$);
   PERFORM pg_temp.check(r->>'error' = '42501' AND r->>'message' = 'Changing the production accounts also needs Financials full access.', 'production user can''t change accounts', r::text);
@@ -281,7 +294,8 @@ BEGIN
   PERFORM pg_temp.check((SELECT flagged AND warranty_status = 'out_of_warranty' AND warranty_end = DATE '2025-09-15' AND technician_name = 'QA Technician'
                            AND warranty_note LIKE '%Out of warranty: the warranty of SMP-1020 serial KT-SMP-0001 ended on 15 Sep 2025.%'
                            FROM erp.service_call WHERE company_code = 'ZZ99' AND call_id = c1), 'flag, warranty end and message stored on the call');
-  PERFORM pg_temp.check((SELECT flagged FROM erp.service_call_list WHERE company_code = 'ZZ99' AND call_id = c1), 'flag shows in the call list');
+  r := pg_temp.call(svc, format('SELECT to_jsonb(flagged) FROM erp.service_call_list WHERE company_code = %L AND call_id = %s', 'ZZ99', c1));
+  PERFORM pg_temp.check(r::text = 'true', 'flag shows in the call list', r::text);
   r := pg_temp.call(svc, $q$SELECT erp.service_call_save('ZZ99', '{"card_code":"C0011","item_code":"SMP-1030","serial_no":"BL-SMP-0100","subject":"Noisy motor"}')$q$);
   c2 := (r->>'call_id')::integer;
   PERFORM pg_temp.check(r->'warranty'->>'status' = 'in_warranty' AND NOT (r->'warranty'->>'flagged')::boolean AND r->'warranty'->>'basis' = 'equipment_card',

@@ -102,11 +102,6 @@ export async function searchBoms(company: string, q: string) {
   if (error) throw new ApiError(error);
   return (data ?? []) as unknown as BomHit[];
 }
-export async function searchAllItems(company: string, q: string) {
-  const s = clean(q);
-  let qb = erp().from('item').select('item_code,name,inventory_uom,is_stock,serial_managed').eq('company_code', company).eq('active', true);
-  if (s) qb = qb.or(`item_code.ilike.*${s}*,name.ilike.*${s}*,barcode.ilike.*${s}*`);
-  const { data, error } = await qb.order('item_code').limit(8);
-  if (error) throw new ApiError(error);
-  return (data ?? []) as unknown as Array<{ item_code: string; name: string; inventory_uom: string | null; is_stock: boolean; serial_managed: boolean }>;
-}
+export interface PsItem { item_code: string; name: string; inventory_uom: string | null; is_stock: boolean; serial_managed: boolean; batch_managed: boolean }
+/** Items for production and service comboboxes (through ps_lookup: those positions may not read the item master directly). */
+export const searchAllItems = (company: string, q: string) => rpc<PsItem[]>('ps_lookup', { p_company: company, p: { kind: 'item', q } });

@@ -4,6 +4,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { LOCAL_RESPONDER, localAnswer } from './ai-test-responder.mjs';
 
 const PORT = Number(process.env.GATEWAY_PORT ?? 54321);
 const PGRST = process.env.PGRST_URL ?? 'http://127.0.0.1:3000';
@@ -103,6 +104,25 @@ http.createServer(async (req, res) => {
     const j3 = await r3.json();
     if (!r3.ok) return send(res, 400, { code: j3.code, message: j3.message, invite_id: j1.invite_id });
     return send(res, 200, { invite_id: j1.invite_id, user_id: u.id, email: j1.email, state: 'sent' });
+  }
+  // A11 · stand-in for the ai-assistant Edge Function (supabase/functions/ai-assistant): same RPC flow with the user's own JWT,
+  // but the answer comes from a deterministic LOCAL TEST RESPONDER (labelled, not AI). Local stack only, never deployed.
+  if (url.pathname === '/functions/v1/ai-assistant' && req.method === 'POST') {
+    const auth = req.headers.authorization ?? '';
+    if (!verify(auth.replace(/^Bearer /i, ''))) return send(res, 401, { code: '42501', message: 'Sign in first.' });
+    const body = JSON.parse((await readBody(req)) || '{}');
+    if (!body.company || !body.question) return send(res, 400, { code: 'P0001', message: 'Send the company and the question.' });
+    const rpc = (fn, args, authz) => fetch(`${PGRST}/rpc/${fn}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'content-profile': 'erp', authorization: authz }, body: JSON.stringify(args),
+    });
+    const r1 = await rpc('ai_ask_context', { p_company: body.company, p_question: String(body.question), p_ref: body.ref ?? null }, auth);
+    const ctx = await r1.json();
+    if (!r1.ok) return send(res, ctx.code === '42501' ? 403 : 400, { code: ctx.code, message: ctx.message });
+    const answer = localAnswer(ctx);
+    await rpc('ai_log_answer', { p_audit_id: ctx.audit_id, p_responder: LOCAL_RESPONDER, p_chars: answer.length }, auth);
+    const service = `Bearer ${sign({ role: 'service_role', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 60 })}`;
+    await rpc('ai_usage_record', { p_company: body.company, p_requests: 1, p_tokens: 0 }, service);
+    return send(res, 200, { answer, responder: LOCAL_RESPONDER, sources: ctx.sources, tools: ctx.tools, audit_id: ctx.audit_id });
   }
   if (url.pathname === '/auth/v1/logout') return send(res, 204);
   if (url.pathname.startsWith('/rest/v1/')) {

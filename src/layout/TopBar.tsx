@@ -7,12 +7,14 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useCompany } from './CompanyContext';
 import { LanguageToggle } from './LanguageToggle';
 import { ChangePassword } from './ChangePassword';
+import { useAskAi } from '@/features/erp/components/AskAi';
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { t } = useTranslation();
   const { profile, signOut } = useAuth();
   const { company, setCompany } = useCompany();
   const { theme, toggle } = useTheme();
+  const { open: openAi } = useAskAi();
   const nav = useNavigate();
   const loc = useLocation();
   const selectId = useId();
@@ -66,8 +68,9 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <Link to="/search" className="grid h-11 w-11 place-items-center rounded-btn border border-line md:hidden" aria-label={t('top.search')}>
           <Search className="h-5 w-5" aria-hidden />
         </Link>
-        <button type="button" disabled title={t('top.askSoon')} className="hidden min-h-[44px] cursor-not-allowed items-center gap-2 rounded-btn border border-line px-3 text-sm text-muted xl:inline-flex">
-          <Sparkles className="h-4 w-4" aria-hidden /> {t('top.ask')} <span className="text-xs">· {t('erp.planned')}</span>
+        <button type="button" onClick={() => openAi()} title={t('top.askTitle')} aria-label={t('top.askTitle')} id="top-ask-ai"
+          className="hidden min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-btn border border-line px-3 text-sm font-medium hover:bg-page sm:inline-flex">
+          <Sparkles className="h-4 w-4 text-primary" aria-hidden /> <span className="hidden xl:inline">{t('top.askAi')}</span>
         </button>
         <Link to="/approvals" className="hidden h-11 w-11 place-items-center sm:grid rounded-btn border border-line" aria-label={t('nav.approvals')} title={t('nav.approvals')}>
           <Bell className="h-5 w-5" aria-hidden />

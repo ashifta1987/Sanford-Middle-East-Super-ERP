@@ -15,6 +15,7 @@ import { Fields, LiveBadge, PageTitle, SectionCard, StatusTag, fmtDay, fmtMoney,
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { DocFlow } from '../components/DocFlow';
+import { AskAiDocCard } from '../components/AskAi';
 import { DOC_KINDS, moduleByKey, type DocKind } from '../modules';
 import { searchCustomers, useSoSetup, type CustomerHit } from '../salesOrder';
 import {
@@ -599,6 +600,7 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
               </ol>
             </SectionCard>
           )}
+          <AskAiDocCard company={company} obj={obj} entry={id} title={t('ai.docTitle')} label={t(`erp.doc.${kind}`)} />
         </aside>
       </div>
     </RequireModule>

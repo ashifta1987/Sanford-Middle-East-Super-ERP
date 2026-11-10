@@ -11,6 +11,7 @@ import { useJournalInfo } from '../journal';
 import { ReverseAction } from './JournalPages';
 import { ItemHistoryCard } from './InventoryPages';
 import { BpDetailExtras, BpEditAction, ItemChangesCard, ItemEditAction } from './MasterDataPages';
+import { AskAiDocCard } from '../components/AskAi';
 import { Flash, useFlash } from './BankingPages';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -231,6 +232,7 @@ export function DocumentDetail() {
               {kind.endsWith('invoice') && <><dt className="text-muted">{t('erp.col.paid')}</dt><dd className="text-end">{fmtMoney(d.paid)}</dd></>}
             </dl>
           </SectionCard>
+          <AskAiDocCard company={company} obj={def.obj} entry={Number(entry)} title={t('ai.docTitle')} label={`${title} ${d.doc_num}`} />
         </div>
       )}
     </Shell>

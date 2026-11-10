@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import clsx from 'clsx';
 import { ArrowRight, Search } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
@@ -195,13 +196,15 @@ export function ModulePage({ moduleKey }: { moduleKey: string }) {
   );
 }
 
-// ---------- Control Tower (rule-based checks on live data) ----------
-const CHECKS = ['credit_limit', 'below_cost', 'overdue_60', 'high_discount', 'low_stock'] as const;
-function checkLink(r: R) {
-  if (r.check_code === 'credit_limit') return `/bp/${r.company_code}/${encodeURIComponent(r.ref)}`;
-  if (r.check_code === 'low_stock') return `/items/${r.company_code}/${encodeURIComponent(String(r.ref).split(' @ ')[0])}`;
-  const [kind, entry] = String(r.ref).split(':');
-  return DOC_KINDS[kind as keyof typeof DOC_KINDS] ? `/docs/${kind}/${r.company_code}/${entry}` : undefined;
+// ---------- Control Tower (rule-based checks on live data; A11: + 5 rules, each with severity, record link and amount) ----------
+const CHECKS = ['credit_limit', 'below_cost', 'overdue_60', 'high_discount', 'low_stock',
+  'count_variance', 'bank_change', 'price_increase', 'duplicate_invoice', 'checkin_outside'] as const;
+const WARN_CHECKS = new Set(['low_stock', 'high_discount', 'count_variance', 'price_increase', 'checkin_outside']);
+function amountText(r: R, t: TFunction) {
+  if (r.amount === null || r.amount === undefined) return null;
+  if (r.check_code === 'low_stock') return t('erp.control.short', { n: fmtInt(r.amount) });
+  if (r.check_code === 'checkin_outside') return t('erp.control.metres', { n: fmtInt(r.amount) });
+  return fmtMoney(r.amount);
 }
 
 export function ControlTowerPage() {
@@ -209,18 +212,18 @@ export function ControlTowerPage() {
   const { company } = useCompany();
   const [sev, setSev] = useState<'all' | 'critical' | 'warning'>('all');
   const [check, setCheck] = useState<string>('');
-  const q = useQuery({ queryKey: ['control', company], queryFn: () => rpc<R[]>('control_checks', { p_company: pc(company) }), refetchInterval: 60_000 });
+  const q = useQuery({ queryKey: ['control', company], queryFn: () => rpc<R[]>('control_findings', { p_company: pc(company) }), refetchInterval: 60_000 });
   const rows = (q.data ?? []).filter((r) => (sev === 'all' || r.severity === sev) && (!check || r.check_code === check));
   const counts = Object.fromEntries(CHECKS.map((c) => [c, (q.data ?? []).filter((r) => r.check_code === c).length]));
   return (
     <div>
       <PageTitle eyebrow={t('nav.oversight')} title={<span className="inline-flex items-center gap-3">{t('erp.control.title')} <LiveBadge live /></span>} desc={t('erp.control.desc')} />
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5" data-testid="ct-cards">
         {CHECKS.map((c) => (
-          <button key={c} type="button" onClick={() => setCheck(check === c ? '' : c)} aria-pressed={check === c}
+          <button key={c} type="button" onClick={() => setCheck(check === c ? '' : c)} aria-pressed={check === c} data-check={c}
             className={clsx('card p-4 text-start transition', check === c ? 'border-primary ring-1 ring-primary' : 'hover:border-primary-line')}>
             <div className="text-sm text-muted">{t(`erp.control.check.${c}`)}</div>
-            <div className={clsx('num mt-1 text-2xl font-semibold', counts[c] ? (c === 'low_stock' || c === 'high_discount' ? 'text-warn-fg' : 'text-crit-fg') : '')}>{q.data ? counts[c] : '…'}</div>
+            <div className={clsx('num mt-1 text-2xl font-semibold', counts[c] ? (WARN_CHECKS.has(c) ? 'text-warn-fg' : 'text-crit-fg') : '')}>{q.data ? counts[c] : '…'}</div>
           </button>
         ))}
       </div>
@@ -237,18 +240,19 @@ export function ControlTowerPage() {
         ) : (
           <ul className="divide-y divide-line">
             {rows.map((r, i) => {
-              const to = checkLink(r);
+              const to = r.link as string | null;
+              const amt = amountText(r, t);
               const inner = (
                 <>
                   <StatusTag value={r.severity} />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{t(`erp.control.check.${r.check_code}`)} · {r.title}</span>
-                    <span className="block text-sm text-muted">{r.company_code} · {r.detail}</span>
+                    <span className="block font-medium" dir="auto">{t(`erp.control.check.${r.check_code}`)} · {r.title}</span>
+                    <span className="block text-sm text-muted" dir="auto">{r.company_code} · {r.detail}</span>
                   </span>
-                  {r.amount !== null && <span className="num whitespace-nowrap text-sm text-ink-2">{r.check_code === 'low_stock' ? t('erp.control.short', { n: fmtInt(r.amount) }) : fmtMoney(r.amount)}</span>}
+                  {amt && <span className="num whitespace-nowrap text-sm text-ink-2">{amt}</span>}
                 </>
               );
-              return <li key={i}>{to ? <Link to={to} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">{inner}</Link> : <div className="flex items-center gap-3 px-5 py-3">{inner}</div>}</li>;
+              return <li key={i} data-check={r.check_code}>{to ? <Link to={to} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">{inner}</Link> : <div className="flex items-center gap-3 px-5 py-3">{inner}</div>}</li>;
             })}
           </ul>
         )}

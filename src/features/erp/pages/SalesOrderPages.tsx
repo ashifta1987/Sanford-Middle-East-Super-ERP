@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { AlertCircle, AlertTriangle, ArrowLeft, Check, CircleCheck, CircleX, Pencil, Plus, Printer, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeft, Check, CircleCheck, CircleX, Pencil, Plus, Printer, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { useCompany } from '@/layout/CompanyContext';
 import { erp } from '@/lib/supabase';
@@ -17,6 +17,7 @@ import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
 import { moduleByKey } from '../modules';
 import { DocFlow } from '../components/DocFlow';
+import { AskAiDocCard } from '../components/AskAi';
 import { copySource } from '../salesCycle';
 import {
   SALES_OBJ, itemPrice, itemStock, lineTotal, round2, searchCustomers, searchItems, soCancel, soChecks, soDecide, soSave, soSubmit, useSoInfo, useSoSetup,
@@ -104,13 +105,9 @@ function checkText(c: SoCheck, info: SoInfo | null | undefined) {
   return i18n.t('so.checkDiscountOther', { line: c.line, value: fmtQty(c.value), limit: fmtQty(c.limit), name: info.submitted_by_name ?? '—' });
 }
 
-function AskAiCard({ kind = 'sales_order' }: { kind?: SalesKind }) {
+function AskAiCard({ kind = 'sales_order', company, obj, entry, label }: { kind?: SalesKind; company: string; obj: number; entry?: number | null; label: string }) {
   const { t } = useTranslation();
-  return (
-    <SectionCard title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4" aria-hidden />{t(tk(kind, 'askAi'))}</span>} right={<span className="pill pill-neutral">{t('erp.planned')}</span>}>
-      <p className="p-5 text-sm text-muted">{t(tk(kind, 'askAiBody'))}</p>
-    </SectionCard>
-  );
+  return <AskAiDocCard company={company} obj={obj} entry={entry} title={t(tk(kind, 'askAi'))} label={label} />;
 }
 
 // ---------- Form (new / edit) ----------
@@ -592,7 +589,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
               </dl>
             </SectionCard>
           )}
-          <AskAiCard kind={kind} />
+          <AskAiCard kind={kind} company={company} obj={obj} entry={entry} label={t(`erp.doc.${kind}`)} />
         </aside>
       </div>
     </div>
@@ -722,7 +719,7 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
             <SectionCard title={t('so.sourceTitle')}><p className="p-5 text-sm text-muted">{d!.source === 'sap' ? t(tk(kind, 'sapReadOnly')) : t('so.sampleReadOnly')}</p></SectionCard>
           )}
           {I?.workflow && <ActivityCard kind={kind} info={I} />}
-          <AskAiCard kind={kind} />
+          <AskAiCard kind={kind} company={company} obj={obj} entry={id} label={title} />
         </aside>
       </div>
     </RequireModule>

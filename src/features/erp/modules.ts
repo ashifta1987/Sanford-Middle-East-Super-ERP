@@ -122,11 +122,15 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   },
   financials: {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
+    // A11 · reports
+    'Financial Reports': '/reports?cat=financials',
   },
   sales: {
     'Sales Quotation': '/docs/sales_quotation', 'Sales Order': '/docs/sales_order', Delivery: '/docs/delivery', Return: '/docs/sales_return',
     'A/R Down Payment Invoice': '/docs/ar_down_payment', 'A/R Invoice': '/docs/ar_invoice', 'A/R Credit Memo': '/docs/ar_credit_note',
     'Available-to-Promise Check': '/sales/atp',
+    // A11 · reports
+    'Sales Reports': '/reports?cat=sales_purchasing',
   },
   purchasing: {
     'Purchase Request': '/docs/purchase_request', 'Purchase Quotation': '/docs/purchase_quotation', 'Purchase Order': '/docs/purchase_order',
@@ -134,8 +138,10 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'A/P Invoice': '/docs/ap_invoice', 'A/P Credit Memo': '/docs/ap_credit_note',
     // A6 · China flow
     'Landed Costs': '/purchasing/landed-costs', 'PI Tracking Entry': '/docs/purchase_order?f_status=open',
+    // A11 · reports
+    'Purchasing Reports': '/reports?cat=sales_purchasing',
   },
-  bp: { 'Business Partner Master Data': '/bp', 'Trademark Master': '/bp/trademarks' },
+  bp: { 'Business Partner Master Data': '/bp', 'Trademark Master': '/bp/trademarks', 'Business Partner Reports': '/reports?cat=bp' },
   banking: {
     'Incoming Payments': '/banking/payments/in', 'Outgoing Payments': '/banking/payments/out', Deposits: '/banking/deposits',
     'Bank Statements and External Reconciliations': '/banking/statements', 'Banking Reports': '/banking/cash-position',
@@ -144,6 +150,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Item Master Data': '/items', 'Price Lists': '/inventory/prices',
     // A7 · inventory transactions
     'Bin Locations': '/inventory/setup', 'Inventory Transactions': '/docs/inventory_transfer',
+    // A11 · reports
+    'Inventory Reports': '/reports?cat=inventory',
   },
   hr: {
     'Employee Master Data': '/hr/employees',
@@ -151,12 +159,17 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Human Resources Reports': '/hr/expiry', 'Roles and Duties': '/hr/setup', 'Attendance and Check-in': '/hr/attendance', Leave: '/hr/leave',
     Payroll: '/hr/payroll', 'Staff Portal': '/portal',
   },
+  // A11 · Reports: report library (read-only SQL functions with the user's own rights), Ask AI for a Report
+  reports: {
+    Financials: '/reports?cat=financials', 'Sales and Purchasing': '/reports?cat=sales_purchasing', 'Business Partners': '/reports?cat=bp',
+    Inventory: '/reports?cat=inventory', 'Ask AI for a Report': '/reports?ask=1',
+  },
 };
 /** sub-function (item) name → working screen, wherever it appears */
 const LIVE_ITEMS: Record<string, string> = {
   'Goods Receipt': '/docs/goods_receipt', 'Goods Issue': '/docs/goods_issue', 'Inventory Transfer Request': '/docs/transfer_request',
   'Inventory Transfer': '/docs/inventory_transfer', 'Inventory Status': '/inventory/stock', 'Items List': '/items',
-  'Inventory in Warehouse Report': '/inventory/stock', 'Find an item': '/items', 'Stock per warehouse': '/inventory/stock', 'Price Report': '/inventory/prices',
+  'Inventory in Warehouse Report': '/reports/inventory-in-warehouse', 'Find an item': '/items', 'Stock per warehouse': '/inventory/stock', 'Price Report': '/inventory/prices',
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '/admin/exchange-rates',
   'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
   'New sales order': '/docs/sales_order/new',
@@ -204,6 +217,11 @@ const LIVE_ITEMS: Record<string, string> = {
   'Company Details': '/admin/company', 'Authorizations ›': '/admin/authorizations', 'Document Numbering': '/admin/numbering',
   'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approval-templates', 'Approval Stages': '/admin/approval-templates',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
+  // A11 · reports and Ask AI
+  'Financial ›': '/reports?cat=financials', 'Open Items List': '/reports/open-items', 'Sales Analysis': '/reports/sales-analysis',
+  'Customer receivables ageing': '/reports/ar-aging', 'Supplier liabilities ageing': '/reports/ap-aging', 'Aging ›': '/reports/ar-aging',
+  'Customer Receivables by Customer Cross-Section': '/reports/ar-aging', 'Inventory in warehouse': '/reports/inventory-in-warehouse',
+  'Inventory valuation': '/reports/inventory-valuation', 'Ask in plain words': '/reports?ask=1',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */

@@ -26,6 +26,7 @@ import {
   type LcEval, type PuCheck, type PuCopyLine, type PuEval, type PuHeaderInput, type PuInfo, type PuLineInput, type PurchaseKind, type PurchaseViewKind,
   type SupplierHit,
 } from '../purchasing';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -700,6 +701,7 @@ function ApprovalPanel({ company, id, info, kind, docNo, onDone }: { company: st
         {info.state === 'pending_approval' && (
           <>
             <p className="font-semibold text-warn-fg">{t('so.approval.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>
+            <ApprovalStageNote items={current} />
             {current.map((a) => msgs(a).map((m, k) => <p key={`${a.approval_id}-${k}`} dir="auto" className="text-ink-2">{m}</p>))}
             {info.reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{info.reason}”</blockquote>}
             {info.is_submitter && <p className="text-muted">{t('pu.youCantApprove')}</p>}

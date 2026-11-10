@@ -203,7 +203,8 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
   const C = await context(browser);
   const p = await C.newPage(); watch(p, 'admin-setup');
   await login(p, 'admin'); await settle(p);
-  await p.goto(`${BASE}/admin/approval-templates`); await settle(p);
+  // B2: the A10 rule list moved to /admin/approval-rules (compatibility); /admin/approval-templates is the new Approval Templates screen.
+  await p.goto(`${BASE}/admin/approval-rules`); await settle(p);
   ok('templates list the sample rules and the new-documents note', await seen(p.locator('[data-testid=adm-rule-row]')) && (await txt(p.locator('[data-testid=adm-tpl-note]'))).includes('from now on'));
   await p.click('#adm-add-discount_pct');
   await p.fill('#adm-r-limit', '5'); await p.selectOption('#adm-r-appr', 'QA_SALES_MGR');
@@ -306,7 +307,7 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
 
 // ---------- 9. Screenshots: 1440 / 390, light / dark, EN / AR ----------
 const shots = [
-  ['users', '/admin/users'], ['invite', '/admin/users/invite'], ['authorizations', '/admin/authorizations'], ['templates', '/admin/approval-templates'],
+  ['users', '/admin/users'], ['invite', '/admin/users/invite'], ['authorizations', '/admin/authorizations'], ['templates', '/admin/approval-rules'],
   ['numbering', '/admin/numbering'], ['company', '/admin/company'], ['rates', '/admin/exchange-rates'], ['ai', '/admin/ai-assistant'],
 ];
 for (const [lang, theme, width] of [['en', 'light', 1440], ['en', 'dark', 1440], ['ar', 'light', 1440], ['ar', 'dark', 1440], ['en', 'light', 390], ['en', 'dark', 390], ['ar', 'light', 390], ['ar', 'dark', 390]]) {
@@ -333,7 +334,7 @@ for (const [lang, theme, width] of [['en', 'light', 1440], ['en', 'dark', 1440],
   await login(page, 'admin'); await settle(page);
   await page.goto(`${BASE}/m/administration?fn=7`); await settle(page);
   await page.waitForTimeout(500);
-  ok('module page: Approval Process opens the templates', await seen(page.locator('a[href="/admin/approval-templates"]')));
+  ok('module page: Approval Process opens the templates', await seen(page.locator('a[href="/admin/approvals/templates"]')));
   await page.goto(`${BASE}/m/administration?fn=3`); await settle(page);
   ok('module page: Authorizations and Document Numbering live', await seen(page.locator('a[href="/admin/authorizations"]')) && await seen(page.locator('a[href="/admin/numbering"]')));
   await page.screenshot({ path: `${OUT}/a10-module-en-light-1440.png`, fullPage: true });

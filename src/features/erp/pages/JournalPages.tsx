@@ -21,6 +21,7 @@ import {
   jeCancel, jeChecks, jeDecide, jeReverse, jeSave, jeSubmit, round2, searchAccounts, todayIso, useJeDraftInfo, useJeSetup,
   type AccountHit, type JeDraftInfo, type JeEval, type JeHeaderInput, type JeLineInput, type JeState, type JournalInfo,
 } from '../journal';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -536,6 +537,7 @@ function JeApprovalPanel({ info, onDone }: { info: JeDraftInfo; onDone: (msg: st
         {info.state === 'pending_approval' && (
           <>
             <p className="font-semibold text-warn-fg">{t('je.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>
+            <ApprovalStageNote items={current} />
             {info.reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{info.reason}”</blockquote>}
             {info.is_submitter && <p className="text-muted">{t('je.youCantApprove')}</p>}
           </>

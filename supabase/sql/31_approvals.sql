@@ -3924,7 +3924,7 @@ BEGIN
   RETURN (
     WITH b AS (SELECT * FROM erp._apr_base(true) x WHERE x.company_code = p_company),
     g AS (
-      SELECT b.object, b.object_ref, min(b.kind) AS kind, min(b.doc_no) AS doc_no, min(b.doc_entry) AS doc_entry, min(b.state) AS state,
+      SELECT b.object, b.object_ref, min(b.kind) AS kind, min(b.rule_code) AS rule_code, min(b.doc_no) AS doc_no, min(b.doc_entry) AS doc_entry, min(b.state) AS state,
              min(b.card_code) AS card_code, min(b.card_name) AS card_name, min(b.total) AS total, min(b.currency) AS currency,
              min(b.requested_at) AS requested_at, (array_agg(b.requested_by ORDER BY b.requested_at))[1] AS requested_by,
              string_agg(DISTINCT coalesce(b.template_name, erp._apr_kind_label(b.rule_code)), ', ') AS templates,
@@ -3943,7 +3943,7 @@ BEGIN
       'counts', jsonb_build_object('pending', (SELECT count(*) FROM s WHERE status = 'pending'), 'approved', (SELECT count(*) FROM s WHERE status = 'approved'),
                                    'rejected', (SELECT count(*) FROM s WHERE status = 'rejected'), 'cancelled', (SELECT count(*) FROM s WHERE status = 'cancelled')),
       'rows', coalesce((SELECT jsonb_agg(jsonb_build_object(
-                'object', s.object, 'object_ref', s.object_ref, 'kind', s.kind, 'doc_no', s.doc_no, 'doc_entry', s.doc_entry, 'company_code', p_company,
+                'object', s.object, 'object_ref', s.object_ref, 'kind', s.kind, 'rule_code', s.rule_code, 'doc_no', s.doc_no, 'doc_entry', s.doc_entry, 'company_code', p_company,
                 'status', s.status, 'state', s.state, 'card_code', s.card_code, 'card_name', s.card_name, 'total', s.total, 'currency', s.currency,
                 'requested_at', s.requested_at, 'requested_by_name', erp._adm_name(s.requested_by), 'templates', s.templates,
                 'current_step', s.current_step, 'steps', s.steps, 'last_decided_at', s.last_decided_at,

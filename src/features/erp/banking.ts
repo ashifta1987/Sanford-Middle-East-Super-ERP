@@ -12,12 +12,12 @@ export type DraftState = 'pending_approval' | 'posted' | 'rejected' | 'cancelled
 export interface BankRef { bank_code: string; name: string; acct_code: string; bank_name?: string | null }
 export interface PaySetup {
   currency: string; can_write: boolean; banks: BankRef[]; accounts: { cash: boolean; cheque: boolean; card: boolean };
-  numbering: boolean; my_limit: number | null; bank_change_days: number | null;
+  numbering: boolean; my_limit: number | null; bank_change_days: number | null; needs_approval?: boolean | null;
 }
 export interface OpenDoc { obj_type: number; doc_entry: number; doc_no: string; doc_date: string; due_date: string; total: number; open: number; reserved: number; sign: 1 | -1 }
 export interface OpenDocs { card_code: string; card_name: string; currency: string | null; balance: number; bank_changed_at: string | null; docs: OpenDoc[]; other_open: number }
 export interface PayProblem { line: number | null; field: string; message: string }
-export interface PayCheck { rule_code: 'payment_amount' | 'bank_change'; step: number; approver_position: string; approver_name: string; value: number | string; limit: number; message: string }
+export interface PayCheck { rule_code: 'payment_amount' | 'bank_change' | 'incoming_payment'; step: number; approver_position: string; approver_name: string; value: number | string; limit: number; message: string }
 export interface PayEval { errors: PayProblem[]; checks: PayCheck[]; totals: { total: number; applied: number; on_account: number; currency: string } }
 export interface ChequeInput { cheque_no: string; bank_name: string; due_date: string; amount: string }
 export interface PayHeaderInput {

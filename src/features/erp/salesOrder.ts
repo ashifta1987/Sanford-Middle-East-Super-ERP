@@ -11,7 +11,7 @@ export type SalesKind = 'sales_order' | 'sales_quotation';
 export const SALES_OBJ: Record<SalesKind, number> = { sales_order: 17, sales_quotation: 23 };
 export type WorkflowState = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
 export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount' | 'payment_amount' | 'bank_change' | 'po_amount' | 'po_price_increase'
-  | 'stock_doc_amount' | 'count_variance_pct' | 'count_variance_value' | 'bp_credit_limit' | 'bp_bank_detail' | 'leave_manager' | 'leave_hr' | 'leave_long' | 'company_details' | 'credit_memo_amount';
+  | 'stock_doc_amount' | 'count_variance_pct' | 'count_variance_value' | 'bp_credit_limit' | 'bp_bank_detail' | 'leave_manager' | 'leave_hr' | 'leave_long' | 'company_details' | 'credit_memo_amount' | 'incoming_payment';
 
 export interface Code<T = string> { code: T; name: string }
 export interface SoSetup {
@@ -61,6 +61,8 @@ export interface InboxRow {
   card_code: string | null; card_name: string | null; total: number; currency: string; requested_by_name: string | null; requested_at: string;
   reason: string | null; decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null;
   state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;
+  /** B2: the approval template and stage of this row (built-in = leave / rows sent before B2). */
+  template_name?: string | null; stage_name?: string | null; stages?: number; need_approvals?: number; approvals?: number; built_in?: boolean;
 }
 export interface Inbox { is_approver: boolean; waiting: InboxRow[]; sent: InboxRow[]; decided: InboxRow[] }
 

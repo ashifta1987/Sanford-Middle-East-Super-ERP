@@ -12,6 +12,7 @@ import { RequireModule } from '../components/Guard';
 import { Dialog } from '../components/Dialog';
 import { salesRequestCancel, salesRequestDecide, useSalesRequest } from '../salesCycle';
 import { ErrorBox, Flash } from './AdminPages';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 const STATE_TONE: Record<string, string> = { pending_approval: 'pill-warning', approved: 'pill-ok', rejected: 'pill-crit', cancelled: 'pill-neutral' };
 
@@ -132,6 +133,7 @@ export function SalesRequestPage() {
                       {a.decision ? t(`erp.status.${a.decision}`) : a.superseded ? t('inbox.closed') : t('md.req.pill.pending_approval')}
                     </span>
                   </div>
+                  <ApprovalStageNote items={[a]} />
                   {a.decided_by_name && <p className="mt-1 text-xs text-muted">{a.decided_by_name} · {fmtDate(a.decided_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
                   {a.note && <p className="mt-1 text-xs italic text-ink-2" dir="auto">“{a.note}”</p>}
                 </li>

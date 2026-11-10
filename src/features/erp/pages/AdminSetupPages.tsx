@@ -17,6 +17,7 @@ import {
   type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec,
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 const OBJ_LABEL: Record<number, string> = {
   17: 'Sales Order', 22: 'Purchase Order', 46: 'Outgoing Payment', 30: 'Journal Entry', 59: 'Goods Receipt', 60: 'Goods Issue',
@@ -228,6 +229,7 @@ export function CompanyDetailsPage() {
               <SectionCard title={t('adm.co.pendingTitle')} className="border-warn-fg/40">
                 <div className="space-y-3 p-5 text-sm" data-testid="adm-co-pending">
                   <p>{t('adm.co.pendingBy', { name: info.pending.requested_by_name ?? '—', when: fmtDate(info.pending.requested_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }), pos: info.pending.approver_position ?? '—' })}</p>
+                  <ApprovalStageNote items={(info.pending.approvals ?? []).filter((a) => a.current)} />
                   {info.pending.reason && <p className="italic text-ink-2" dir="auto">“{info.pending.reason}”</p>}
                   <ul className="divide-y divide-line rounded-btn border border-line">
                     {PROFILE_FIELDS.filter((k) => String(info.pending!.before[k] ?? '') !== String(info.pending!.after[k] ?? '')).map((k) => (

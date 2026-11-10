@@ -21,6 +21,7 @@ import {
   bpBankSave, bpChangeCancel, bpChangeDecide, bpChecks, bpSave, itemChecks, itemSave, searchSuppliers, useBpInfo, useItemInfo, useMdSetup,
   type Address, type BankAccount, type BpEval, type BpInfo, type BpKind, type BpRequest, type Contact, type FieldError, type HistoryRow, type ItemEval,
 } from '../masterData';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const linkBtn = 'inline-flex min-h-[44px] items-center gap-2 rounded-btn px-4 text-[15px] font-medium';
@@ -571,6 +572,7 @@ function RequestsCard({ info, company, code, onFlash }: { info: BpInfo; company:
                   <p className="text-muted">{t('so.approval.requested', { name: r.requested_by_name ?? '—', when: fmtWhen(r.requested_at) })}</p>
                   {r.reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{r.reason}”</blockquote>}
                   {r.state === 'pending_approval' && <p className="font-medium text-warn-fg">{t('so.approval.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>}
+                  {r.state === 'pending_approval' && <ApprovalStageNote items={current} />}
                   {r.state === 'pending_approval' && r.requested_by_me && <p className="text-muted">{t('md.req.youCantApprove')}</p>}
                   {r.state !== 'pending_approval' && (
                     <p className={clsx('flex items-center gap-1.5 font-medium', r.state === 'approved' ? 'text-ok-fg' : 'text-crit-fg')}>

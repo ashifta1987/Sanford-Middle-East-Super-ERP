@@ -56,6 +56,7 @@ export interface CompanyInfo {
   pending: null | {
     request_id: number; before: Profile; after: Profile; reason: string | null; requested_by_name: string | null; requested_at: string;
     is_requester: boolean; approver_position: string | null; can_decide: boolean;
+    approvals?: Array<{ step: number; template_name: string | null; stage_name: string | null; need_approvals: number; votes: Array<{ decision: string }>; current: boolean }>;
   };
   history: Array<{ request_id: number; state: string; after: Profile; reason: string | null; requested_by_name: string | null; requested_at: string; decided_by_name: string | null; decided_at: string | null; note: string | null }>;
 }

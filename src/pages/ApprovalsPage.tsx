@@ -90,7 +90,7 @@ function DocumentApprovals() {
             <table className="w-full text-[14px] sm:min-w-[640px]" data-testid="inbox-table">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('inbox.col.document')}</th>
-                <th scope="col" className="px-4 py-2.5 text-start">{t('inbox.col.rule')}</th>
+                <th scope="col" className="px-4 py-2.5 text-start">{t('inbox.col.template')}</th>
                 <th scope="col" className="px-4 py-2.5 text-start max-md:hidden">{view === 'decided' ? t('inbox.col.decision') : t('inbox.col.requester')}</th>
                 <th scope="col" className="px-4 py-2.5 text-end">{t('inbox.col.amount')}</th>
                 <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{view === 'waiting' ? t('inbox.col.waited') : t('inbox.col.status')}</th>
@@ -107,7 +107,7 @@ function DocumentApprovals() {
                       ) : r.kind === 'payment' ? (
                         <>
                           <Link className="font-mono text-[13px] font-medium text-primary hover:underline" to={`/banking/payment-drafts/${r.company_code}/${r.doc_entry}`}>{t('bk.draftN', { n: r.doc_no })}</Link>
-                          <div dir="auto" className="text-xs text-muted">{t('inbox.kind.payment')} · {r.card_code} {r.card_name}</div>
+                          <div dir="auto" className="text-xs text-muted">{t(r.rule_code === 'incoming_payment' ? 'inbox.kind.payment_in' : 'inbox.kind.payment')} · {r.card_code} {r.card_name}</div>
                         </>
                       ) : r.kind === 'inventory_count' ? (
                         <>
@@ -142,8 +142,12 @@ function DocumentApprovals() {
                       )}
                     </td>
                     <td className="px-4 py-2.5">
-                      <div>{t(`so.rule.${r.rule_code}`)}</div>
-                      <div className="text-xs text-muted">{r.approver_position_name}</div>
+                      <div dir="auto" data-testid="inbox-template">{r.template_name ?? t(`so.rule.${r.rule_code}`)}</div>
+                      <div className="text-xs text-ink-2" data-testid="inbox-stage">
+                        {t('apr.stageOfShort', { n: r.step, of: r.stages ?? r.step })} · <span dir="auto">{r.stage_name ?? r.approver_position_name}</span>
+                        {(r.need_approvals ?? 1) > 1 && <> · <span className="num">{t('apr.votes', { a: r.approvals ?? 0, n: r.need_approvals })}</span></>}
+                      </div>
+                      <div className="text-xs text-muted" dir="auto">{r.approver_position_name}</div>
                     </td>
                     <td className="px-4 py-2.5 max-md:hidden">
                       {view === 'decided'

@@ -24,6 +24,7 @@ import {
   SALES_OBJ, itemPrice, itemStock, lineTotal, round2, searchCustomers, searchItems, soCancel, soChecks, soDecide, soSave, soSubmit, useSoInfo, useSoSetup,
   type CustomerHit, type ItemHit, type SalesKind, type SoCheck, type SoEval, type SoHeaderInput, type SoInfo, type SoLineInput, type SoSetup, type WorkflowState,
 } from '../salesOrder';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -870,6 +871,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone, kind }: { company: st
         {info.state === 'pending_approval' && (
           <>
             <p className="font-semibold text-warn-fg">{t('so.approval.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>
+            <ApprovalStageNote items={current} />
             {current.map((a) => (a.detail?.checks ?? []).map((c, k) => <p key={`${a.approval_id}-${k}`} dir="auto" className="text-ink-2">{checkText(c, info)}</p>))}
             {info.reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{info.reason}”</blockquote>}
             {info.is_submitter && <p className="text-muted">{t(tk(kind, 'approval.youCantApprove'))}</p>}

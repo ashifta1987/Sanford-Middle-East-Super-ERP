@@ -117,7 +117,7 @@ export const docKindByObj = (obj: number) => (Object.keys(DOC_KINDS) as DocKind[
 const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   // A10 · Administration
   administration: {
-    'Exchange Rates and Indexes': '/admin/exchange-rates', 'Approval Process': '/admin/approval-templates', License: '/admin/users',
+    'Exchange Rates and Indexes': '/admin/exchange-rates', 'Approval Process': '/admin/approvals/templates', License: '/admin/users',
     'Data Import/Export': '/backoffice/migration',
     // B1 · companies are created from the front end
     'Choose/Create Company': '/admin/companies',
@@ -183,7 +183,7 @@ const LIVE_ITEMS: Record<string, string> = {
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '/admin/exchange-rates',
   // A12 · special prices and period/volume discounts from SAP (OSPP/SPP1, OEDG/EDG1)
   'Special prices for partners': '/inventory/special-prices', 'Period and volume discounts': '/inventory/discounts',
-  'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
+  'Approval Status Report': '/admin/approvals/report', 'Approval Decision Report': '/admin/approvals/report?status=approved',
   'New sales order': '/docs/sales_order/new',
   // A4 · sales cycle
   'New quotation': '/docs/sales_quotation/new', 'Open quotations': '/docs/sales_quotation?f_status=open', 'Copy to sales order': '/docs/sales_quotation?f_status=open',
@@ -229,7 +229,7 @@ const LIVE_ITEMS: Record<string, string> = {
   'Company Details': '/admin/company', 'Authorizations ›': '/admin/authorizations', 'Document Numbering': '/admin/numbering',
   // B1 · Choose/Create Company, Document Numbering check
   'Create new company': '/admin/companies/new', 'Sanford Middle East DWC Group': '/admin/companies', 'Check Document Numbering': '/admin/numbering',
-  'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approval-templates', 'Approval Stages': '/admin/approval-templates',
+  'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approvals/templates', 'Approval Stages': '/admin/approvals/stages',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
   // A14 · go-live checklist and system health
   'Implementation Center ›': '/admin/go-live',

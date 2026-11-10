@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '@/layout/AppShell';
 import { CompanyProvider } from '@/layout/CompanyContext';
 import { LoginPage } from '@/auth/LoginPage';
@@ -65,6 +65,8 @@ const P_AdminPages = from(() => import('@/features/erp/pages/AdminPages'));
 const { AuthorizationsPage, UserFormPage, UsersPage } = P_AdminPages('AuthorizationsPage', 'UserFormPage', 'UsersPage');
 const P_AdminSetupPages = from(() => import('@/features/erp/pages/AdminSetupPages'));
 const { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage } = P_AdminSetupPages('AiAssistantPage', 'ApprovalTemplatesPage', 'CompanyDetailsPage', 'ExchangeRatesPage');
+const P_ApprovalProcessPages = from(() => import('@/features/erp/pages/ApprovalProcessPages'));
+const { ApprovalStagesPage, ApprovalStatusReportPage, ApprovalTemplateFormPage, ApprovalTemplatesListPage } = P_ApprovalProcessPages('ApprovalStagesPage', 'ApprovalStatusReportPage', 'ApprovalTemplateFormPage', 'ApprovalTemplatesListPage');
 const P_NumberingPages = from(() => import('@/features/erp/pages/NumberingPages'));
 const { CompaniesPage, CompanyFormPage, DocNumberingPage } = P_NumberingPages('CompaniesPage', 'CompanyFormPage', 'DocNumberingPage');
 const P_SalesRequestPages = from(() => import('@/features/erp/pages/SalesRequestPages'));
@@ -87,6 +89,10 @@ const backOffice: Array<[string, string]> = [
   ['requests', 'tabs.requests'], ['licences', 'tabs.licences'], ['it', 'tabs.it'], ['sysadmin', 'tabs.sysadmin'],
 ];
 
+/** Old links keep their ?company= when they move. */
+function RedirectKeepQuery({ to }: { to: string }) {
+  return <Navigate to={`${to}${useLocation().search}`} replace />;
+}
 function BackOfficeHome() {
   const { isMigrationAdmin } = useAuth();
   return <Navigate to={isMigrationAdmin ? '/backoffice/migration' : '/backoffice/requests'} replace />;
@@ -227,7 +233,15 @@ export default function App() {
         <Route path="admin/users/invite" element={<UserFormPage key="u-new" mode="new" />} />
         <Route path="admin/users/:id" element={<UserFormPage key="u-edit" mode="edit" />} />
         <Route path="admin/authorizations" element={<AuthorizationsPage />} />
-        <Route path="admin/approval-templates" element={<ApprovalTemplatesPage />} />
+        {/* B2 · Approval Process: stages, templates (the earlier rule list stays under approval-rules), status report */}
+        <Route path="admin/approval-templates" element={<RedirectKeepQuery to="/admin/approvals/templates" />} />
+        <Route path="admin/approval-rules" element={<ApprovalTemplatesPage />} />
+        <Route path="admin/approvals" element={<RedirectKeepQuery to="/admin/approvals/templates" />} />
+        <Route path="admin/approvals/stages" element={<ApprovalStagesPage />} />
+        <Route path="admin/approvals/templates" element={<ApprovalTemplatesListPage />} />
+        <Route path="admin/approvals/templates/new" element={<ApprovalTemplateFormPage key="apr-new" mode="new" />} />
+        <Route path="admin/approvals/templates/:id" element={<ApprovalTemplateFormPage key="apr-edit" mode="edit" />} />
+        <Route path="admin/approvals/report" element={<ApprovalStatusReportPage />} />
         {/* B1 · Document Numbering (several series per type, user defaults) and Choose/Create Company */}
         <Route path="admin/numbering" element={<DocNumberingPage />} />
         <Route path="admin/companies" element={<CompaniesPage />} />

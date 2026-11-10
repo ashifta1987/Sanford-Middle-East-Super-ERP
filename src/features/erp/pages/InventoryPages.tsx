@@ -23,6 +23,7 @@ import {
   useLotHistory, whsInvSet,
   type CountState, type InvApproval, type InvEval, type InvKind, type StockDocKind, type StockItemHit, type TransferKind,
 } from '../inventory';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const linkBtn = 'inline-flex min-h-[44px] items-center gap-2 rounded-btn px-4 text-[15px] font-medium';
@@ -160,6 +161,7 @@ function ApprovalCard({ approvals, state, canDecide, isSubmitter, submittedBy, s
         {state === 'pending_approval' && (
           <>
             <p className="font-semibold text-warn-fg">{t('so.approval.waitingFor', { names: [...new Set(current.map((a) => a.approver_position_name))].join(', ') })}</p>
+            <ApprovalStageNote items={current} />
             {current.map((a) => msgs(a).map((m, k) => <p key={`${a.approval_id}-${k}`} dir="auto" className="text-ink-2">{m}</p>))}
             {reason && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{reason}”</blockquote>}
             {isSubmitter && <p className="text-muted">{t('inv.youCantApprove')}</p>}

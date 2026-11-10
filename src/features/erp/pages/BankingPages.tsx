@@ -22,6 +22,7 @@ import {
   dirOf, dirPath, payCancel, payChecks, payDecide, payDraftCancel, paySubmit, searchPartners, useDraftInfo, useOpenDocs, usePaySetup, usePaymentInfo,
   type Activity, type BpHit, type ChequeInput, type Dir, type DraftInfo, type DraftState, type PayEval, type PayHeaderInput,
 } from '../banking';
+import { ApprovalStageNote } from '../components/ApprovalStageNote';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -480,6 +481,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
           </SectionCard>
           {!incoming && setup.data?.my_limit != null && <p className="px-1 text-sm text-muted">{t('bk.myLimit', { amount: fmtMoney(setup.data.my_limit, cur) })}</p>}
           {!incoming && setup.data?.bank_change_days != null && <p className="px-1 text-sm text-muted">{t('bk.bankRule', { n: setup.data.bank_change_days })}</p>}
+          {incoming && setup.data?.needs_approval && <p className="px-1 text-sm text-muted" data-testid="bk-in-approval">{setup.data.my_limit != null ? t('bk.inApprovalAbove', { amount: fmtMoney(setup.data.my_limit, cur) }) : t('bk.inApproval')}</p>}
         </aside>
       </div>
     </div>
@@ -810,6 +812,7 @@ function DraftApprovalPanel({ d, onDone }: { d: DraftInfo; onDone: (msg: string)
     <SectionCard title={t('je.status')}>
       <div className="space-y-3 p-5 text-sm" data-testid="bk-status-card">
         {d.state === 'pending_approval' && <p className="font-semibold text-warn-fg">{t('je.waitingFor', { names: [...new Set(steps.filter((a) => a.current).map((a) => a.approver_position_name))].join(', ') })}</p>}
+        {d.state === 'pending_approval' && <ApprovalStageNote items={steps.filter((a) => a.current)} />}
         {d.state === 'posted' && <p className="flex items-center gap-2 font-semibold text-ok-fg"><CircleCheck className="h-4 w-4" aria-hidden />{t('bk.postedAfterApproval', { no: d.doc_no })}</p>}
         {d.state === 'rejected' && <p className="flex items-center gap-2 font-semibold text-crit-fg"><CircleX className="h-4 w-4" aria-hidden />{t('bk.state.rejected')}</p>}
         {d.state === 'cancelled' && <><p className="font-semibold text-crit-fg">{t('je.cancelledAt', { when: fmtWhen(d.cancelled_at) })}</p>{d.cancel_note && <blockquote dir="auto" className="border-s-4 border-line-strong ps-3 italic text-ink-2">“{d.cancel_note}”</blockquote>}</>}

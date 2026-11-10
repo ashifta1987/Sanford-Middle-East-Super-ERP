@@ -61,26 +61,27 @@ The list is also in `scripts/local-stack/sql-order-supabase.txt`.
 | 13 | `27_migration_more.sql` | A12 (re-creates `erp.sync_company` with 4 more steps) |
 | 14 | `28_production_service.sql` | A13 |
 | 15 | `29_go_live.sql` | A14: go-live checklist, release log, `system_health()`, checklist gate on `company_go_live` |
+| 16 | `30_numbering_company.sql` | B1: pilot company AE05 (also added to `sap._company`), Document Numbering (several series per type, user defaults), decided rule changes (decisions of 10 Nov 2026) |
 
 - **Never** run `15_sample_company.sql` or `scripts/local-stack/test-users.sql` on live. They are a fictional company and fictional users. On a throwaway branch they are fine for running the test suites (3.3).
-- Files 15–29 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
+- Files 15–30 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
 - **How to run each file:** in the SQL editor, paste the whole file and run it once. Or use `psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/sql/<file>`. Stop at the first error and don't carry on with later files.
 
 ### 3.3 Tests on the branch
 1. On the branch only, load the fictional data: `15_sample_company.sql`, then `scripts/local-stack/test-users.sql`.
-2. Run each suite, `supabase/tests/a1_module_access.sql` to `a14_go_live.sql`. Each one prints PASS/FAIL rows and a TOTAL row, and rolls back.
-3. Expected result, the same as local and CI: **14 suites, 1,647 checks passed, 0 failed.**
+2. Run each suite, `supabase/tests/a1_module_access.sql` to `a14_go_live.sql`, then `b1_numbering_company.sql` (after `scripts/local-stack/test-users-b1.sql`). Each one prints PASS/FAIL rows and a TOTAL row, and rolls back.
+3. Expected result, the same as local and CI: **15 suites, 1,796 checks passed, 0 failed.**
 4. Throw the branch away afterwards, or remove ZZ99 if it is a long-lived test project.
 
 The `a14_go_live.sql` suite runs the same checks as the advisors (RLS on every table, `search_path` on every definer function, nothing callable by anon).
 
 ### 3.4 Verification queries (SQL editor, as `postgres`)
 ```sql
--- every phase function is in place (expect 17 rows, all true)
+-- every phase function is in place (expect 18 rows, all true)
 select f, exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'erp' and p.proname = f) as present
   from unnest(array['company_go_live','migration_inbox','home_kpis','module_level','sales_order_save','journal_submit','sales_delivery_create',
                     'bank_statement_import','landed_cost_create','inv_count_create','bp_save','leave_checks','admin_users','control_findings',
-                    'custom_field_setup','prod_order_create','system_health']) f;
+                    'custom_field_setup','prod_order_create','system_health','doc_series_save']) f;
 -- RLS on every erp table (expect 0 rows)
 select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'erp' and c.relkind in ('r','p') and not c.relrowsecurity;
 -- definer functions anon could call (expect 0 rows)
@@ -104,7 +105,7 @@ Use the same files in the same order, in a quiet window (no migration run active
 select erp.schema_release_record(f, 'live', 'Ashif', 'A14 go-live apply')
   from unnest(array['15_stage1_overview.sql','16_module_access.sql','17_sales_order.sql','18_posting.sql','19_sales_cycle.sql','20_banking.sql',
                     '21_purchasing.sql','22_inventory.sql','23_master_data.sql','24_hr.sql','25_admin.sql','26_reports.sql',
-                    '27_migration_more.sql','28_production_service.sql','29_go_live.sql']) f;
+                    '27_migration_more.sql','28_production_service.sql','29_go_live.sql','30_numbering_company.sql']) f;
 ```
 Do the same on the branch with `'branch'`. `schema_release_record` can only be run from the SQL editor (postgres) or with the service role. Signed-in users can only read the log, on the System health page.
 
@@ -185,17 +186,17 @@ Each company works through this in the app at **Administration › System Initia
 | 7 | Hypercare for 2 weeks: daily reconciliation, issue list, fast fixes | System admin | Available 14 days after go-live, and only with no open issue |
 
 ### Per-company sign-off sheet (fill in as you go)
-| Step | AE01 Sanford Middle East DWC | AE02 A.T.M.M. Electronics | AE03 Abdulla Mohamed Home Appliances | AE04 Izaan General Trading |
-|---|---|---|---|---|
-| 1 Run signed off | | | | |
-| 2 Written approval (ref.) | | | | |
-| 3 Users ready | | | | |
-| 4 Opening balances | | | | |
-| 5 SAP frozen, final run (backup ref.) | | | | |
-| 6 Go-live date | | | | |
-| 7 Hypercare closed | | | | |
+| Step | AE05 ATMM General Trading (pilot) | AE01 Sanford Middle East DWC | AE02 A.T.M.M. Electronics | AE03 Abdulla Mohamed Home Appliances | AE04 Izaan General Trading |
+|---|---|---|---|---|---|
+| 1 Run signed off | | | | | |
+| 2 Written approval (ref.) | | | | | |
+| 3 Users ready | | | | | |
+| 4 Opening balances | | | | | |
+| 5 SAP frozen, final run (backup ref.) | | | | | |
+| 6 Go-live date | | | | | |
+| 7 Hypercare closed | | | | | |
 
-**Suggested pilot:** one company first, which Ashif chooses. Start the next only after the pilot's hypercare closes.
+**Pilot:** AE05 · UAE - ATMM GENERAL TRADING LLC (decisions of 10 Nov 2026, seeded by `30_numbering_company.sql`). Its SAP backup is uploaded later through the Migration console and its go-live date is planned after that. Before its first document, enter its numbering series in Administration › System Initialization › Document Numbering (nothing is seeded for real companies). Start the next company only after the pilot's hypercare closes.
 
 ### Hypercare (2 weeks per company)
 - **Daily:** open the company's cross-check (step 7 link) and compare the totals. Then check `/admin/health` (last SAP load must stop updating for a live company) and the Approvals inbox.

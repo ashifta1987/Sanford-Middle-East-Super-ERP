@@ -1,4 +1,4 @@
-// LOCAL / CI ONLY. Fresh rebuild (scripts/local-stack/sql-order.txt) and every phase SQL suite (supabase/tests/a<N>_*.sql),
+// LOCAL / CI ONLY. Fresh rebuild (scripts/local-stack/sql-order.txt) and every phase SQL suite (supabase/tests/a<N>_*.sql, b<N>_*.sql),
 // then one summary line per suite. Exit code 1 when any check fails or any file fails to load.
 //   node scripts/local-stack/run-sql-tests.mjs            (FRESH rebuild first; set NO_REBUILD=1 to skip it)
 // Same env as load.mjs (PGHOST must be local).
@@ -19,10 +19,11 @@ if (!process.env.NO_REBUILD) {
   if (r.status !== 0) process.exit(1);
 }
 
-// a1_explain.sql is a 1M-row performance probe, not a pass/fail suite.
+// a1_explain.sql is a 1M-row performance probe, not a pass/fail suite. Phase A suites first, then B (follow-up phases).
+const rank = (f) => (f[0] === 'b' ? 1000 : 0) + Number(f.match(/^[ab](\d+)/)[1]);
 const suites = fs.readdirSync(path.join(REPO, 'supabase/tests'))
-  .filter((f) => /^a\d+_.*\.sql$/.test(f) && f !== 'a1_explain.sql')
-  .sort((a, b) => Number(a.match(/^a(\d+)/)[1]) - Number(b.match(/^a(\d+)/)[1]));
+  .filter((f) => /^[ab]\d+_.*\.sql$/.test(f) && f !== 'a1_explain.sql')
+  .sort((a, b) => rank(a) - rank(b));
 
 let pass = 0, fail = 0, broken = 0;
 for (const f of suites) {

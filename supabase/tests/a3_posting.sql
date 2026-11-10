@@ -137,8 +137,10 @@ BEGIN
   r := pg_temp.call(fin, 'SELECT to_jsonb(count(*)) FROM erp.gl_determination WHERE company_code = ''ZZ99''');
   -- A6 (21_purchasing.sql) adds 3 ZZ99 sample rows: down payments, goods received not invoiced, landed cost clearing.
   -- A7 (22_inventory.sql) adds 1 ZZ99 sample row: stock count variance.
-  PERFORM pg_temp.check(r::text = CASE WHEN to_regclass('erp.landed_cost') IS NULL THEN '14' WHEN to_regclass('erp.inv_count') IS NULL THEN '17' ELSE '18' END,
-                        'finance reads the ZZ99 sample G/L rows (14, 17 with A6, 18 with A7)', r::text);
+  -- B1 (30_numbering_company.sql) adds 1 ZZ99 sample row: price difference (landed costs on goods already sold).
+  PERFORM pg_temp.check(r::text = CASE WHEN to_regclass('erp.landed_cost') IS NULL THEN '14' WHEN to_regclass('erp.inv_count') IS NULL THEN '17'
+                                       WHEN to_regclass('erp.sales_doc_request') IS NULL THEN '18' ELSE '19' END,
+                        'finance reads the ZZ99 sample G/L rows (14, 17 with A6, 18 with A7, 19 with B1)', r::text);
   r := pg_temp.call(fin, 'SELECT to_jsonb(count(*)) FROM erp.posting_period WHERE company_code = ''ZZ99''');
   PERFORM pg_temp.check(r::text = '24', 'finance reads 24 ZZ99 sample periods (2026–2027)', r::text);
   r := pg_temp.call(sales, 'SELECT to_jsonb(count(*)) FROM erp.gl_posting_key');

@@ -212,7 +212,8 @@ BEGIN
   PERFORM pg_temp.ok(r, 'admin adds a rule');
   PERFORM pg_temp.ok(pg_temp.call(admin, format('SELECT erp.approval_rule_delete(%L, %s)', 'ZZ99', r->>'rule_id')), 'admin deletes a rule');
   r := pg_temp.call(admin, 'SELECT erp.approval_template_setup(''ZZ99'')');
-  PERFORM pg_temp.check(jsonb_array_length(r->'catalogue') = 13 AND jsonb_array_length(r->'rules') >= 10, 'template setup lists 13 rule kinds and the ZZ99 rules', jsonb_array_length(r->'rules')::text);
+  PERFORM pg_temp.check(jsonb_array_length(r->'catalogue') = CASE WHEN to_regclass('erp.sales_doc_request') IS NULL THEN 13 ELSE 14 END AND jsonb_array_length(r->'rules') >= 10,
+                        'template setup lists 13 rule kinds (14 with B1) and the ZZ99 rules', jsonb_array_length(r->'rules')::text);
 
   -- ---------- 6. Numbering ----------
   PERFORM pg_temp.expect(pg_temp.call(admin, 'SELECT erp.number_series_save(''ZZ99'', 17, ''PO-26-'', 900, 5, true)'),

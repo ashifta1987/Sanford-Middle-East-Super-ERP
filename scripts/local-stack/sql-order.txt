@@ -23,3 +23,5 @@ supabase/sql/26_reports.sql
 supabase/sql/27_migration_more.sql
 supabase/sql/28_production_service.sql
 supabase/sql/29_go_live.sql
+supabase/sql/30_numbering_company.sql
+scripts/local-stack/test-users-b1.sql

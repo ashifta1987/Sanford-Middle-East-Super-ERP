@@ -328,9 +328,9 @@ BEGIN
   sb0 := pg_temp.sb('SMP-1140', 'WH01');
   r := pg_temp.call(admin, format($q$SELECT erp.landed_cost_create('ZZ99', '{"doc_date":"2026-11-26"}', '[{"grpo_entry":%s,"grpo_line":0,"weight":5400}]', '[{"code":"TRANSPORT","amount":300}]')$q$, gr));
   lc2 := (r->>'doc_entry')::integer; v_trans := (r->>'trans_id')::integer;
-  PERFORM pg_temp.check((r->>'to_inventory')::numeric = 100 AND (r->>'to_cogs')::numeric = 200 AND pg_temp.jl(v_trans) = '1300 Dr 100, 5100 Dr 200, 2130 Cr 300'
+  PERFORM pg_temp.check((r->>'to_inventory')::numeric = 100 AND (r->>'to_cogs')::numeric = 200 AND pg_temp.jl(v_trans) = CASE WHEN to_regclass('erp.sales_doc_request') IS NULL THEN '1300 Dr 100, 5100 Dr 200, 2130 Cr 300' ELSE '1300 Dr 100, 5340 Dr 200, 2130 Cr 300' END
                         AND (pg_temp.sb('SMP-1140', 'WH01')).avg_cost = round((200 * sb0.avg_cost + 100) / 200, 6),
-    '200 of 600 on hand: 1/3 to inventory (average cost), 2/3 to COGS', coalesce(pg_temp.jl(v_trans), r::text));
+    '200 of 600 on hand: 1/3 to inventory (average cost), 2/3 to COGS (price difference since B1)', coalesce(pg_temp.jl(v_trans), r::text));
   PERFORM pg_temp.expect(pg_temp.call(staff, format($q$SELECT erp.landed_cost_create('ZZ99', '{"doc_date":"2026-11-26"}', '[{"grpo_entry":%s,"grpo_line":0}]', '[{"code":"CLEARING","amount":1}]')$q$, gr)),
     'You have read-only access to Purchasing. Ask the system admin for full access to post landed costs.', 'read-only user can''t post landed costs');
 

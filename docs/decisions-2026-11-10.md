@@ -51,3 +51,4 @@ Principle: **anything company-specific is entered by Sanford in the front end la
 
 ## 4. Entered later in the front end, no build needed
 Real users and positions, owner position, approval limits, currencies, number prefixes, leave/weekend/holidays, overtime/unpaid leave, WPS routing/MOHRE/SIF, attendance sites, gratuity/air tickets, payroll accounts, bank accounts, PI statuses, China offices, required fields, bins/batches per warehouse/group, warranty months, opening date/clearing account/VAT period, attachments folder, opening balances, which reports come next.
+

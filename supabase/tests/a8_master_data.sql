@@ -222,8 +222,9 @@ BEGIN
 
   -- ---------- Duplicate warnings ----------
   r := pg_temp.chk(bp, '{"kind":"customer","name":"Zenith Home Appliance LLC","group_code":100,"payment_terms":2}');
-  PERFORM pg_temp.check(r->'duplicates'->0->>'card_code' = c1 AND r->'duplicates'->0->>'match' = 'name' AND (r->'duplicates'->0->>'similarity')::numeric > 0.8,
-                        'similar name found (trigram similarity above 0.8)', r->>'duplicates');
+  -- B1 (decisions 2026-11-10 §3): the name-similarity duplicate warning is removed; same TRN / phone still warn.
+  PERFORM pg_temp.check(jsonb_array_length(r->'duplicates') = 0,
+                        'similar name no longer warns (B1 decision)', r->>'duplicates');
   PERFORM pg_temp.check(erp._md_trgm_sim('Zenith Home Appliances LLC', 'Zenith Home Appliance LLC') BETWEEN 0.8 AND 0.95
                         AND erp._md_trgm_sim('word', 'two words') = 0.3636 AND erp._md_trgm_sim('abc', 'abc') = 1,
                         'trigram similarity matches pg_trgm values', erp._md_trgm_sim('word', 'two words')::text);
@@ -233,10 +234,10 @@ BEGIN
   PERFORM pg_temp.check(r->'duplicates' @> jsonb_build_array(jsonb_build_object('card_code', c1, 'match', 'phone')), 'same phone found (formatting ignored)', r->>'duplicates');
   r := pg_temp.chk(bp, '{"kind":"customer","name":"Quiet Unique Name","phone":"+971 4 999 1234","group_code":100,"payment_terms":2}');
   PERFORM pg_temp.check(jsonb_array_length(r->'duplicates') = 0, 'no false duplicate', r->>'duplicates');
-  PERFORM pg_temp.expect(pg_temp.save(bp, '{"kind":"customer","name":"Zenith Home Appliance LLC","group_code":100,"payment_terms":2}'),
-    'This partner may already exist: C00001 · Zenith Home Appliances LLC (similar name). Check the list and confirm with a reason to save it anyway.',
+  PERFORM pg_temp.expect(pg_temp.save(bp, '{"kind":"customer","name":"Totally Different Co","country":"AE","trn":"100234567890003","group_code":100,"payment_terms":2}'),
+    'This partner may already exist: C00001 · Zenith Home Appliances LLC (same TRN). Check the list and confirm with a reason to save it anyway.',
     'duplicate warning stops the save without a reason');
-  r := pg_temp.save(bp, '{"kind":"customer","name":"Zenith Home Appliance LLC","group_code":100,"payment_terms":2}', 'Separate branch with its own TRN');
+  r := pg_temp.save(bp, '{"kind":"customer","name":"Zenith Home Appliance LLC","group_code":100,"payment_terms":2,"trn":"100234567890003","country":"AE"}', 'Separate branch with its own TRN');
   c2 := r->>'card_code';
   PERFORM pg_temp.check(c2 = 'C00002' AND EXISTS (SELECT 1 FROM erp.audit_log WHERE action = 'bp_duplicate_confirmed' AND object_ref = c2
                                                    AND detail->>'reason' = 'Separate branch with its own TRN'), 'confirmed duplicate saved with the reason logged', r::text);

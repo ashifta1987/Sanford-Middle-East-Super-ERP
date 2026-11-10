@@ -8,6 +8,8 @@ import { MigrationCentrePage } from '@/features/migration/pages/MigrationCentreP
 import { UploadPage } from '@/features/migration/pages/UploadPage';
 import { RunPage } from '@/features/migration/pages/RunPage';
 import { CrossCheckPage } from '@/features/migration/pages/CrossCheckPage';
+import { CustomFieldsPage } from '@/features/migration/pages/CustomFieldsPage';
+import { DiscountGroupsPage, SpecialPricesPage } from '@/features/erp/pages/SpecialPricePages';
 import { useAuth } from '@/auth/AuthProvider';
 import { ApprovalsPage } from '@/pages/ApprovalsPage';
 import { ControlTowerPage, HomePage, ModulePage, SearchPage } from '@/features/erp/pages/HomePages';
@@ -95,6 +97,8 @@ export default function App() {
         <Route path="items/:company/:code" element={<ItemDetail />} />
         <Route path="inventory/stock" element={<StockPage />} />
         <Route path="inventory/prices" element={<PricesPage />} />
+        <Route path="inventory/special-prices" element={<SpecialPricesPage />} />
+        <Route path="inventory/discounts" element={<DiscountGroupsPage />} />
         {/* A2: sales order document form (new, view for SAP + ERP orders, edit drafts) */}
         <Route path="docs/sales_order/new" element={<SalesOrderNewPage />} />
         <Route path="docs/sales_order/:company/:entry" element={<SalesOrderDetailPage />} />
@@ -203,6 +207,7 @@ export default function App() {
         <Route path="backoffice/migration/upload" element={<RequireAccess access="migrationAdmin"><UploadPage /></RequireAccess>} />
         <Route path="backoffice/migration/runs/:runId" element={<RequireAccess access="migrationAdmin"><RunPage /></RequireAccess>} />
         {/* Finance / CFO signers reach only this screen */}
+        <Route path="backoffice/migration/fields" element={<RequireAccess access="signedIn"><CustomFieldsPage /></RequireAccess>} />
         <Route path="backoffice/migration/runs/:runId/check" element={<RequireAccess access="migrationReviewer"><CrossCheckPage /></RequireAccess>} />
 
         <Route path="no-access" element={<NoAccessPage />} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, FileSpreadsheet, FileText, PencilLine, X } from 'lucide-react';
+import { Download, FileDown, FileSpreadsheet, FileText, ListChecks, PencilLine, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
@@ -13,7 +13,8 @@ import { EmptyState, ErrorState, PageLoading, SkeletonRows } from '@/components/
 import { useAuth } from '@/auth/AuthProvider';
 import { useGoLive, useOverview, useResolveIssue, useReview, useSetReportFigure, useSign, useStatus } from '../queries';
 import { useRunRealtime } from '../useRunRealtime';
-import { FINANCE_ROWS, issueDetail, money, qty, stockRows, summarise } from '../check/derive';
+import { FINANCE_ROWS, MORE_AREAS, issueDetail, money, qty, stockRows, summarise } from '../check/derive';
+import { downloadText, moreApi, reportCsv } from '../more';
 import { errorMessage, fmtDate } from '@/lib/format';
 import type { IssueStatus, MigrationReviewRow, SignRole } from '@/lib/database.types';
 
@@ -55,7 +56,7 @@ export function CrossCheckPage() {
   const isCfo = signRoles.includes('business');
 
   const [figuresOpen, setFiguresOpen] = useState(false);
-  const [busyReport, setBusyReport] = useState<null | 'pdf' | 'xlsx'>(null);
+  const [busyReport, setBusyReport] = useState<null | 'pdf' | 'xlsx' | 'csv'>(null);
   const [reportErr, setReportErr] = useState<string | null>(null);
 
   if (status.isLoading) return <PageLoading />;
@@ -68,12 +69,19 @@ export function CrossCheckPage() {
   const passed = checks.filter((c) => c.ok).length;
   const acceptedCount = issues.filter((i) => i.status === 'accepted').length;
 
-  async function report(kind: 'pdf' | 'xlsx') {
+  async function report(kind: 'pdf' | 'xlsx' | 'csv') {
     setBusyReport(kind);
     setReportErr(null);
     try {
+      // the server builds (and audits) the auditor's report: run, steps, files, checks, issues, sign-offs, register, attachments
+      const extra = await moreApi.report(runId);
+      const generatedAt = new Date().toISOString();
+      if (kind === 'csv') {
+        downloadText(reportCsv(extra), `sanford-migration-${code}-${runId.slice(0, 8)}-${generatedAt.slice(0, 10)}.csv`);
+        return;
+      }
       const mod = await import('../check/report');
-      const data = { runId, company: code, companyName, status: head!.run_status, generatedAt: new Date().toISOString(), checks: all.filter((r) => r.item === 'check'), issues, signoffs };
+      const data = { runId, company: code, companyName, status: head!.run_status, generatedAt, checks: all.filter((r) => r.item === 'check'), issues, signoffs, extra };
       await (kind === 'pdf' ? mod.downloadPdf(data) : mod.downloadExcel(data));
     } catch (e) {
       setReportErr(errorMessage(e));
@@ -88,6 +96,9 @@ export function CrossCheckPage() {
         <PageHeader crumb={t('migration.check.breadcrumb')} title={t('migration.check.titleFull', { code })} subtitle={t('migration.check.subtitle')} />
         <div className="flex flex-wrap items-center gap-2">
           <RunStatusPill status={head.run_status} />
+          <Link to={`/backoffice/migration/fields?company=${code}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-btn border border-line bg-surface px-4 font-medium hover:bg-page">
+            <ListChecks className="h-4 w-4" aria-hidden /> {t('migration.fields.open')}
+          </Link>
           <details className="relative">
             <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-2 rounded-btn border border-line bg-surface px-4 font-medium hover:bg-page">
               <Download className="h-4 w-4" aria-hidden /> {busyReport ? t('migration.check.building') : t('migration.check.download')}
@@ -98,6 +109,9 @@ export function CrossCheckPage() {
               </button>
               <button type="button" disabled={!!busyReport || review.isLoading} onClick={() => void report('xlsx')} className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 hover:bg-page">
                 <FileSpreadsheet className="h-4 w-4" aria-hidden /> {t('migration.check.excel')}
+              </button>
+              <button type="button" disabled={!!busyReport || review.isLoading} onClick={() => void report('csv')} className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 hover:bg-page">
+                <FileDown className="h-4 w-4" aria-hidden /> {t('migration.check.csv')}
               </button>
             </div>
           </details>
@@ -161,6 +175,8 @@ export function CrossCheckPage() {
         )}
       </Card>
 
+      <MoreChecksCard checks={checks} loading={review.isLoading} />
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0 space-y-6">
           <Card title={t('migration.check.stockTitle')}>
@@ -204,6 +220,53 @@ export function CrossCheckPage() {
 
       {figuresOpen && <FiguresSheet runId={runId} company={code} rows={required} onClose={() => setFiguresOpen(false)} />}
     </div>
+  );
+}
+
+/** A12 · checks 5.3, 5.5-5.10, duplicates, register and coexistence: failed first, values as returned. */
+function MoreChecksCard({ checks, loading }: { checks: MigrationReviewRow[]; loading: boolean }) {
+  const { t } = useTranslation();
+  const [all, setAll] = useState(false);
+  const rows = useMemo(() => {
+    const order = new Map<string, number>(MORE_AREAS.map((a, i) => [a, i]));
+    return checks.filter((c) => order.has(c.area))
+      .sort((a, b) => Number(a.ok !== false) - Number(b.ok !== false) || (order.get(a.area)! - order.get(b.area)!) || a.name.localeCompare(b.name));
+  }, [checks]);
+  if (!loading && rows.length === 0) return null;
+  const shown = all ? rows : rows.slice(0, 25);
+  const failed = rows.filter((r) => r.ok === false).length;
+  return (
+    <Card
+      title={t('migration.check.moreTitle')}
+      actions={<span className="text-sm text-muted">{t('migration.check.moreNote', { n: rows.length, failed })}</span>}
+    >
+      {loading ? <SkeletonRows rows={4} /> : (
+        <>
+          <DataTable
+            caption={t('migration.check.moreTitle')}
+            rows={shown}
+            rowKey={(r) => r.id}
+            minWidth={820}
+            columns={[
+              { key: 'a', header: t('migration.check.colArea'), cell: (r) => <StatusPill tone="info">{t(`migration.check.area.${r.area}`, { defaultValue: r.area })}</StatusPill> },
+              { key: 'c', header: t('migration.check.colCheck'), cell: (r) => <span dir="auto">{r.name}</span> },
+              { key: 's', header: t('migration.check.colSap'), align: 'end', cell: (r) => money(r.sap_value) },
+              { key: 'raw', header: t('migration.check.colRaw'), align: 'end', cell: (r) => money(r.raw_value) },
+              { key: 'app', header: t('migration.check.colApp'), align: 'end', cell: (r) => money(r.app_value) },
+              { key: 'd', header: t('migration.check.colDiff'), align: 'end', cell: (r) => <strong>{money(r.difference)}</strong> },
+              { key: 'res', header: t('migration.check.colResult'), cell: (r) => (
+                (r.detail as { skipped?: boolean } | null)?.skipped ? <StatusPill tone="neutral">{t('migration.check.skipped')}</StatusPill>
+                  : <StatusPill tone={r.ok === false ? 'critical' : 'ok'}>{r.ok === false ? t('migration.check.rawAppDiffer') : t('migration.check.ok')}</StatusPill>) },
+            ]}
+          />
+          {rows.length > 25 && (
+            <div className="border-t border-line px-5 py-3">
+              <Button className="min-h-[40px] px-3 text-sm" onClick={() => setAll((x) => !x)}>{all ? t('migration.check.showFewer') : t('migration.check.showAll', { n: rows.length })}</Button>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   );
 }
 

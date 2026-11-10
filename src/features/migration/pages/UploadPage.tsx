@@ -17,6 +17,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { migrationApi } from '../api';
 import { mk, RUNNING, useFiles, useOverview, useReview } from '../queries';
 import { useRunRealtime } from '../useRunRealtime';
+import { OpeningSettingsCard } from '../components/OpeningSettingsCard';
 import { analyse, type Analysis, type PickedFile } from '../upload/classify';
 import { ResumableUpload, type Progress } from '../upload/ResumableUpload';
 import { sessions, type UploadSession } from '../upload/uploadStore';
@@ -85,6 +86,7 @@ export function UploadPage() {
   const [confirmStart, setConfirmStart] = useState(false);
   const [starting, setStarting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [opening, setOpening] = useState(false);   // A12: opening-balances-only load
   const uploader = useRef<ResumableUpload | null>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const filesInput = useRef<HTMLInputElement>(null);
@@ -125,11 +127,12 @@ export function UploadPage() {
       // continue the open upload of this company, or start a new run
       const continuing = run?.status === 'uploading' && session ? session : null;
       const merged = continuing ? mergeAnalysis(analysis, fresh) : fresh;
-      const rid = continuing?.runId ?? (await migrationApi.request(company, merged.structureOnly ? 'structure_only' : 'full', null));
+      const kind = merged.structureOnly ? 'structure_only' : opening ? 'opening_only' : 'full';
+      const rid = continuing?.runId ?? (await migrationApi.request(company, kind, null));
       const files = { ...(continuing?.files ?? {}) };
       for (const p of picked) if (!files[p.path]) files[p.path] = { size: p.file.size, done: false };
       const sess: UploadSession = {
-        runId: rid, company, kind: merged.structureOnly ? 'structure_only' : 'full',
+        runId: rid, company, kind: continuing?.kind ?? kind,
         createdAt: continuing?.createdAt ?? new Date().toISOString(), files, facts: merged,
       };
       await sessions.put(sess);
@@ -307,6 +310,20 @@ export function UploadPage() {
         {/* ---------- left column ---------- */}
         <div className="min-w-0 space-y-6">
           <Card title={t('migration.upload.addFiles')} bodyClassName="p-5 space-y-5">
+            <fieldset disabled={disabledPick || run?.status === 'uploading'}>
+              <legend className="mb-2 text-sm font-medium">{t('migration.upload.loadType')}</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {([false, true] as const).map((o) => (
+                  <label key={String(o)} className={clsx('flex min-h-[44px] cursor-pointer items-start gap-3 rounded-btn border p-3', (run?.status === 'uploading' ? run.kind === 'opening_only' : opening) === o ? 'border-primary bg-primary-soft' : 'border-line')}>
+                    <input type="radio" name="load-type" className="mt-1 h-4 w-4" checked={(run?.status === 'uploading' ? run.kind === 'opening_only' : opening) === o} onChange={() => setOpening(o)} />
+                    <span>
+                      <span className="block font-medium">{t(o ? 'migration.upload.kindOpening' : 'migration.upload.kindFull')}</span>
+                      <span className="block text-sm text-muted">{t(o ? 'migration.upload.kindOpeningNote' : 'migration.upload.kindFullNote')}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div
               onDragOver={(e) => { e.preventDefault(); if (!disabledPick) setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -398,6 +415,7 @@ export function UploadPage() {
 
         {/* ---------- right column ---------- */}
         <div className="min-w-0 space-y-6">
+          {company && (opening || run?.kind === 'opening_only') && <OpeningSettingsCard company={company} />}
           <section className="card overflow-hidden">
             <div className="border-b border-line px-5 py-4">
               <h2 className="text-[17px] font-semibold">{t('migration.upload.found')}</h2>

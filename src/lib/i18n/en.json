@@ -295,7 +295,12 @@
         "done": "Uploaded",
         "failed": "Failed"
       },
-      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Super ERP › Back Office › Upload backup, or send me the link.\n\nThank you"
+      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Super ERP › Back Office › Upload backup, or send me the link.\n\nThank you",
+      "loadType": "What to load",
+      "kindFull": "Full history",
+      "kindFullNote": "Every table and every posted journal, kept with SAP's numbers (recommended).",
+      "kindOpening": "Opening balances only",
+      "kindOpeningNote": "Master data, open documents and one opening journal at the opening date."
     },
     "run": {
       "title": "Rebuild run",
@@ -343,7 +348,8 @@
       "kind": {
         "full": "Full load",
         "tables": "Some tables",
-        "structure_only": "Structure check"
+        "structure_only": "Structure check",
+        "opening_only": "Opening balances only"
       }
     },
     "check": {
@@ -373,7 +379,20 @@
         "app_tables": "App tables",
         "finance": "Finance",
         "stock": "Stock",
-        "hr": "HR"
+        "hr": "HR",
+        "inventory_gl": "Inventory = G/L",
+        "partners": "A/R and A/P",
+        "open_orders": "Open orders",
+        "vat": "VAT",
+        "intercompany": "Intercompany",
+        "payroll": "Payroll",
+        "attachments": "Attachments",
+        "opening": "Opening balances",
+        "duplicates": "Duplicates",
+        "custom_fields": "Custom fields",
+        "coexistence": "Super ERP records",
+        "worker": "Worker",
+        "load": "Load"
       },
       "match": "Match",
       "differs": "{{n}} differ",
@@ -388,7 +407,9 @@
         "finance": "trial balance, A/R and A/P · {{failed}} differ",
         "stock": "{{qty}} pcs in {{whs}} warehouses",
         "hr": "{{n}} employees · {{active}} active",
-        "none": "no checks in this run"
+        "none": "no checks in this run",
+        "more": "{{total}} checks · {{failed}} differ · {{skipped}} skipped",
+        "skipped": "skipped: the tables are not in this SAP copy"
       },
       "financeTitle": "Finance · {{currency}}",
       "financeNote": "SAP report = figure Finance printed from SAP",
@@ -478,9 +499,118 @@
       "live": "{{code}} is live since {{when}}",
       "reportTitle": "Sanford ERP · migration report",
       "runId": "Run",
-      "generated": "Generated"
+      "generated": "Generated",
+      "csv": "CSV (auditors)",
+      "moreTitle": "Reconciliation 5.3–5.10, duplicates and custom fields",
+      "moreNote": "{{n}} checks · {{failed}} differ",
+      "colArea": "Area",
+      "colSap": "SAP",
+      "skipped": "Skipped",
+      "showAll": "Show all {{n}}",
+      "showFewer": "Show fewer"
     },
-    "phase": "Screen arrives in the next build phase."
+    "phase": "Screen arrives in the next build phase.",
+    "settings": {
+      "title": "Opening balances and settings · {{company}}",
+      "ready": "Ready",
+      "missing": "Not set",
+      "body": "An opening-balances-only run needs the opening date and the clearing account. Finance gives them; nothing is filled in for you.",
+      "opening_date": "Opening (go-live) date",
+      "opening_dateHelp": "Balances and open documents as at the end of this day.",
+      "opening_clearing_acct": "Opening balance clearing account",
+      "opening_clearing_acctHelp": "Account code from the chart of accounts. Changing it needs Financials full access.",
+      "net_pay_wage_codes": "Net-pay wage codes",
+      "net_pay_wage_codesHelp": "Comma-separated, for payroll check 5.9. Empty: the check compares all wage codes.",
+      "vat_period_from": "VAT period from",
+      "vat_period_fromHelp": "Empty: the month of the last SAP posting.",
+      "vat_period_to": "VAT period to",
+      "vat_period_toHelp": "Used by VAT check 5.7.",
+      "save": "Save settings",
+      "saved": "Settings saved."
+    },
+    "fields": {
+      "open": "Custom fields",
+      "crumb": "Custom fields",
+      "title": "Custom-field register · {{code}}",
+      "subtitle": "Every SAP user field (U_) and user table (@): mapped to a Super ERP column, kept in the SAP copy only, or dropped. Dropping needs the owner's approval.",
+      "noCompany": "No company in your list",
+      "kTotal": "On the register",
+      "kTotalNote": "{{fields}} fields · {{tables}} user tables",
+      "kMapped": "Mapped to a column",
+      "kMappedNote": "Read from the sync code, or set by IT",
+      "kRaw": "SAP copy only",
+      "kRawNote": "{{n}} with no rows using them",
+      "kDrop": "Drops waiting for the owner",
+      "kDropNote": "{{n}} approved · owner position {{owner}}",
+      "listTitle": "Register",
+      "built": "Built {{when}} from {{source}}",
+      "notBuilt": "Not built yet",
+      "rebuild": "Rebuild from the SAP copy",
+      "building": "Rebuilding…",
+      "rebuilt": "Register rebuilt: {{n}} lines. Decisions were kept.",
+      "search": "Search",
+      "searchPh": "Field, description or target",
+      "colTable": "Table",
+      "colField": "Field",
+      "colDesc": "Description",
+      "colUsed": "Rows used",
+      "colDecision": "Decision",
+      "colTarget": "Target",
+      "all": "All",
+      "dropPending": "Drop waiting for the owner",
+      "unusedOnly": "Unused only",
+      "wholeTable": "whole table",
+      "notInCopy": "not in the SAP copy",
+      "lastUsed": "Last used {{when}}",
+      "auto": "suggested",
+      "dec": {
+        "mapped": "Mapped",
+        "raw_only": "SAP copy only",
+        "drop": "Drop"
+      },
+      "drop": {
+        "pending": "Waiting for owner",
+        "approved": "Drop approved",
+        "rejected": "Drop rejected"
+      },
+      "selected": "{{n}} selected",
+      "selectAll": "Select all on this page",
+      "actMap": "Map to a column…",
+      "actRaw": "Keep in SAP copy only",
+      "actDrop": "Propose drop",
+      "actApprove": "Approve drop ({{n}})",
+      "actReject": "Reject drop",
+      "dlg": {
+        "mapped": "Map this field to a Super ERP column?",
+        "raw_only": "Keep {{n}} field(s) in the SAP copy only?",
+        "drop": "Propose dropping {{n}} field(s)?",
+        "approve": "Approve dropping {{n}} field(s)?",
+        "reject": "Reject dropping {{n}} field(s)?"
+      },
+      "ok": {
+        "mapped": "Map field",
+        "raw_only": "Keep in SAP copy",
+        "drop": "Propose drop",
+        "approve": "Approve drop",
+        "reject": "Reject drop"
+      },
+      "done": {
+        "mapped": "Field mapped.",
+        "raw_only": "{{n}} field(s) kept in the SAP copy only.",
+        "drop": "{{n}} field(s) proposed for dropping. The owner approves them here.",
+        "approve": "Drop approved for {{n}} field(s).",
+        "reject": "Drop rejected for {{n}} field(s). They stay in the SAP copy."
+      },
+      "targetLabel": "Target column (erp.table.column)",
+      "reasonLabel": "Why is the drop rejected?",
+      "noteLabel": "Note (optional)",
+      "noMatch": "No matches. Try a shorter search or clear the filters.",
+      "empty": "The register is empty. Rebuild it after a run has loaded the SAP copy.",
+      "page": "Page {{a}} of {{b}} · {{n}} lines",
+      "prev": "Previous",
+      "next": "Next",
+      "footnote": "Nothing is deleted from the SAP copy. \"Drop\" means the field is not carried into Super ERP; the raw copy keeps it."
+    }
   },
   "stepNames": {
     "validate": {
@@ -530,6 +660,10 @@
     "cross_check": {
       "name": "Cross-check the whole system",
       "desc": "Finance, stock and HR totals · then sign-off"
+    },
+    "attachments": {
+      "name": "Copy attachments",
+      "desc": "ATC1 files to Storage, with size and SHA-256 · the SAP folder is only read"
     }
   },
   "inbox": {
@@ -876,7 +1010,41 @@
       "none": "Nothing matched in the companies you can see.",
       "docs": "Documents"
     },
-    "createNew": "New: {{name}}"
+    "createNew": "New: {{name}}",
+    "sp": {
+      "title": "Special prices for partners",
+      "desc": "Prices per customer or supplier and item, copied from SAP (OSPP, with date ranges from SPP1). Read only.",
+      "search": "Partner, item or name",
+      "bp": "Partner",
+      "discount": "Discount",
+      "valid": "Active",
+      "validTo": "Valid to",
+      "periods": "Date ranges",
+      "yes": "Yes",
+      "no": "No",
+      "listPeriod": "Price list period"
+    },
+    "dg": {
+      "title": "Period and volume discounts",
+      "desc": "Discount groups copied from SAP (OEDG with EDG1 lines). Read only.",
+      "search": "Item, group or manufacturer code",
+      "group": "Group",
+      "for": "For",
+      "applies": "Applies to",
+      "key": "Code",
+      "upTo": "Up to qty",
+      "kind": {
+        "A": "All partners",
+        "C": "Customer group",
+        "S": "Supplier group",
+        "V": "One partner"
+      },
+      "obj": {
+        "4": "Item",
+        "52": "Item group",
+        "43": "Manufacturer"
+      }
+    }
   },
   "so": {
     "titleNew": "New sales order",

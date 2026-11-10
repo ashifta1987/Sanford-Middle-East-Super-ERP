@@ -4,7 +4,10 @@ import type { IssueDetail, MigrationReviewRow } from '@/lib/database.types';
 import type { Tone } from '../components/StatusPill';
 
 export const AREAS = ['structure', 'row_counts', 'orphans', 'app_tables', 'finance', 'stock', 'hr'] as const;
-export type Area = (typeof AREAS)[number];
+/** A12 · reconciliation checks 5.3, 5.5-5.10 and the other checks added by 27_migration_more.sql (shown when the run has them). */
+export const MORE_AREAS = ['inventory_gl', 'partners', 'open_orders', 'vat', 'intercompany', 'payroll', 'attachments', 'opening',
+  'duplicates', 'custom_fields', 'coexistence'] as const;
+export type Area = (typeof AREAS)[number] | (typeof MORE_AREAS)[number];
 
 export const FINANCE_ROWS = [
   'journal lines: debit minus credit',
@@ -49,7 +52,8 @@ export function summarise(args: {
 }): AreaSummary[] {
   const { t, checks, issues } = args;
   const fmt = (x: number | null) => (x == null ? '—' : x.toLocaleString('en-US'));
-  return AREAS.map((area) => {
+  const present = MORE_AREAS.filter((a) => checks.some((c) => c.area === a));
+  return ([...AREAS, ...present] as Area[]).map((area) => {
     const cs = checks.filter((c) => c.area === area);
     const failed = cs.filter((c) => c.ok === false);
     const openCrit = issues.some((i) => i.area === area && i.status === 'open' && i.severity === 'critical');
@@ -92,6 +96,11 @@ export function summarise(args: {
         break;
       }
       case 'hr': detail = t('migration.check.areaDetail.hr', { n: fmt(n(by('employees')?.raw_value)), active: fmt(n(by('active employees')?.raw_value)) }); break;
+      default: {
+        const skipped = cs.filter((c) => (c.detail as { skipped?: boolean } | null)?.skipped).length;
+        detail = skipped === cs.length ? t('migration.check.areaDetail.skipped')
+          : t('migration.check.areaDetail.more', { total: cs.length - skipped, failed: failed.length, skipped });
+      }
     }
     return { area, tone, pill, detail, total: cs.length, failed: failed.length };
   });

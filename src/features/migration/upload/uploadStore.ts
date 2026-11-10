@@ -53,7 +53,7 @@ export class IdbUrlStorage implements UrlStorage {
 export interface UploadSession {
   runId: string;
   company: string;
-  kind: 'full' | 'tables' | 'structure_only';
+  kind: 'full' | 'tables' | 'structure_only' | 'opening_only';
   createdAt: string;
   /** path → size + done */
   files: Record<string, { size: number; done: boolean }>;

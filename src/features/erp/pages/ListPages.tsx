@@ -19,7 +19,7 @@ import { isInvKind } from '../inventory';
 
 type R = Row & Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-function Frame({ module, title, desc, actions, children }: { module: ModuleKey; title: string; desc?: string; actions?: React.ReactNode; children: React.ReactNode }) {
+export function Frame({ module, title, desc, actions, children }: { module: ModuleKey; title: string; desc?: string; actions?: React.ReactNode; children: React.ReactNode }) {
   const { t } = useTranslation();
   const m = moduleByKey(module)!;
   return (

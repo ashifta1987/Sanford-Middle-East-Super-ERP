@@ -171,6 +171,8 @@ const LIVE_ITEMS: Record<string, string> = {
   'Inventory Transfer': '/docs/inventory_transfer', 'Inventory Status': '/inventory/stock', 'Items List': '/items',
   'Inventory in Warehouse Report': '/reports/inventory-in-warehouse', 'Find an item': '/items', 'Stock per warehouse': '/inventory/stock', 'Price Report': '/inventory/prices',
   'SAP B1 migration (new, one-time)': '/backoffice/migration', 'Daily rates table': '/admin/exchange-rates',
+  // A12 · special prices and period/volume discounts from SAP (OSPP/SPP1, OEDG/EDG1)
+  'Special prices for partners': '/inventory/special-prices', 'Period and volume discounts': '/inventory/discounts',
   'Approval Status Report': '/approvals', 'Approval Decision Report': '/approvals?view=decided',
   'New sales order': '/docs/sales_order/new',
   // A4 · sales cycle

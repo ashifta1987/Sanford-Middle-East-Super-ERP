@@ -65,6 +65,7 @@ export function MigrationCentrePage() {
             ? <Link className={linkBtn} to={`/backoffice/migration/runs/${latestRunning.latest_run_id}`}>{t('migration.centre.loadLog')}</Link>
             : started[0]?.latest_run_id && <Link className={linkBtn} to={`/backoffice/migration/runs/${started[0].latest_run_id}`}>{t('migration.centre.loadLog')}</Link>}
           {reviewable[0]?.latest_run_id && <Link className={linkBtn} to={`/backoffice/migration/runs/${reviewable[0].latest_run_id}/check`}>{t('migration.centre.crossCheck')}</Link>}
+          <Link className={linkBtn} to={`/backoffice/migration/fields${focus ? `?company=${focus.company_code}` : ''}`}>{t('migration.fields.open')}</Link>
         </div>
       </div>
 

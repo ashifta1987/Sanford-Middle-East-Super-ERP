@@ -1,4 +1,4 @@
-export const STEP_ORDER = ['validate', 'stage', 'cast', 'clean_02', 'orphans_03', 'links_04', 'real_keys', 'security_06', 'app_sync', 'check_sync', 'check_deleted', 'cross_check'];
+export const STEP_ORDER = ['validate', 'stage', 'cast', 'clean_02', 'orphans_03', 'links_04', 'real_keys', 'security_06', 'app_sync', 'check_sync', 'check_deleted', 'cross_check', 'attachments'];
 
 /** Plain names for the worker's step codes (P4). */
 export const STEP_NAMES: Record<string, { name: string; desc: string }> = {
@@ -14,5 +14,6 @@ export const STEP_NAMES: Record<string, { name: string; desc: string }> = {
   check_sync: { name: 'App checks', desc: 'App tables against the SAP copy' },
   check_deleted: { name: 'Deleted in SAP', desc: 'App rows no longer in SAP' },
   cross_check: { name: 'Cross-check the whole system', desc: 'Counts, links, finance, stock, HR' },
+  attachments: { name: 'Copy attachments', desc: 'ATC1 files to Storage, with size and SHA-256' },
 };
 

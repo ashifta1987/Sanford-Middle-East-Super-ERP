@@ -2,7 +2,7 @@
 // Replace with the generated file once the erp schema is exposed:
 //   npm run gen:types
 
-export type RunKind = 'full' | 'tables' | 'structure_only';
+export type RunKind = 'full' | 'tables' | 'structure_only' | 'opening_only';
 export type RunStatus =
   | 'uploading' | 'queued' | 'validating' | 'loading' | 'rebuilding' | 'checking'
   | 'needs_review' | 'signed_off' | 'failed' | 'cancelled';

@@ -25,6 +25,8 @@ import {
   type CustomerHit, type ItemHit, type SalesKind, type SoCheck, type SoEval, type SoHeaderInput, type SoInfo, type SoLineInput, type SoSetup, type WorkflowState,
 } from '../salesOrder';
 import { ApprovalStageNote } from '../components/ApprovalStageNote';
+import { CurrencyFields } from '../components/CurrencyFields';
+import { defaultCurrency, docAmt, fmtRate, isFcDoc, lineAmt, useLocalCurrency } from '../currency';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -75,7 +77,10 @@ export function DocHeader({ title, pills, sub, actions, onBack, kind = 'sales_or
   );
 }
 
-export function Totals({ before, discount, vat, total, currency }: { before: number; discount: number; vat: number; total: number; currency: string }) {
+/** Document totals in the document currency; lc = the same total in the company currency (foreign-currency documents, B4). */
+export function Totals({ before, discount, vat, total, currency, lc }: {
+  before: number; discount: number; vat: number; total: number; currency: string; lc?: { total: number; currency: string; rate?: number | null } | null;
+}) {
   const { t } = useTranslation();
   return (
     <dl className="num ms-auto grid w-full max-w-xs grid-cols-2 gap-x-6 gap-y-1 border-t border-line p-5 text-[15px] sm:border-t-0">
@@ -83,6 +88,12 @@ export function Totals({ before, discount, vat, total, currency }: { before: num
       <dt className="text-muted">{t('so.totals.discount')}</dt><dd className="text-end">{discount ? `−${fmtMoney(discount)}` : fmtMoney(0)}</dd>
       <dt className="text-muted">{t('so.totals.vat')}</dt><dd className="text-end">{fmtMoney(vat)}</dd>
       <dt className="text-[17px] font-semibold">{t('so.totals.total', { cur: currency })}</dt><dd className="text-end text-[17px] font-semibold" data-testid="so-total">{fmtMoney(total)}</dd>
+      {lc && lc.currency && lc.currency !== currency && (
+        <>
+          <dt className="text-muted">{t('cur.totalLc', { cur: lc.currency })}{lc.rate != null ? <span className="block text-xs">{t('cur.atRate', { rate: fmtRate(lc.rate) })}</span> : null}</dt>
+          <dd className="text-end text-muted" data-testid="so-total-lc">{fmtMoney(lc.total, lc.currency)}</dd>
+        </>
+      )}
     </dl>
   );
 }
@@ -139,6 +150,7 @@ export function SalesOrderNewPage({ kind = 'sales_order' }: { kind?: SalesKind }
         header: {
           card_code: h.card_code, doc_date: today(), due_date: '', price_list: h.price_list ?? '', payment_terms: h.payment_terms ?? '',
           slp_code: h.slp_code ?? '', whs_code: h.whs_code ?? '', customer_ref: h.customer_ref ?? '', comments: h.comments ?? '',
+          currency: h.currency ?? '', fx_rate: '',
         },
         lines: src.lines.map((l) => ({
           key: `l${++lineSeq}`, item_code: l.item_code, qty: String(Number(l.open_qty)), price: String(Number(l.price)), discount_pct: String(Number(l.discount_pct ?? 0)),
@@ -196,6 +208,7 @@ export function SalesOrderEditPage({ kind = 'sales_order' }: { kind?: SalesKind 
           header: {
             card_code: doc.card_code ?? '', doc_date: doc.doc_date ?? today(), due_date: doc.due_date ?? '', price_list: info?.price_list ?? '',
             payment_terms: info?.payment_terms ?? '', slp_code: doc.slp_code ?? '', whs_code: info?.whs_code ?? '', customer_ref: doc.customer_ref ?? '', comments: doc.comments ?? '',
+            currency: doc.currency ?? '', fx_rate: doc.total_fc != null && doc.fx_rate != null ? String(Number(doc.fx_rate)) : '',
           },
         },
       };
@@ -235,7 +248,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
   const [entry, setEntry] = useState<number | null>(initial?.entry ?? null);
   const [docNo, setDocNo] = useState<string | null>(initial?.docNo ?? null);
   const [header, setHeader] = useState<SoHeaderInput>(initial?.header ?? {
-    card_code: '', doc_date: today(), due_date: '', price_list: '', payment_terms: '', slp_code: '', whs_code: '', customer_ref: '', comments: '',
+    card_code: '', doc_date: today(), due_date: '', price_list: '', payment_terms: '', slp_code: '', whs_code: '', customer_ref: '', comments: '', currency: '', fx_rate: '',
   });
   const [customer, setCustomer] = useState<CustomerHit | null>(initial?.customer ?? null);
   const [custText, setCustText] = useState(initial?.customer ? `${initial.customer.card_code} · ${initial.customer.name}` : initial?.header.card_code ?? '');
@@ -282,10 +295,16 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewKey]);
 
+  // B4: document currency (the header's, else the customer's own, else the company currency) and its rate.
+  const localCur = useLocalCurrency(company);
+  const docCur = header.currency || defaultCurrency(customer?.currency, localCur);
+  const isFc = Boolean(docCur && localCur && docCur !== localCur);
+
   // Browser-side totals while typing.
   const rate = (code: string) => Number(S?.tax_codes.find((x) => x.code === code)?.rate ?? 0);
-  const calc = lines.map((l) => {
-    const price = l.price !== '' ? Number(l.price) : l.hit ? Number(itemPrice(l.hit, priceList) ?? 0) : 0;
+  const calc = lines.map((l, i) => {
+    // Price lists are in the company currency: in a foreign currency the server's converted price is shown until a price is typed.
+    const price = l.price !== '' ? Number(l.price) : isFc ? Number(preview?.lines?.find((x) => x.line_num === i)?.price ?? 0) : l.hit ? Number(itemPrice(l.hit, priceList) ?? 0) : 0;
     const qty = Number(l.qty) || 0;
     const disc = Number(l.discount_pct) || 0;
     const net = l.item_code ? lineTotal(qty, price, disc) : 0;
@@ -293,7 +312,10 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
   });
   const sum = (k: 'gross' | 'net' | 'vat') => round2(calc.reduce((s, c) => s + c[k], 0));
   const totals = { before: sum('gross'), discount: round2(sum('gross') - sum('net')), vat: sum('vat'), total: round2(sum('net') + sum('vat')) };
-  const currency = S?.currency ?? companies.find((c) => c.company_code === company)?.currency ?? '';
+  const currency = isFc ? docCur : S?.currency ?? companies.find((c) => c.company_code === company)?.currency ?? '';
+  // Credit is in the company currency: a foreign-currency order counts at its LC value.
+  const thisOrderLc = isFc ? Number(preview?.credit?.this_order ?? preview?.totals?.total_lc ?? 0) : totals.total;
+  const lcTotals = isFc && preview?.totals?.total_lc != null && !preview.errors.length ? { total: Number(preview.totals.total_lc), currency: localCur, rate: preview.totals.rate } : null;
 
   const problems = attempted ? preview?.errors ?? [] : [];
   const fieldErr = (field: string, line: number | null = null) => problems.find((p) => p.field === field && p.line === line)?.message;
@@ -411,11 +433,14 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
               )}
               <Combobox<CustomerHit> id="so-card_code" label={t('erp.col.customer')} required text={custText} onText={(s) => { setCustText(s); if (customer) { setCustomer(null); setH({ card_code: '' }); } }}
                 search={custOpts} placeholder={t('so.customerPh')} error={fieldErr('card_code')} noMatch={t('so.combo.noCustomer')}
-                onSelect={(o) => { setCustomer(o.data); setCustText(o.label); setH({ card_code: o.value, price_list: '', payment_terms: '', slp_code: '' }); }} />
+                onSelect={(o) => { setCustomer(o.data); setCustText(o.label); setH({ card_code: o.value, price_list: '', payment_terms: '', slp_code: '', currency: '', fx_rate: '' }); }} />
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span>
                 <input id="so-doc_date" type="date" className="input num mt-1 text-[15px] text-ink" value={header.doc_date} onChange={(e) => setH({ doc_date: e.target.value })} aria-invalid={Boolean(fieldErr('doc_date'))} />
                 {fieldErr('doc_date') && <span className="mt-1 block text-crit-fg">{fieldErr('doc_date')}</span>}
               </label>
+              <CurrencyFields company={company} date={header.doc_date} bpCurrency={customer?.currency} idPrefix="so"
+                currency={header.currency ?? ''} onCurrency={(c) => setH({ currency: c })} rate={header.fx_rate ?? ''} onRate={(r) => setH({ fx_rate: r })}
+                errors={{ currency: fieldErr('currency'), fx_rate: fieldErr('fx_rate') }} />
               <label className="block text-xs font-medium text-muted">{t(tk(kind, 'deliveryDate'))}
                 <input id="so-due_date" type="date" className="input num mt-1 text-[15px] text-ink" value={header.due_date} onChange={(e) => setH({ due_date: e.target.value })} aria-invalid={Boolean(fieldErr('due_date'))} />
                 {fieldErr('due_date') && <span className="mt-1 block text-crit-fg">{fieldErr('due_date')}</span>}
@@ -431,7 +456,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
                   <option value="">{t('so.customerDefault')}{customer?.payment_terms != null ? ` (${S?.payment_terms.find((p) => p.code === customer.payment_terms)?.name ?? customer.payment_terms})` : ''}</option>
                   {S?.payment_terms.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
                 </select>
-                {preview?.credit?.left != null && <span className="num mt-1 block">{t('so.creditLeft')} {fmtMoney(preview.credit.left, currency)}</span>}
+                {preview?.credit?.left != null && <span className="num mt-1 block">{t('so.creditLeft')} {fmtMoney(preview.credit.left, localCur || currency)}</span>}
               </label>
               <label className="block text-xs font-medium text-muted">{t('erp.col.warehouse')} <span className="text-crit-fg">*</span>
                 <select id="so-whs_code" className="input mt-1 text-[15px] text-ink" value={header.whs_code} onChange={(e) => setH({ whs_code: e.target.value })}>
@@ -530,7 +555,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
                 )}
                 {fieldErr('lines') && <span className="text-sm text-crit-fg">{fieldErr('lines')}</span>}
               </div>
-              <Totals {...totals} currency={currency} />
+              <Totals {...totals} currency={currency} lc={lcTotals} />
             </div>
           </SectionCard>
         </div>
@@ -582,13 +607,13 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
           {customer && !isQ && (
             <SectionCard title={t('so.creditTitle')}>
               <dl className="num grid grid-cols-2 gap-x-4 gap-y-1 p-5 text-sm">
-                <dt className="text-muted">{t('erp.col.creditLimit')}</dt><dd className="text-end">{customer.credit_limit != null ? fmtMoney(customer.credit_limit, currency) : t('so.notSet')}</dd>
+                <dt className="text-muted">{t('erp.col.creditLimit')}</dt><dd className="text-end">{customer.credit_limit != null ? fmtMoney(customer.credit_limit, localCur || currency) : t('so.notSet')}</dd>
                 <dt className="text-muted">{t('erp.col.balance')}</dt><dd className="text-end">{fmtMoney(customer.balance)}</dd>
                 <dt className="text-muted">{t('so.openOrders')}</dt><dd className="text-end">{preview?.credit ? fmtMoney(preview.credit.open_orders) : '…'}</dd>
-                <dt className="text-muted">{t('so.thisOrder')}</dt><dd className="text-end">{fmtMoney(totals.total)}</dd>
+                <dt className="text-muted">{t('so.thisOrder')}</dt><dd className="text-end">{fmtMoney(thisOrderLc)}</dd>
                 <dt className="font-semibold">{t('so.creditLeft')}</dt>
-                <dd className={clsx('text-end font-semibold', preview?.credit?.left != null && preview.credit.left - totals.total < 0 && 'text-crit-fg')}>
-                  {preview?.credit?.left != null ? fmtMoney(preview.credit.left - totals.total) : '—'}
+                <dd className={clsx('text-end font-semibold', preview?.credit?.left != null && preview.credit.left - thisOrderLc < 0 && 'text-crit-fg')}>
+                  {preview?.credit?.left != null ? fmtMoney(preview.credit.left - thisOrderLc) : '—'}
                 </dd>
               </dl>
             </SectionCard>
@@ -625,6 +650,7 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
   const setup = useSoSetup(q.data ? company : null, obj);
   const I = info.data;
   const d = q.data?.doc;
+  const localCur = useLocalCurrency(company);
 
   useEffect(() => { if (flash) { const h = setTimeout(() => setFlash(null), 6000); return () => clearTimeout(h); } }, [flash]);
 
@@ -650,8 +676,9 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
   const pending = (I?.approvals ?? []).filter((a) => a.current);
   const flagged = new Map<number, SoCheck[]>();
   for (const a of pending) for (const c of a.detail?.checks ?? []) if (c.line) flagged.set(c.line, [...(flagged.get(c.line) ?? []), c]);
+  const isFc = isFcDoc(d, localCur);
   const before = round2(lines.reduce((s, l) => s + Number(l.quantity ?? 0) * Number(l.price ?? 0), 0));
-  const net = round2(lines.reduce((s, l) => s + Number(l.line_total ?? 0), 0));
+  const net = round2(lines.reduce((s, l) => s + lineAmt(l, isFc), 0));
   const slp = S?.salespersons.find((s) => s.code === d!.slp_code)?.name;
   const sub = [d!.card_name, slp, I?.created_at ? t('so.createdAt', { when: fmtWhen(I.created_at) }) : d!.created_on ? t('so.createdAt', { when: fmtDay(d!.created_on) }) : null].filter(Boolean).join(' · ');
 
@@ -675,6 +702,7 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
               [t('so.paymentTerms'), I?.payment_terms != null ? S?.payment_terms.find((p) => p.code === I.payment_terms)?.name ?? I.payment_terms : null],
               [t('erp.col.warehouse'), I?.whs_code ?? ([...new Set(lines.map((l) => l.whs_code).filter(Boolean))].join(', ') || null)],
               [t('erp.col.customerRef'), d!.customer_ref],
+              [t('cur.currency'), isFc ? t('cur.currencyRate', { cur: d!.currency, rate: fmtRate(d!.fx_rate), local: localCur }) : d!.currency],
               [t('erp.col.remarks'), d!.comments],
               [t('erp.col.source'), sourceLabel(d!.source)],
             ]} />
@@ -706,7 +734,7 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
                           <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(l.price)}</td>
                           <td className="px-4 py-2.5 text-end">{Number(l.discount_pct) ? <span className={clsx('pill num', fc.some((c) => c.rule_code === 'discount_pct') ? 'pill-warning' : 'pill-neutral')} data-testid="so-disc">{pct(l.discount_pct)}</span> : '—'}</td>
                           {showOpen && <td className="num px-4 py-2.5 text-end max-sm:hidden" data-testid="so-open-qty">{fmtQty(l.line_status === 'C' ? 0 : l.open_qty)}</td>}
-                          <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(l.line_total)}</td>
+                          <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(lineAmt(l, isFc))}</td>
                         </tr>
                       );
                     })}
@@ -714,7 +742,8 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
                 </table>
               </div>
             )}
-            <div className="flex justify-end"><Totals before={before} discount={round2(before - net)} vat={Number(d!.vat_total ?? 0)} total={Number(d!.total ?? 0)} currency={d!.currency ?? ''} /></div>
+            <div className="flex justify-end"><Totals before={before} discount={round2(before - net)} vat={docAmt(d!, 'vat_total', isFc)} total={docAmt(d!, 'total', isFc)} currency={d!.currency ?? ''}
+              lc={isFc ? { total: Number(d!.total ?? 0), currency: localCur, rate: d!.fx_rate } : null} /></div>
           </SectionCard>
         </div>
 

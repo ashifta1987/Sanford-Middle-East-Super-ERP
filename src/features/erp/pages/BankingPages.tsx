@@ -12,6 +12,8 @@ import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, PageTitle, SectionCard, fmtDay, fmtMoney } from '../components/ui';
 import { SeriesPicker } from '../components/SeriesPicker';
+import { CurrencyFields } from '../components/CurrencyFields';
+import { defaultCurrency, fmtRate, lcLabel, useLocalCurrencies, useLocalCurrency } from '../currency';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -126,6 +128,7 @@ export function DraftStatePill({ state }: { state: DraftState }) {
 // ---------- Lists ----------
 export function PaymentsList({ dir }: { dir: Dir }) {
   const { t } = useTranslation();
+  const localOf = useLocalCurrencies();
   const incoming = dir === 'I';
   const cfg = useMemo<ListConfig<R>>(() => ({
     id: `payment-${dir}`, table: 'payment_list',
@@ -149,7 +152,7 @@ export function PaymentsList({ dir }: { dir: Dir }) {
       { key: 'source', header: t('erp.col.source'), hideBelow: 'lg', cell: (r) => sourceName(r.source) },
       { key: 'cancelled', header: t('erp.col.status'), cell: (r) => <span className={clsx('pill', r.cancelled ? 'pill-crit' : 'pill-ok')}>{r.cancelled ? t('erp.status.cancelled') : t('erp.status.posted')}</span>,
         csv: (r) => (r.cancelled ? 'cancelled' : 'posted') },
-      { key: 'total', header: t('erp.col.amount'), align: 'end', cell: (r) => fmtMoney(r.total, r.currency) },
+      { key: 'total', header: t('erp.col.amount'), align: 'end', cell: (r) => lcLabel(r.total, r.currency, localOf(r.company_code), fmtMoney) },
     ],
   }), [t, dir, incoming]);
   return <ListScreen key={dir} config={cfg} />;
@@ -210,8 +213,15 @@ function PaymentForm({ dir }: { dir: Dir }) {
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [series, setSeries] = useState<number | null>(null);
-  const docs = useOpenDocs(company, dir, h.card_code);
-  const cur = setup.data?.currency ?? '';
+  const docsQ = useOpenDocs(company, dir, h.card_code);
+  // B4: the payment is in one currency (the partner's own by default); it pays that currency's documents only.
+  const localCur = useLocalCurrency(company);
+  const [payCur, setPayCur] = useState('');
+  const [fxRate, setFxRate] = useState('');
+  const bpCur = docsQ.data?.currency ?? null;
+  const cur = payCur || defaultCurrency(bpCur, localCur) || setup.data?.currency || '';
+  const docs = { ...docsQ, data: docsQ.data ? { ...docsQ.data, docs: docsQ.data.docs.filter((d) => (d.currency ?? localCur) === cur) } : docsQ.data };
+  const otherCurDocs = (docsQ.data?.docs ?? []).filter((d) => (d.currency ?? localCur) !== cur).length;
   const banks = setup.data?.banks ?? [];
 
   useEffect(() => {
@@ -224,7 +234,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
 
   const set = (patch: Partial<typeof h>) => { setHdr((x) => ({ ...x, ...patch })); setDirty(true); };
   const setChq = (key: string, patch: Partial<FormCheque>) => { setCheques((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c))); setDirty(true); };
-  const header: PayHeaderInput = { ...h, cheques: cheques.map(({ key: _k, ...c }) => c) }; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const header: PayHeaderInput = { ...h, currency: payCur, fx_rate: fxRate, cheques: cheques.map(({ key: _k, ...c }) => c) }; // eslint-disable-line @typescript-eslint/no-unused-vars
   const lines = (docs.data?.docs ?? []).filter((d) => num(apply[`${d.obj_type}:${d.doc_entry}`] ?? '') !== 0)
     .map((d) => ({ obj_type: d.obj_type, doc_entry: d.doc_entry, amount: apply[`${d.obj_type}:${d.doc_entry}`] }));
   const total = r2(num(h.cash) + num(h.transfer) + cheques.reduce((s, c) => s + num(c.amount), 0) + (incoming ? num(h.card) : 0));
@@ -325,11 +335,15 @@ function PaymentForm({ dir }: { dir: Dir }) {
                 <Combobox<BpHit> id="bk-bp" label={incoming ? t('erp.col.customer') : t('erp.col.supplier')} required text={bpText}
                   onText={(s) => { setBpText(s); if (h.card_code) { set({ card_code: '' }); setApply({}); } }}
                   search={bpOpts} placeholder={t('bk.bpPh')} error={fieldErr('card_code')}
-                  onSelect={(o) => { setBpText(o.label); set({ card_code: o.value }); setApply({}); }} />
+                  onSelect={(o) => { setBpText(o.label); set({ card_code: o.value }); setApply({}); setPayCur(''); setFxRate(''); }} />
               </div>
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span>
                 <input id="bk-date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.doc_date} onChange={(e) => set({ doc_date: e.target.value })} />
               </label>
+              {h.card_code && (
+                <CurrencyFields company={company} date={h.doc_date} bpCurrency={bpCur} idPrefix="bk" currency={cur} onCurrency={(c) => { setPayCur(c); setApply({}); setDirty(true); }}
+                  rate={fxRate} onRate={(r) => { setFxRate(r); setDirty(true); }} errors={{ currency: fieldErr('currency'), fx_rate: fieldErr('fx_rate') }} />
+              )}
               <SeriesPicker company={company} obj={incoming ? 24 : 46} value={series} onChange={setSeries} date={h.doc_date} />
               <label className="block text-xs font-medium text-muted sm:col-span-2 xl:col-span-3">{t('erp.col.remarks')}
                 <input id="bk-memo" dir="auto" className="input mt-1 text-[15px] text-ink" value={h.memo} onChange={(e) => set({ memo: e.target.value })} />
@@ -337,7 +351,8 @@ function PaymentForm({ dir }: { dir: Dir }) {
             </div>
             {docs.data && (
               <p className="border-t border-line px-5 py-3 text-sm text-muted" data-testid="bk-bp-info">
-                {t('bk.balance', { amount: fmtMoney(docs.data.balance, cur) })}
+                {t('bk.balance', { amount: fmtMoney(docs.data.balance, localCur || cur) })}
+                {otherCurDocs > 0 && <span className="ms-2" data-testid="bk-other-cur">{t('cur.otherCurrencyDocs', { n: otherCurDocs })}</span>}
                 {docs.data.bank_changed_at && !incoming && <span className="ms-2 pill pill-warning">{t('bk.bankChanged', { when: fmtDay(docs.data.bank_changed_at) })}</span>}
               </p>
             )}
@@ -448,6 +463,12 @@ function PaymentForm({ dir }: { dir: Dir }) {
               <dt className="text-muted">{t('bk.applied')}</dt><dd className="text-end" data-testid="bk-applied">{fmtMoney(applied)}</dd>
               <dt className={clsx('text-[17px] font-semibold', applied > total && 'text-crit-fg')}>{t('bk.onAccount', { cur })}</dt>
               <dd className={clsx('text-end text-[17px] font-semibold', applied > total && 'text-crit-fg')} data-testid="bk-on-account">{fmtMoney(r2(total - applied))}</dd>
+              {cur !== localCur && preview?.totals?.total_lc != null && !errors.length && (
+                <>
+                  <dt className="text-muted">{t('cur.totalLc', { cur: localCur })}<span className="block text-xs">{t('cur.atRate', { rate: fmtRate(preview.totals.rate) })}</span></dt>
+                  <dd className="text-end text-muted" data-testid="bk-total-lc">{fmtMoney(preview.totals.total_lc, localCur)}</dd>
+                </>
+              )}
             </dl>
           </SectionCard>
         </div>
@@ -494,6 +515,7 @@ export function PaymentDetailPage() {
   const { dir: dp, company = '', entry = '' } = useParams();
   const dir = dirOf(dp);
   const q = usePaymentInfo(company, dir, Number(entry));
+  const localCur = useLocalCurrency(company);
   const qc = useQueryClient();
   const [flash, setFlash] = useFlash();
   const listName = dir === 'I' ? t('erp.page.paymentsIn') : t('erp.page.paymentsOut');
@@ -509,6 +531,9 @@ export function PaymentDetailPage() {
   }
   const p = q.data;
   const cur = p.currency ?? '';
+  // B4: a foreign-currency payment keeps its own total (total_fc); means and allocations are stored in the company currency.
+  const fc = p.total_fc != null;
+  const lc = fc ? localCur : cur;
   return (
     <RequireModule module="banking">
       <BkHeader title={`${dir === 'I' ? t('bk.paymentIn') : t('bk.paymentOut')} ${p.doc_no}`} back={back}
@@ -525,12 +550,15 @@ export function PaymentDetailPage() {
             <Fields items={[
               [dir === 'I' ? t('erp.col.customer') : t('erp.col.supplier'), p.card_code ? `${p.card_code} · ${p.card_name ?? ''}` : '—'],
               [t('erp.col.postingDate'), fmtDay(p.doc_date)],
-              [t('bk.paymentTotal'), <span key="t" className="num font-semibold" data-testid="bk-detail-total">{fmtMoney(p.total, cur)}</span>],
-              [t('erp.means.cash'), Number(p.cash) ? fmtMoney(p.cash, cur) : '—'],
-              [t('erp.means.transfer'), Number(p.transfer) ? `${fmtMoney(p.transfer, cur)}${p.transfer_bank_name ? ` · ${p.transfer_bank_name}` : ''}${p.transfer_ref ? ` · ${p.transfer_ref}` : ''}` : '—'],
-              [t('erp.means.cheque'), Number(p.cheque) ? fmtMoney(p.cheque, cur) : '—'],
-              [t('erp.means.card'), Number(p.card) ? `${fmtMoney(p.card, cur)}${p.card_ref ? ` · ${p.card_ref}` : ''}` : '—'],
-              [t('bk.onAccountShort'), <span key="oa" data-testid="bk-detail-on-account">{fmtMoney(p.on_account ?? 0, cur)}</span>],
+              [t('bk.paymentTotal'), <span key="t" className="num font-semibold" data-testid="bk-detail-total">{fmtMoney(fc ? p.total_fc : p.total, cur)}</span>],
+              ...(fc ? [[t('cur.rateLabel'), <span key="r" className="num" data-testid="bk-detail-rate">{t('cur.currencyRate', { cur, rate: fmtRate(p.fx_rate), local: localCur })}</span>] as [string, ReactNode],
+                [t('cur.totalLc', { cur: localCur }), <span key="tl" className="num">{fmtMoney(p.total, localCur)}</span>] as [string, ReactNode],
+                [t('cur.fxDiff'), <span key="fx" className="num" data-testid="bk-detail-fx">{Number(p.fx_diff ?? 0) === 0 ? fmtMoney(0, localCur) : `${fmtMoney(Math.abs(Number(p.fx_diff)), localCur)} · ${Number(p.fx_diff) > 0 ? t('cur.gain') : t('cur.loss')}`}</span>] as [string, ReactNode]] : []),
+              [t('erp.means.cash'), Number(p.cash) ? fmtMoney(p.cash, lc) : '—'],
+              [t('erp.means.transfer'), Number(p.transfer) ? `${fmtMoney(p.transfer, lc)}${p.transfer_bank_name ? ` · ${p.transfer_bank_name}` : ''}${p.transfer_ref ? ` · ${p.transfer_ref}` : ''}` : '—'],
+              [t('erp.means.cheque'), Number(p.cheque) ? fmtMoney(p.cheque, lc) : '—'],
+              [t('erp.means.card'), Number(p.card) ? `${fmtMoney(p.card, lc)}${p.card_ref ? ` · ${p.card_ref}` : ''}` : '—'],
+              [t('bk.onAccountShort'), <span key="oa" data-testid="bk-detail-on-account">{fmtMoney(fc ? p.on_account_fc ?? 0 : p.on_account ?? 0, cur)}</span>],
               [t('erp.col.remarks'), p.memo],
               [t('erp.col.source'), sourceName(p.source)],
               [t('bk.journal'), p.trans_id ? (p.can_read_journal ? <Link key="j" id="bk-journal-link" className="text-primary hover:underline" to={`/financials/journals/${p.company_code}/${p.trans_id}`}>{p.trans_id}</Link> : String(p.trans_id)) : '—'],
@@ -555,7 +583,7 @@ export function PaymentDetailPage() {
                           <td className="px-4 py-2.5">{to ? <Link className="font-mono text-[13px] text-primary hover:underline" to={to}>{a.doc_no ?? a.doc_entry}</Link> : <span className="font-mono text-[13px]">{a.doc_no ?? a.doc_entry}</span>}
                             <div className="text-xs text-muted">{docLabel(a.obj_type)}{a.doc_date ? ` · ${fmtDay(a.doc_date)}` : ''}</div></td>
                           <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(a.doc_total)}</td>
-                          <td className="num px-4 py-2.5 text-end">{fmtMoney([14, 19].includes(a.obj_type) ? -a.applied : a.applied)}</td>
+                          <td className="num px-4 py-2.5 text-end">{fmtMoney(([14, 19].includes(a.obj_type) ? -1 : 1) * Number(fc ? a.applied_fc ?? a.applied : a.applied), cur)}{fc && <span className="block text-xs text-muted">{fmtMoney(([14, 19].includes(a.obj_type) ? -1 : 1) * Number(a.applied), localCur)}</span>}</td>
                         </tr>
                       );
                     })}

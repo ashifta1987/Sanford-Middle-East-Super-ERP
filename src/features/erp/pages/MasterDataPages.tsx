@@ -811,8 +811,16 @@ export function ItemFormPage({ mode }: { mode: 'new' | 'edit' }) {
                   : <div className={labelCls}>{t('md.f.item_code')}<p className="mt-2 font-mono text-[15px] text-ink">{f.item_code}</p></div>}
                 <TextField id="it-name" label={t('md.f.item_name')} required value={f.name} onChange={(v) => set('name', v)} error={errOf(errs, 'name')} />
                 <TextField id="it-foreign_name" label={t('md.f.foreign_name')} dir="rtl" required={req('foreign_name')} value={f.foreign_name} onChange={(v) => set('foreign_name', v)} error={errOf(errs, 'foreign_name')} />
-                <SelectField id="it-group_code" label={t('md.f.item_group')} required={req('group_code')} value={f.group_code} onChange={(v) => set('group_code', v)}
+                <SelectField id="it-group_code" label={t('md.f.item_group')} required={req('group_code')} value={f.group_code}
+                  onChange={(v) => {
+                    set('group_code', v);
+                    // B4 (B3 follow-up): a new item takes its group's batch / serial method (Inventory › Item Groups); it can still be changed here.
+                    const m = S.item_groups.find((g) => String(g.code) === v)?.manage_method;
+                    if (mode === 'new' && m) set('tracking', m);
+                  }}
                   options={S.item_groups.map((g) => [String(g.code), g.name])} error={errOf(errs, 'group_code')} />
+                {mode === 'new' && (() => { const m = S.item_groups.find((g) => String(g.code) === f.group_code)?.manage_method; return m && m !== 'none'
+                  ? <p className="-mt-2 text-xs text-muted" data-testid="it-group-method">{t('md.groupMethod', { method: t(`md.tracking.${m}`) })}</p> : null; })()}
                 {S.brands.length > 0 && <SelectField id="it-firm_code" label={t('md.f.firm_code')} required={req('firm_code')} value={f.firm_code} onChange={(v) => set('firm_code', v)}
                   options={S.brands.map((g) => [String(g.code), g.name])} error={errOf(errs, 'firm_code')} />}
                 <TextField id="it-barcode" label={t('md.f.barcode')} required={req('barcode')} value={f.barcode} onChange={(v) => set('barcode', v)} error={errOf(errs, 'barcode')} help={t('md.help.barcode')} />

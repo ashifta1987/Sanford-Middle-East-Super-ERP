@@ -10,6 +10,8 @@ import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, StatusTag, fmtDay, fmtMoney, fmtQty } from '../components/ui';
 import { SeriesPicker } from '../components/SeriesPicker';
+import { CurrencyFields } from '../components/CurrencyFields';
+import { docAmt, fmtRate, isFcDoc, lineAmt, useLocalCurrency, useRate } from '../currency';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -61,7 +63,9 @@ export function PuHeader({ kind, title, pills, sub, actions, listTo, listLabel }
   );
 }
 
-function PuTotals({ net, vat, total, currency, extra }: { net: number; vat: number; total: number; currency: string; extra?: Array<[string, ReactNode]> }) {
+function PuTotals({ net, vat, total, currency, extra, lc }: {
+  net: number; vat: number; total: number; currency: string; extra?: Array<[string, ReactNode]>; lc?: { total: number; currency: string; rate?: number | null } | null;
+}) {
   const { t } = useTranslation();
   return (
     <dl className="num ms-auto grid w-full max-w-xs grid-cols-2 gap-x-6 gap-y-1 border-t border-line p-5 text-[15px] sm:border-t-0">
@@ -69,6 +73,12 @@ function PuTotals({ net, vat, total, currency, extra }: { net: number; vat: numb
       <dt className="text-muted">{t('pu.totals.vat')}</dt><dd className="text-end">{fmtMoney(vat)}</dd>
       {extra?.map(([k, v]) => <Fragment key={k}><dt className="text-muted">{k}</dt><dd className="text-end">{v}</dd></Fragment>)}
       <dt className="text-[17px] font-semibold">{t('pu.totals.total', { cur: currency })}</dt><dd className="text-end text-[17px] font-semibold" data-testid="pu-total">{fmtMoney(total)}</dd>
+      {lc && lc.currency && lc.currency !== currency && (
+        <>
+          <dt className="text-muted">{t('cur.totalLc', { cur: lc.currency })}{lc.rate != null ? <span className="block text-xs">{t('cur.atRate', { rate: fmtRate(lc.rate) })}</span> : null}</dt>
+          <dd className="text-end text-muted" data-testid="pu-total-lc">{fmtMoney(lc.total, lc.currency)}</dd>
+        </>
+      )}
     </dl>
   );
 }
@@ -191,7 +201,7 @@ export function PurchaseDocNewPage({ kind }: { kind: PurchaseKind }) {
   const initial = S?.header ? {
     entry: null, docNo: null, supplierText: kind === 'purchase_order' && S.header.card_code ? `${S.header.card_code} · ${S.header.card_name ?? ''}` : '',
     header: { ...emptyHeader(), card_code: kind === 'purchase_order' ? S.header.card_code ?? '' : '', whs_code: S.header.whs_code ?? '', china_office: S.header.china_office ?? '',
-      due_date: kind === 'purchase_order' ? '' : S.header.due_date ?? '' },
+      due_date: kind === 'purchase_order' ? '' : S.header.due_date ?? '', currency: kind === 'purchase_order' && fromObj === 540000006 ? S.header.currency ?? '' : '' },
     lines: S.lines.map((l) => ({ key: `l${++lineSeq}`, item_code: l.item_code, text: `${l.item_code} · ${l.description ?? ''}`, qty: String(Number(l.open_qty)),
       price: kind === 'purchase_order' && l.price != null ? String(Number(l.price)) : '', tax_code: l.tax_code ?? '', whs_code: l.whs_code ?? '', cbm: l.cbm != null ? String(Number(l.cbm)) : '',
       base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line, baseNo: l.base_doc_no, baseOpen: Number(l.open_qty) })),
@@ -223,7 +233,8 @@ export function PurchaseDocEditPage({ kind }: { kind: PurchaseKind }) {
   const initial = {
     entry: id, docNo: w?.doc_no ?? String(d!.doc_num), supplierText: d!.card_code ? `${d!.card_code} · ${d!.card_name ?? ''}` : '',
     header: { card_code: d!.card_code ?? '', doc_date: d!.doc_date, due_date: d!.due_date ?? '', whs_code: w?.whs_code ?? '', china_office: w?.china_office ?? '',
-      payment_terms: w?.payment_terms ?? '', customer_ref: d!.customer_ref ?? '', comments: d!.comments ?? '' } as PuHeaderInput,
+      payment_terms: w?.payment_terms ?? '', customer_ref: d!.customer_ref ?? '', comments: d!.comments ?? '',
+      currency: d!.currency ?? '', fx_rate: d!.total_fc != null && d!.fx_rate != null ? String(Number(d!.fx_rate)) : '' } as PuHeaderInput,
     lines: ls.map((l) => ({ key: `l${++lineSeq}`, item_code: l.item_code, text: `${l.item_code} · ${l.description ?? ''}`, qty: String(Number(l.quantity)),
       price: l.price != null && obj !== 1470000113 ? String(Number(l.price)) : '', tax_code: l.tax_code ?? '', whs_code: l.whs_code ?? '', cbm: l.cbm != null ? String(Number(l.cbm)) : '',
       base_obj_type: l.base_obj_type, base_doc_entry: l.base_doc_entry, base_line: l.base_line })),
@@ -247,6 +258,8 @@ function PurchaseDocForm({ kind, company, initial }: {
   const allowed = isReq ? Boolean(S?.can_request) : canWrite;
   const [h, setH] = useState<PuHeaderInput>(initial?.header ?? emptyHeader());
   const [supText, setSupText] = useState(initial?.supplierText ?? '');
+  const [supCur, setSupCur] = useState<string | null>(initial?.header.currency || null);
+  const localCur = useLocalCurrency(company);
   const [lines, setLines] = useState<FormLine[]>(initial?.lines ?? []);
   const [entry, setEntry] = useState<number | null>(initial?.entry ?? null);
   const [series, setSeries] = useState<number | null>(null);
@@ -290,7 +303,9 @@ function PurchaseDocForm({ kind, company, initial }: {
     const n = r2(num(l.qty) * p);
     return { net: acc.net + n, vat: acc.vat + r2((n * rate(l.tax_code)) / 100) };
   }, { net: 0, vat: 0 });
-  const tot = preview && !errors.length ? preview.totals : { net: r2(est.net), vat: r2(est.vat), total: r2(est.net + est.vat), currency: S?.currency ?? '' };
+  const tot = preview && !errors.length ? preview.totals : { net: r2(est.net), vat: r2(est.vat), total: r2(est.net + est.vat), currency: h.currency || (supCur && supCur !== '##' ? supCur : S?.currency ?? '') };
+  const lcTot = preview && !errors.length && preview.totals.total_lc != null && preview.totals.currency !== localCur
+    ? { total: Number(preview.totals.total_lc), currency: localCur, rate: preview.totals.rate } : null;
 
   const supOpts = async (s: string): Promise<Array<ComboOption<SupplierHit>>> => (await searchSuppliers(company, s)).map((c) => ({
     value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c, meta: [c.city, c.currency].filter(Boolean).join(' · '),
@@ -341,11 +356,16 @@ function PurchaseDocForm({ kind, company, initial }: {
                   onText={(s) => { setSupText(s); if (h.card_code) set({ card_code: '' }); }}
                   search={supOpts} placeholder={t('pu.supplierPh')} noMatch={t('pu.noSupplier')}
                   error={attempted ? errors.find((e) => e.field === 'card_code' && e.line == null)?.message : undefined}
-                  onSelect={(o) => { set({ card_code: o.value, payment_terms: o.data.payment_terms ?? '' }); setSupText(o.label); }} />
+                  onSelect={(o) => { set({ card_code: o.value, payment_terms: o.data.payment_terms ?? '', currency: '', fx_rate: '' }); setSupText(o.label); setSupCur(o.data.currency); }} />
               )}
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span>
                 <input id="pu-doc_date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.doc_date} onChange={(e) => set({ doc_date: e.target.value })} />
               </label>
+              {!isReq && (
+                <CurrencyFields company={company} date={h.doc_date} bpCurrency={supCur} idPrefix="pu" currency={h.currency ?? ''} onCurrency={(c) => set({ currency: c })}
+                  rate={h.fx_rate ?? ''} onRate={(r) => set({ fx_rate: r })}
+                  errors={attempted ? { currency: errors.find((e) => e.field === 'currency')?.message, fx_rate: errors.find((e) => e.field === 'fx_rate')?.message } : undefined} />
+              )}
               <label className="block text-xs font-medium text-muted">{t(`pu.due.${kind}`)} {isReq && <span className="text-crit-fg">*</span>}
                 <input id="pu-due_date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.due_date} onChange={(e) => set({ due_date: e.target.value })} />
               </label>
@@ -428,7 +448,7 @@ function PurchaseDocForm({ kind, company, initial }: {
                   <Plus className="h-4 w-4" aria-hidden /> {t('so.addLine')}
                 </Button>
               </div>
-              {!isReq && <PuTotals {...tot} currency={tot.currency || S?.currency || ''} />}
+              {!isReq && <PuTotals {...tot} currency={tot.currency || S?.currency || ''} lc={lcTot} />}
             </div>
           </SectionCard>
         </div>
@@ -487,6 +507,7 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
   const info = usePuInfo(company, obj, id);
   const I = info.data;
   const d = q.data?.doc;
+  const localCur = useLocalCurrency(company);
   const refresh = (msg?: string) => {
     q.refetch(); info.refetch();
     qc.invalidateQueries({ queryKey: ['pu-flow'] });
@@ -505,7 +526,8 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
   const wf = Boolean(I?.workflow);
   const docNo = wf ? I!.doc_no : String(d!.doc_num);
   const isReq = kind === 'purchase_request';
-  const net = lines.reduce((s, l) => s + Number(l.line_total ?? 0), 0);
+  const isFc = isFcDoc(d, localCur);
+  const net = lines.reduce((s, l) => s + lineAmt(l, isFc), 0);
   const whs = [...new Set(lines.map((l) => l.whs_code).filter(Boolean))].join(', ');
   const pill = wf && I!.state !== 'approved' && I!.state !== 'cancelled' ? <StatePill state={I!.state} /> : <StatusTag value={d!.status} />;
 
@@ -527,7 +549,8 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
               [t(`pu.due.${kind}`), d!.due_date ? fmtDay(d!.due_date) : null],
               [t('pu.receiveWhs'), whs || I?.whs_code || null],
               [t('pu.office'), I?.china_office_name ?? null],
-              ...(isReq ? [] : [[t('pu.supplierRef'), d!.customer_ref] as [string, ReactNode]]),
+              ...(isReq ? [] : [[t('pu.supplierRef'), d!.customer_ref] as [string, ReactNode],
+                [t('cur.currency'), isFc ? t('cur.currencyRate', { cur: d!.currency, rate: fmtRate(d!.fx_rate), local: localCur }) : d!.currency] as [string, ReactNode]]),
               ...(kind === 'purchase_order' && d!.container_no ? [[t('pu.container'), <span className="font-mono">{d!.container_no}</span>] as [string, ReactNode]] : []),
               [t('erp.col.remarks'), d!.comments],
               [t('erp.col.source'), sourceLabel(d!.source)],
@@ -555,14 +578,15 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
                         <td className="num px-4 py-2.5 text-end">{fmtQty(l.quantity)} <span className="text-muted">{l.uom}</span></td>
                         {wf && <td className="num px-4 py-2.5 text-end max-sm:hidden" data-testid="pu-open-qty">{fmtQty(l.line_status === 'C' ? 0 : l.open_qty)}</td>}
                         {!isReq && <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(l.price)}</td>}
-                        {!isReq && <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(l.line_total)}</td>}
+                        {!isReq && <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(lineAmt(l, isFc))}</td>}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            {!isReq && <div className="flex justify-end"><PuTotals net={r2(net)} vat={Number(d!.vat_total ?? 0)} total={Number(d!.total ?? 0)} currency={d!.currency ?? ''} /></div>}
+            {!isReq && <div className="flex justify-end"><PuTotals net={r2(net)} vat={docAmt(d!, 'vat_total', isFc)} total={docAmt(d!, 'total', isFc)} currency={d!.currency ?? ''}
+              lc={isFc ? { total: Number(d!.total ?? 0), currency: localCur, rate: d!.fx_rate } : null} /></div>}
           </SectionCard>
           {kind === 'purchase_order' && wf && I!.state === 'approved' && <ChinaSteps company={company} po={id} poNo={docNo} info={I!} doc={d!} lines={lines} onDone={refresh} />}
         </div>
@@ -769,7 +793,7 @@ function ChinaSteps({ company, po, poNo, info, doc, lines, onDone }: { company: 
     <div id="china" className="space-y-5">
       {err && <FormError message={err} />}
       {/* PI and deposit */}
-      <SectionCard title={t('pu.china.pi')} right={can && form !== 'pi' ? <Button variant="secondary" id="pu-pi-add" onClick={() => { setPiEdit(null); setPi({ vendor_pi_no: '', pi_date: today(), amount: String(Number(doc.total ?? 0)), eta: '', status: S?.pi_statuses[0]?.code ?? '', note: '' }); open('pi'); }}><Plus className="h-4 w-4" aria-hidden />{t('pu.pi.add')}</Button> : undefined}>
+      <SectionCard title={t('pu.china.pi')} right={can && form !== 'pi' ? <Button variant="secondary" id="pu-pi-add" onClick={() => { setPiEdit(null); setPi({ vendor_pi_no: '', pi_date: today(), amount: String(Number(doc.total_fc ?? doc.total ?? 0)), eta: '', status: S?.pi_statuses[0]?.code ?? '', note: '' }); open('pi'); }}><Plus className="h-4 w-4" aria-hidden />{t('pu.pi.add')}</Button> : undefined}>
         {form === 'pi' && (
           <div className="grid grid-cols-1 gap-4 border-b border-line p-5 sm:grid-cols-2" data-testid="pu-pi-form">
             <label className={field}>{t('pu.pi.no')} <span className="text-crit-fg">*</span><input id="pu-pi-no" className={input} value={pi.vendor_pi_no} onChange={(e) => setPi({ ...pi, vendor_pi_no: e.target.value })} /></label>
@@ -817,7 +841,7 @@ function ChinaSteps({ company, po, poNo, info, doc, lines, onDone }: { company: 
               </label>
               {dep.mode === 'pct'
                 ? <label className={field}>{t('pu.deposit.pct')}<input id="pu-dep-pct" inputMode="decimal" className={`${input} num text-end`} value={dep.pct} onChange={(e) => setDep({ ...dep, pct: e.target.value })} />
-                    <span className="mt-1 block num">{fmtMoney(r2(Number(doc.total ?? 0) * num(dep.pct) / 100), cur)}</span></label>
+                    <span className="mt-1 block num">{fmtMoney(r2(Number(doc.total_fc ?? doc.total ?? 0) * num(dep.pct) / 100), cur)}</span></label>
                 : <label className={field}>{t('pu.deposit.amount', { cur })}<input id="pu-dep-amount" inputMode="decimal" className={`${input} num text-end`} value={dep.amount} onChange={(e) => setDep({ ...dep, amount: e.target.value })} /></label>}
               <label className={field}>{t('pu.deposit.forPi')}
                 <select id="pu-dep-pi" className={input} value={dep.pi_id} onChange={(e) => setDep({ ...dep, pi_id: e.target.value })}>
@@ -1136,6 +1160,7 @@ export function GrpoNewPage() {
   const [params] = useSearchParams();
   const company = params.get('company') ?? '';
   const po = Number(params.get('po')) || null;
+  const localCur = useLocalCurrency(company);
   const { canWrite, readOnlyReason } = useModuleLevel('purchasing');
   const setup = usePuSetup(company || null);
   const src = useQuery({ queryKey: ['pu-copy', company, 22, po], enabled: Boolean(company && po), queryFn: () => puCopySource(company, 22, po) });
@@ -1181,11 +1206,13 @@ export function GrpoNewPage() {
           <label className="block text-xs font-medium text-muted">{t('pu.deliveryNote')}<input id="pu-ref" className="input mt-1 text-[15px] text-ink" value={ref} onChange={(e) => setRef(e.target.value)} /></label>
           <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="pu-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} /></label>
           <SeriesPicker company={company} obj={20} value={series} onChange={setSeries} date={date} />
+          <CurrencyFields company={company} date={date} currency={h.currency} rate="" idPrefix="pu" locked keepRate={h.currency !== localCur ? h.fx_rate ?? null : null} />
         </div>
       </SectionCard>
       <SectionCard title={t('pu.linesToReceive')}>
         <PickLines rows={rows} setRows={setRows} warehouses={setup.data?.warehouses} />
-        <div className="flex justify-end border-t border-line"><PuTotals net={tot.net} vat={tot.vat} total={r2(tot.net + tot.vat)} currency={h.currency} /></div>
+        <div className="flex justify-end border-t border-line"><PuTotals net={tot.net} vat={tot.vat} total={r2(tot.net + tot.vat)} currency={h.currency}
+          lc={h.currency !== localCur && h.fx_rate != null ? { total: r2((tot.net + tot.vat) * Number(h.fx_rate)), currency: localCur, rate: h.fx_rate } : null} /></div>
       </SectionCard>
     </CreateShell>
   );
@@ -1199,6 +1226,9 @@ export function ApInvoiceNewPage() {
   const [params] = useSearchParams();
   const company = params.get('company') ?? '';
   const grpo = Number(params.get('grpo')) || null;
+  const localCur = useLocalCurrency(company);
+  const [fxRate, setFxRate] = useState('');
+  const [date, setDate] = useState(today());
   const { canWrite: pw } = useModuleLevel('purchasing');
   const { canWrite: fw } = useModuleLevel('financials');
   const can = pw || fw;
@@ -1207,19 +1237,31 @@ export function ApInvoiceNewPage() {
   const dps = useQuery({
     queryKey: ['pu-dps', company, card], enabled: Boolean(company && card),
     queryFn: async () => {
-      const [{ data: d, error: e1 }, { data: x, error: e2 }] = await Promise.all([
+      const [{ data: d, error: e1 }, { data: x, error: e2 }, { data: fx, error: e3 }] = await Promise.all([
         erp().from('purchase_doc_list').select('doc_entry,doc_no,doc_date,total,paid,status').match({ company_code: company, obj_type: 204, card_code: card!, source: 'erp' }).neq('status', 'cancelled').order('doc_entry'),
-        erp().from('ap_dp_draw').select('dp_entry,amount').eq('company_code', company),
+        erp().from('ap_dp_draw').select('dp_entry,amount,amount_fc').eq('company_code', company),
+        erp().from('document').select('doc_entry,currency,total_fc,paid_fc').match({ company_code: company, obj_type: 204, card_code: card!, source: 'erp' }),
       ]);
-      if (e1 || e2) throw new ApiError((e1 ?? e2)!);
+      if (e1 || e2 || e3) throw new ApiError((e1 ?? e2 ?? e3)!);
+      // B4: a down payment in a foreign currency is drawn in that currency.
+      const fcOf = new Map<number, R>(((fx ?? []) as R[]).map((r) => [r.doc_entry, r]));
       const drawn = new Map<number, number>();
-      for (const r of (x ?? []) as R[]) drawn.set(r.dp_entry, (drawn.get(r.dp_entry) ?? 0) + Number(r.amount));
-      return ((d ?? []) as R[]).map((r): R => ({ ...r, drawn: drawn.get(r.doc_entry) ?? 0, avail: r2(Number(r.paid ?? 0) - (drawn.get(r.doc_entry) ?? 0)) }));
+      for (const r of (x ?? []) as R[]) {
+        const f = fcOf.get(r.dp_entry);
+        drawn.set(r.dp_entry, (drawn.get(r.dp_entry) ?? 0) + Number(f?.total_fc != null ? r.amount_fc ?? 0 : r.amount));
+      }
+      return ((d ?? []) as R[]).map((r): R => {
+        const f = fcOf.get(r.doc_entry);
+        const fc = f?.total_fc != null;
+        const total = fc ? Number(f!.total_fc) : Number(r.total);
+        const paid = fc ? Number(f!.paid_fc ?? 0) : Number(r.paid ?? 0);
+        return { ...r, currency: f?.currency, total, paid, drawn: drawn.get(r.doc_entry) ?? 0, avail: r2(paid - (drawn.get(r.doc_entry) ?? 0)) };
+      });
     },
   });
   const [rows, setRows] = useState<Pick[]>([]);
   const [draw, setDraw] = useState<Record<number, string>>({});
-  const [date, setDate] = useState(today());
+  const apRate = useRate(company || null, src.data?.header?.currency ?? null, date);
   const [due, setDue] = useState('');
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
@@ -1248,7 +1290,7 @@ export function ApInvoiceNewPage() {
     if (!sel.length) { setErr(t('sc.chooseLines')); return; }
     setBusy(true);
     try {
-      const res = await apInvoiceCreate(company, { doc_date: date, due_date: due || null, customer_ref: ref, comments,
+      const res = await apInvoiceCreate(company, { doc_date: date, due_date: due || null, customer_ref: ref, comments, fx_rate: fxRate || null,
         down_payments: Object.entries(draw).filter(([, v]) => num(v) > 0).map(([k, v]) => ({ doc_entry: Number(k), amount: v })) },
       sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['pu-flow'] });
@@ -1274,6 +1316,7 @@ export function ApInvoiceNewPage() {
           <label className="block text-xs font-medium text-muted">{t('erp.col.dueDate')}<input id="pu-due_date" type="date" className="input num mt-1 text-[15px] text-ink" value={due} onChange={(e) => setDue(e.target.value)} /><span className="mt-1 block">{t('sc.dueFromTerms')}</span></label>
           <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="pu-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} /></label>
           <SeriesPicker company={company} obj={18} value={series} onChange={setSeries} date={date} />
+          <CurrencyFields company={company} date={date} currency={h.currency} idPrefix="pu" locked rate={fxRate} onRate={setFxRate} />
         </div>
       </SectionCard>
       <SectionCard title={t('pu.linesToInvoice')}><PickLines rows={rows} setRows={setRows} /></SectionCard>
@@ -1291,6 +1334,7 @@ export function ApInvoiceNewPage() {
         )}
         <div className="flex justify-end border-t border-line">
           <PuTotals net={tot.net} vat={tot.vat} total={r2(gross - drawn)} currency={h.currency}
+            lc={h.currency !== localCur && (fxRate !== '' || apRate.data?.rate != null) ? { total: r2((gross - drawn) * Number(fxRate !== '' ? fxRate : apRate.data!.rate)), currency: localCur, rate: fxRate !== '' ? Number(fxRate) : apRate.data!.rate } : null}
             extra={[[t('pu.totals.gross'), fmtMoney(gross)], [t('pu.totals.drawn'), drawn ? `−${fmtMoney(drawn)}` : fmtMoney(0)]]} />
         </div>
       </SectionCard>
@@ -1309,6 +1353,7 @@ export function PurchaseViewPage({ kind }: { kind: PurchaseViewKind }) {
   const view = usePuView(company, obj, id);
   const V = view.data;
   const d = q.data?.doc;
+  const localCur = useLocalCurrency(company);
   let body: ReactNode = null;
   if (q.isLoading || view.isLoading) body = <PageLoading />;
   else if (q.error || view.error) body = <div className="card"><ErrorState error={q.error ?? view.error} onRetry={() => { q.refetch(); view.refetch(); }} /></div>;
@@ -1316,7 +1361,8 @@ export function PurchaseViewPage({ kind }: { kind: PurchaseViewKind }) {
   if (body) return <RequireModule module="purchasing"><PuHeader kind={kind} title={t(`erp.doc.${kind}`)} />{body}</RequireModule>;
   const lines = q.data!.lines;
   const cur = d!.currency ?? '';
-  const net = lines.reduce((s, l) => s + Number(l.line_total ?? 0), 0);
+  const isFc = isFcDoc(d, localCur);
+  const net = lines.reduce((s, l) => s + lineAmt(l, isFc), 0);
   const erpDoc = d!.source === 'erp';
   const payTo = V?.open_amount && V.open_amount > 0 ? `/banking/payments/out/new?company=${company}&card=${encodeURIComponent(d!.card_code)}&apply=${obj}:${id}:${V.open_amount}` : null;
   return (
@@ -1341,6 +1387,7 @@ export function PurchaseViewPage({ kind }: { kind: PurchaseViewKind }) {
               [t('erp.col.postingDate'), fmtDay(d!.doc_date)],
               [t('erp.col.dueDate'), kind === 'goods_receipt_po' ? null : fmtDay(d!.due_date)],
               [kind === 'goods_receipt_po' ? t('pu.deliveryNote') : t('pu.supplierInvoice'), d!.customer_ref],
+              [t('cur.currency'), isFc ? t('cur.currencyRate', { cur, rate: fmtRate(d!.fx_rate), local: localCur }) : cur],
               [t('erp.col.remarks'), d!.comments],
               [t('erp.col.source'), sourceLabel(d!.source)],
             ]} />
@@ -1363,15 +1410,16 @@ export function PurchaseViewPage({ kind }: { kind: PurchaseViewKind }) {
                       <td className="num px-4 py-2.5 text-end">{fmtQty(l.quantity)} <span className="text-muted">{l.uom}</span></td>
                       {kind === 'goods_receipt_po' && erpDoc && <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtQty(l.line_status === 'C' ? 0 : l.open_qty)}</td>}
                       <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(l.price)}</td>
-                      <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(l.line_total)}</td>
+                      <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(lineAmt(l, isFc))}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="flex justify-end">
-              <PuTotals net={r2(net)} vat={Number(d!.vat_total ?? 0)} total={Number(d!.total ?? 0)} currency={cur}
-                extra={kind === 'ap_invoice' && V?.gross != null && (V.draws ?? []).length ? [[t('pu.totals.gross'), fmtMoney(V.gross)], [t('pu.totals.drawn'), `−${fmtMoney(r2(Number(V.gross) - Number(d!.total)))}`]] : undefined} />
+              <PuTotals net={r2(net)} vat={docAmt(d!, 'vat_total', isFc)} total={docAmt(d!, 'total', isFc)} currency={cur}
+                lc={isFc ? { total: Number(d!.total ?? 0), currency: localCur, rate: d!.fx_rate } : null}
+                extra={kind === 'ap_invoice' && V?.gross != null && (V.draws ?? []).length ? [[t('pu.totals.gross'), fmtMoney(V.gross)], [t('pu.totals.drawn'), `−${fmtMoney(r2(Number(V.gross) - docAmt(d!, 'total', isFc)))}`]] : undefined} />
             </div>
           </SectionCard>
         </div>

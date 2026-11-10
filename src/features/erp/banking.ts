@@ -14,15 +14,21 @@ export interface PaySetup {
   currency: string; can_write: boolean; banks: BankRef[]; accounts: { cash: boolean; cheque: boolean; card: boolean };
   numbering: boolean; my_limit: number | null; bank_change_days: number | null; needs_approval?: boolean | null;
 }
-export interface OpenDoc { obj_type: number; doc_entry: number; doc_no: string; doc_date: string; due_date: string; total: number; open: number; reserved: number; sign: 1 | -1 }
-export interface OpenDocs { card_code: string; card_name: string; currency: string | null; balance: number; bank_changed_at: string | null; docs: OpenDoc[]; other_open: number }
+export interface OpenDoc {
+  obj_type: number; doc_entry: number; doc_no: string; doc_date: string; due_date: string; total: number; open: number; reserved: number; sign: 1 | -1;
+  /** B4: the document's currency; total / open are in it, open_lc / total_lc in the company currency. */
+  currency?: string; fx_rate?: number | null; open_lc?: number; total_lc?: number;
+}
+export interface OpenDocs { card_code: string; card_name: string; currency: string | null; local_currency?: string; balance: number; bank_changed_at: string | null; docs: OpenDoc[]; other_open: number }
 export interface PayProblem { line: number | null; field: string; message: string }
 export interface PayCheck { rule_code: 'payment_amount' | 'bank_change' | 'incoming_payment'; step: number; approver_position: string; approver_name: string; value: number | string; limit: number; message: string }
-export interface PayEval { errors: PayProblem[]; checks: PayCheck[]; totals: { total: number; applied: number; on_account: number; currency: string } }
+export interface PayEval { errors: PayProblem[]; checks: PayCheck[]; totals: { total: number; applied: number; on_account: number; currency: string; rate?: number | null; local_currency?: string; total_lc?: number | null } }
 export interface ChequeInput { cheque_no: string; bank_name: string; due_date: string; amount: string }
 export interface PayHeaderInput {
   card_code: string; doc_date: string; memo: string; cash: string; transfer: string; transfer_bank: string; transfer_ref: string;
   cheques: ChequeInput[]; cheque_bank: string; card: string; card_ref: string;
+  /** B4: payment currency ('' = the partner's own) and a typed rate ('' = the payment date's rate; Financials only). */
+  currency?: string; fx_rate?: string;
 }
 export interface PayLineInput { obj_type: number; doc_entry: number; amount: string }
 export interface Activity { at: string; action: string; actor_name: string; detail: Record<string, unknown> | null }
@@ -44,10 +50,11 @@ export interface PaymentInfo {
   company_code: string; direction: Dir; doc_entry: number; doc_num: number; doc_no: string; doc_type: string | null; doc_date: string;
   card_code: string | null; card_name: string | null; currency: string | null; total: number; cash: number | null; transfer: number | null; cheque: number | null;
   card: number | null; on_account: number | null; cancelled: boolean; trans_id: number | null; memo: string | null; source: string;
+  fx_rate?: number | null; total_fc?: number | null; on_account_fc?: number | null; fx_diff?: number | null;
   transfer_bank: string | null; transfer_bank_name: string | null; transfer_ref: string | null; cheque_bank: string | null; card_ref: string | null; draft_id: number | null;
   created_by_name: string | null; created_at: string | null; cancelled_at: string | null; cancel_note: string | null; cancel_trans_id: number | null;
   can_read_journal: boolean; can_cancel: boolean; cancel_block: string | null;
-  allocations: Array<{ line_no: number; obj_type: number; doc_entry: number; doc_no: string | null; applied: number; doc_total: number | null; doc_date: string | null }>;
+  allocations: Array<{ line_no: number; obj_type: number; doc_entry: number; doc_no: string | null; applied: number; applied_fc?: number | null; doc_total: number | null; doc_date: string | null }>;
   cheques: Array<{ cheque_id: number; cheque_no: string; bank_name: string | null; due_date: string; amount: number; post_dated: boolean; deposit_id: number | null; deposit_no: string | null }>;
   activity: Activity[];
 }
@@ -63,7 +70,7 @@ export interface StatementInfo {
   from_date: string | null; to_date: string | null; lines_imported: number; lines_skipped: number; imported_at: string; imported_by_name: string | null;
   currency: string; can_write: boolean; match_days: number | null; lines: StatementLine[];
 }
-export interface Candidate { trans_id: number; line_id: number; ref_date: string; amount: number; memo: string | null; ref1: string | null; days: number; source: JlSource | null }
+export interface Candidate { trans_id: number; line_id: number; ref_date: string; amount: number; memo: string | null; ref1: string | null; days: number; source: JlSource | null; ref_match?: boolean }
 export interface CashPosition {
   company_code: string; currency: string; as_of: string; total: number;
   accounts: Array<{ bank_code: string; name: string; kind: 'bank' | 'cash'; acct_code: string; bank_name: string | null; iban: string | null; currency: string | null;
@@ -104,7 +111,7 @@ export const useCashPosition = (company: string | null) => useQuery({
 });
 
 /** The header as the database expects it (numbers as strings are parsed and checked there). */
-const header = (h: PayHeaderInput) => ({ ...h, cheques: h.cheques.filter((c) => c.cheque_no.trim() || c.amount.trim() || c.due_date) });
+const header = (h: PayHeaderInput) => ({ ...h, currency: h.currency || null, fx_rate: h.fx_rate || null, cheques: h.cheques.filter((c) => c.cheque_no.trim() || c.amount.trim() || c.due_date) });
 export const payChecks = (company: string, dir: Dir, h: PayHeaderInput, lines: PayLineInput[]) =>
   rpc<PayEval>('payment_checks', { p_company: company, p_dir: dir, p_header: header(h), p_lines: lines });
 export const paySubmit = (company: string, dir: Dir, h: PayHeaderInput, lines: PayLineInput[], reason: string | null, series: number | null = null) =>

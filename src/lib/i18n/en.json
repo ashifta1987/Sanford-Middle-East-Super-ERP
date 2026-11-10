@@ -1632,7 +1632,10 @@
     "receivedBy": "Received by (name, signature, date)",
     "footer": "Printed from Super ERP",
     "sapCopy": "Copy of a SAP Business One document, for reference.",
-    "sampleCopy": "Sample test data — not a real document."
+    "sampleCopy": "Sample test data — not a real document.",
+    "rate": "Exchange rate",
+    "vatLocal": "VAT",
+    "totalLocal": "Total"
   },
   "bk": {
     "newIn": "New incoming payment",
@@ -1913,7 +1916,8 @@
       "bank_statement_match": "Matched by hand",
       "bank_statement_unmatch": "Match removed",
       "counts": "{{n}} matched, {{left}} left"
-    }
+    },
+    "refFits": "Reference fits"
   },
   "pu": {
     "back": "Purchasing",
@@ -2689,7 +2693,8 @@
       "validTo": "Valid to",
       "empty": "No trademarks migrated yet",
       "emptyBody": "They appear after the SAP migration of this company."
-    }
+    },
+    "groupMethod": "This item group manages its items by {{method}}."
   },
   "hr": {
     "add": "Add",
@@ -3551,7 +3556,9 @@
       "avg_cost": "Average cost",
       "value": "Value",
       "group_name": "Item group",
-      "section": "Section"
+      "section": "Section",
+      "currency": "Currency",
+      "total_fc": "Open in currency"
     },
     "section": {
       "assets": "Assets",
@@ -4730,5 +4737,22 @@
       "note_other": "{{count}} moulds are kept on the moulds screen.",
       "moulds": "Moulds and machines"
     }
+  },
+  "cur": {
+    "currency": "Currency",
+    "allCurrencies": "This partner may use any currency of the rates list.",
+    "rate": "Exchange rate ({{local}} per 1 {{cur}})",
+    "kept": "Kept from the document it is copied from.",
+    "listRate": "Rate on {{date}}: {{rate}}. Leave it empty to use it.",
+    "overridden": "changed by Financials",
+    "listRateRo": "From Exchange Rates for {{date}}.",
+    "totalLc": "Total {{cur}}",
+    "atRate": "at {{rate}}",
+    "currencyRate": "{{cur}} at {{rate}} {{local}}",
+    "otherCurrencyDocs": "{{n}} open documents in another currency: choose that currency to pay them.",
+    "rateLabel": "Currency and rate",
+    "fxDiff": "Exchange rate difference",
+    "gain": "gain",
+    "loss": "loss"
   }
 }

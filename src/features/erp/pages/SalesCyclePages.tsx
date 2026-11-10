@@ -24,6 +24,8 @@ import {
   useAtpRules, useDocView, type AtpCheck, type AtpRule, type CopyLine,
 } from '../salesCycle';
 import { DocHeader, SourcePill, Totals, fmtWhen, sourceLabel, today } from './SalesOrderPages';
+import { CurrencyFields } from '../components/CurrencyFields';
+import { docAmt, fmtRate, isFcDoc, lineAmt, useLocalCurrency, useRate } from '../currency';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type CycleKind = 'delivery' | 'ar_invoice' | 'ar_credit_note';
@@ -116,6 +118,12 @@ function PickTable({ rows, setRows, warehouses, showStock, showBase }: {
   );
 }
 
+/** LC equivalent of a total in a foreign currency at a rate (an estimate before the server rounds each line). */
+function lcOf(total: number, cur: string | null | undefined, local: string, rate: number | null | undefined) {
+  if (!cur || !local || cur === local || rate == null) return null;
+  return { total: r2(total * Number(rate)), currency: local, rate };
+}
+
 function pickTotals(rows: PickRow[]) {
   let before = 0; let net = 0; let vat = 0;
   for (const r of rows) {
@@ -152,6 +160,7 @@ export function DeliveryNewPage() {
   const [params] = useSearchParams();
   const company = params.get('company') ?? '';
   const order = Number(params.get('order')) || null;
+  const localCur = useLocalCurrency(company);
   const { canWrite, readOnlyReason } = useModuleLevel('sales');
   const setup = useSoSetup(company || null, 17);
   const q = useQuery({ queryKey: ['copy', company, 17, order], enabled: Boolean(company && order), queryFn: () => copySource(company, 17, order) });
@@ -211,11 +220,12 @@ export function DeliveryNewPage() {
             <input id="sc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} />
           </label>
           <SeriesPicker company={company} obj={15} value={series} onChange={setSeries} date={date} />
+          <CurrencyFields company={company} date={date} currency={h.currency} rate="" idPrefix="sc" locked keepRate={h.currency !== localCur ? h.fx_rate ?? null : null} />
         </div>
       </SectionCard>
       <SectionCard title={t('sc.linesToDeliver')}>
         <PickTable rows={rows} setRows={setRows} warehouses={setup.data?.warehouses} showStock />
-        <div className="flex justify-end border-t border-line"><Totals {...tot} currency={h.currency} /></div>
+        <div className="flex justify-end border-t border-line"><Totals {...tot} currency={h.currency} lc={lcOf(tot.total, h.currency, localCur, h.fx_rate)} /></div>
       </SectionCard>
     </CreateShell>
   );
@@ -252,7 +262,16 @@ export function InvoiceNewPage() {
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open.data) setRows(pickRows(open.data.lines, (l) => (delivery ? l.base_doc_entry === delivery : false))); }, [open.data, delivery]);
   const S = setup.data;
-  const currency = S?.currency ?? '';
+  const localCur = useLocalCurrency(company);
+  // B4: copied deliveries keep their currency (the invoice takes its own date's rate); service-only invoices use the customer's.
+  const baseCur = rows.find((r) => r.sel)?.line.currency ?? first.data?.header?.currency ?? null;
+  const [docCurPick, setDocCurPick] = useState('');
+  const [fxRate, setFxRate] = useState('');
+  const bpCur = customer?.currency ?? null;
+  const docCur = baseCur ?? (docCurPick || (bpCur && bpCur !== '##' ? bpCur : localCur));
+  const rateQ = useRate(company || null, docCur, date);
+  const docRate = docCur === localCur ? 1 : fxRate !== '' ? Number(fxRate) : rateQ.data?.rate ?? null;
+  const currency = docCur || S?.currency || '';
   const defTax = S?.default_tax_code ?? '';
   const rate = (code: string) => Number(S?.tax_codes.find((x) => x.code === code)?.rate ?? 0);
   const priceList = customer?.price_list ?? null;
@@ -281,7 +300,8 @@ export function InvoiceNewPage() {
     if (!sel.length && !svcFilled.length) { setErr(t('sc.chooseLines')); return; }
     setBusy(true);
     try {
-      const res = await invoiceCreate(company, { card_code: card, doc_date: date, due_date: due || null, customer_ref: ref, comments, approval_reason: why || null }, [
+      const res = await invoiceCreate(company, { card_code: card, doc_date: date, due_date: due || null, customer_ref: ref, comments, approval_reason: why || null,
+        currency: baseCur ? null : docCurPick || null, fx_rate: fxRate || null }, [
         ...sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })),
         ...svcFilled.map((l) => ({ item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, discount_pct: l.disc === '' ? null : l.disc, tax_code: l.tax_code || null })),
       ], series);
@@ -339,6 +359,8 @@ export function InvoiceNewPage() {
             <input id="sc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} />
           </label>
           <SeriesPicker company={company} obj={13} value={series} onChange={setSeries} date={date} />
+          <CurrencyFields company={company} date={date} bpCurrency={baseCur ? null : bpCur} currency={docCur} idPrefix="sc" locked={Boolean(baseCur)}
+            onCurrency={baseCur ? undefined : setDocCurPick} rate={fxRate} onRate={setFxRate} />
           <label className="block text-xs font-medium text-muted sm:col-span-2 xl:col-span-3">{t('sreq.reasonField')}
             <input id="sc-approval-reason" className="input mt-1 text-[15px] text-ink" dir="auto" value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sreq.reasonPhInvoice')} />
           </label>
@@ -391,7 +413,7 @@ export function InvoiceNewPage() {
               <Plus className="h-4 w-4" aria-hidden /> {t('sc.addService')}
             </Button>
           </div>
-          <Totals {...tot} currency={currency} />
+          <Totals {...tot} currency={currency} lc={lcOf(tot.total, currency, localCur, docRate)} />
         </div>
       </SectionCard>
     </CreateShell>
@@ -406,6 +428,7 @@ export function CreditMemoNewPage() {
   const [params] = useSearchParams();
   const company = params.get('company') ?? '';
   const invoice = Number(params.get('invoice')) || null;
+  const localCur = useLocalCurrency(company);
   const { canWrite, readOnlyReason } = useModuleLevel('sales');
   const setup = useSoSetup(company || null, 17);
   const q = useQuery({ queryKey: ['copy', company, 13, invoice], enabled: Boolean(company && invoice), queryFn: () => copySource(company, 13, invoice) });
@@ -480,6 +503,7 @@ export function CreditMemoNewPage() {
             </label>
           )}
           <SeriesPicker company={company} obj={14} value={series} onChange={setSeries} date={date} />
+          <CurrencyFields company={company} date={date} currency={h.currency} rate="" idPrefix="sc" locked keepRate={h.currency !== localCur ? h.fx_rate ?? null : null} />
           <label className="block text-xs font-medium text-muted sm:col-span-2">{t('sreq.reasonField')}
             <input id="sc-approval-reason" className="input mt-1 text-[15px] text-ink" dir="auto" value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sreq.reasonPhCredit')} />
           </label>
@@ -487,7 +511,7 @@ export function CreditMemoNewPage() {
       </SectionCard>
       <SectionCard title={t('sc.linesToCredit')}>
         <PickTable rows={rows} setRows={setRows} />
-        <div className="flex justify-end border-t border-line"><Totals {...tot} currency={h.currency} /></div>
+        <div className="flex justify-end border-t border-line"><Totals {...tot} currency={h.currency} lc={lcOf(tot.total, h.currency, localCur, h.fx_rate)} /></div>
       </SectionCard>
     </CreateShell>
   );
@@ -516,6 +540,7 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
   const view = useDocView(company, obj, id);
   const V = view.data;
   const d = q.data?.doc;
+  const localCur = useLocalCurrency(company);
 
   let body: ReactNode = null;
   if (q.isLoading || view.isLoading) body = <PageLoading />;
@@ -526,8 +551,9 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
   const lines = q.data!.lines;
   const docNo = V?.doc_no ?? String(d!.doc_num);
   const title = t(`sc.title.${kind}`, { no: docNo });
+  const isFc = isFcDoc(d, localCur);
   const before = lines.reduce((s, l) => s + r2(Number(l.quantity ?? 0) * Number(l.price ?? 0)), 0);
-  const net = lines.reduce((s, l) => s + Number(l.line_total ?? 0), 0);
+  const net = lines.reduce((s, l) => s + lineAmt(l, isFc), 0);
   const showOpen = kind !== 'ar_credit_note' && d!.source === 'erp';
   const copy = kind === 'delivery' ? { label: t('sc.copyToInvoice'), to: `/docs/ar_invoice/new?company=${company}&delivery=${id}` }
     : kind === 'ar_invoice' ? { label: t('sc.copyToCreditMemo'), to: `/docs/ar_credit_note/new?company=${company}&invoice=${id}` } : null;
@@ -559,6 +585,7 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
               [kind === 'ar_invoice' ? t('erp.col.dueDate') : t('sc.docDate'), fmtDay(kind === 'ar_invoice' ? d!.due_date : d!.tax_date ?? d!.doc_date)],
               [t('erp.col.warehouse'), whs || null],
               [t('erp.col.customerRef'), d!.customer_ref],
+              [t('cur.currency'), isFc ? t('cur.currencyRate', { cur: d!.currency, rate: fmtRate(d!.fx_rate), local: localCur }) : d!.currency],
               [t('erp.col.remarks'), d!.comments],
               ...(kind === 'ar_credit_note' ? [[t('sc.returnStock'), V?.return_stock ? t('erp.yes') : t('erp.no')] as [string, ReactNode]] : []),
               [t('erp.col.source'), sourceLabel(d!.source)],
@@ -588,14 +615,15 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
                         {showOpen && <td className="num px-4 py-2.5 text-end max-sm:hidden" data-testid="sc-open-qty">{fmtQty(l.line_status === 'C' ? 0 : l.open_qty)}</td>}
                         <td className="num px-4 py-2.5 text-end max-sm:hidden">{fmtMoney(l.price)}</td>
                         <td className="num px-4 py-2.5 text-end max-md:hidden">{Number(l.discount_pct) ? `${fmtQty(l.discount_pct)}%` : '—'}</td>
-                        <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(l.line_total)}</td>
+                        <td className="num px-4 py-2.5 text-end font-medium">{fmtMoney(lineAmt(l, isFc))}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="flex justify-end"><Totals before={r2(before)} discount={r2(before - net)} vat={Number(d!.vat_total ?? 0)} total={Number(d!.total ?? 0)} currency={d!.currency ?? ''} /></div>
+            <div className="flex justify-end"><Totals before={r2(before)} discount={r2(before - net)} vat={docAmt(d!, 'vat_total', isFc)} total={docAmt(d!, 'total', isFc)} currency={d!.currency ?? ''}
+              lc={isFc ? { total: Number(d!.total ?? 0), currency: localCur, rate: d!.fx_rate } : null} /></div>
           </SectionCard>
         </div>
         <aside className="min-w-0 space-y-5">
@@ -699,6 +727,7 @@ export function SalesPrintPage() {
             {(P.doc.base_docs?.length ?? 0) > 0 && <><dt className="text-muted">{both('print.basedOn')}</dt><dd className="text-end font-mono">{P.doc.base_docs!.join(', ')}</dd></>}
             {P.doc.salesperson && <><dt className="text-muted">{both('print.salesperson')}</dt><dd className="text-end">{P.doc.salesperson}</dd></>}
             <dt className="text-muted">{both('print.currency')}</dt><dd className="text-end">{cur}</dd>
+            {P.doc.fx_rate != null && <><dt className="text-muted">{both('print.rate')}</dt><dd className="num text-end">{fmtRate(P.doc.fx_rate)} {P.company.currency}</dd></>}
           </dl>
         </section>
 
@@ -755,6 +784,10 @@ export function SalesPrintPage() {
               <dt className="text-muted">{both('print.vat')}</dt><dd className="text-end">{fmtMoney(P.doc.vat_total)}</dd>
               <dt className="border-t-2 border-ink pt-1 text-[15px] font-semibold">{both('print.total')} ({cur})</dt>
               <dd className="border-t-2 border-ink pt-1 text-end text-[15px] font-semibold" data-testid="print-total">{fmtMoney(P.doc.total)}</dd>
+              {P.doc.fx_rate != null && <>
+                <dt className="text-muted">{both('print.vatLocal')} ({P.company.currency})</dt><dd className="text-end">{fmtMoney(P.doc.vat_total_lc)}</dd>
+                <dt className="text-muted">{both('print.totalLocal')} ({P.company.currency})</dt><dd className="text-end" data-testid="print-total-lc">{fmtMoney(P.doc.total_lc)}</dd>
+              </>}
             </dl>
           </section>
         )}

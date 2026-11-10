@@ -515,7 +515,8 @@ function MatchDialog({ company, line, currency, onClose, onDone }: { company: st
           {c.data.map((x) => (
             <li key={`${x.trans_id}-${x.line_id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
               <div className="min-w-0">
-                <div><span className="font-mono text-[13px]">{x.trans_id}</span> · {fmtDay(x.ref_date)} {x.source?.doc_no && <span className="font-mono text-[13px] text-muted">· {x.source.doc_no}</span>}</div>
+                <div><span className="font-mono text-[13px]">{x.trans_id}</span> · {fmtDay(x.ref_date)} {x.source?.doc_no && <span className="font-mono text-[13px] text-muted">· {x.source.doc_no}</span>}
+                  {x.ref_match && <span className="pill pill-ok ms-2" data-testid="cand-ref-match">{t('bk.refFits')}</span>}</div>
                 <div dir="auto" className="truncate text-xs text-muted">{x.memo}</div>
               </div>
               <Button variant="secondary" className="min-h-[40px] shrink-0" onClick={() => go(x)}>{t('bk.matchThis')}</Button>

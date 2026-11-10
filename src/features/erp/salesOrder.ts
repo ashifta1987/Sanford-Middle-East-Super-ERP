@@ -33,11 +33,11 @@ export interface SoCheck {
   rule_code: RuleCode; step: number; approver_position: string; approver_name: string;
   line: number | null; value: number; limit: number; message: string;
 }
-export interface SoTotals { before_discount: number; discount: number; net: number; vat: number; total: number; currency: string }
-export interface SoCredit { limit: number | null; balance: number; open_orders: number; this_order: number; left: number | null }
+export interface SoTotals { before_discount: number; discount: number; net: number; vat: number; total: number; currency: string; rate?: number | null; local_currency?: string; total_lc?: number | null; rate_overridden?: boolean }
+export interface SoCredit { limit: number | null; balance: number; open_orders: number; this_order: number; left: number | null; currency?: string }
 export interface AtpInfo { available: number | null; date: string; rule_code: string; no_check: boolean; on_hand?: number; committed?: number; purchase_orders?: number; transfers?: number }
 export interface AtpShort { line: number; item_code: string; whs_code: string; qty: number; available: number; date: string; message: string }
-export interface SoEvalLine { line_num: number; item_code: string; atp: AtpInfo | null; is_stock: boolean }
+export interface SoEvalLine { line_num: number; item_code: string; atp: AtpInfo | null; is_stock: boolean; price?: number | null; line_total?: number | null }
 export interface SoEval { errors: SoProblem[]; checks: SoCheck[]; totals: SoTotals; credit: SoCredit | null; atp?: AtpShort[]; lines?: SoEvalLine[] }
 export interface SoApproval {
   approval_id: number; step: number; rule_code: RuleCode; approver_position: string; approver_position_name: string;
@@ -69,6 +69,8 @@ export interface Inbox { is_approver: boolean; waiting: InboxRow[]; sent: InboxR
 export interface SoHeaderInput {
   card_code: string; doc_date: string; due_date: string; price_list: number | ''; payment_terms: number | ''; slp_code: number | '';
   whs_code: string; customer_ref: string; comments: string;
+  /** B4: document currency ('' = the customer's own) and a typed rate ('' = the posting date's rate; Financials only). */
+  currency?: string; fx_rate?: string;
 }
 export interface SoLineInput {
   item_code: string; qty: string; price: string; discount_pct: string; tax_code: string;
@@ -84,7 +86,7 @@ export const toLinesPayload = (lines: SoLineInput[]) =>
   }));
 export const toHeaderPayload = (h: SoHeaderInput) => ({
   ...h, price_list: h.price_list === '' ? null : h.price_list, payment_terms: h.payment_terms === '' ? null : h.payment_terms,
-  slp_code: h.slp_code === '' ? null : h.slp_code, due_date: h.due_date || null,
+  slp_code: h.slp_code === '' ? null : h.slp_code, due_date: h.due_date || null, currency: h.currency || null, fx_rate: h.fx_rate || null,
 });
 
 export function useSoSetup(company: string | null, obj = 17) {

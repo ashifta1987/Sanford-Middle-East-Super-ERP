@@ -263,6 +263,49 @@ t = patch(t, """'whs_code', w.whs_code, 'china_office', w.china_office, 'custome
                                  'currency', d.currency, 'fx_rate', d.fx_rate),""", label='pd stored')
 add('_pd_stored', '21_purchasing.sql', ln, t + "\n-- B4: + currency and rate.")
 
+# ---- print sheet in the document currency (VAT also in LC)
+t, ln = extract('19_sales_cycle.sql', 'erp.sales_print_data(')
+t = patch(t, """  bp erp.business_partner;
+BEGIN""", """  bp erp.business_partner;
+  v_fc boolean;
+BEGIN""", label='spd decl')
+t = patch(t, """  SELECT * INTO bp FROM erp.business_partner WHERE company_code = p_company AND card_code = d.card_code;
+""", """  SELECT * INTO bp FROM erp.business_partner WHERE company_code = p_company AND card_code = d.card_code;
+  v_fc := d.total_fc IS NOT NULL AND d.total_fc <> 0 AND d.currency IS DISTINCT FROM c.currency;
+""", label='spd fc')
+t = patch(t, """'customer_ref', d.customer_ref, 'comments', d.comments, 'total', d.total,
+                              'vat_total', d.vat_total, 'currency', d.currency,""", """'customer_ref', d.customer_ref, 'comments', d.comments,
+                              'total', CASE WHEN v_fc THEN d.total_fc ELSE d.total END, 'vat_total', CASE WHEN v_fc THEN d.vat_total_fc ELSE d.vat_total END,
+                              'currency', d.currency, 'fx_rate', CASE WHEN v_fc THEN d.fx_rate END, 'total_lc', d.total, 'vat_total_lc', d.vat_total,""", label='spd doc')
+t = patch(t, """'discount_pct', l.discount_pct, 'line_total', l.line_total, 'tax_code', l.tax_code,
+                                                          'vat', l.vat, 'whs_code', l.whs_code)""", """'discount_pct', l.discount_pct, 'line_total', CASE WHEN v_fc THEN l.line_total_fc ELSE l.line_total END, 'tax_code', l.tax_code,
+                                                          'vat', CASE WHEN v_fc THEN l.vat_fc ELSE l.vat END, 'whs_code', l.whs_code)""", label='spd lines')
+t = patch(t, """sum(l.line_total) AS net, sum(l.vat) AS vat""", """sum(CASE WHEN v_fc THEN l.line_total_fc ELSE l.line_total END) AS net, sum(CASE WHEN v_fc THEN l.vat_fc ELSE l.vat END) AS vat""", label='spd vat')
+add('sales_print_data', '19_sales_cycle.sql', ln, t + "\n-- B4: amounts in the document currency; total_lc / vat_total_lc and the rate for foreign-currency documents.")
+
+# ---- GRPO / deposit / A/P invoice page in the document currency
+t, ln = extract('21_purchasing.sql', 'erp.purchase_view(')
+t = patch(t, """    'gross', CASE WHEN p_obj = 18 THEN (SELECT coalesce(sum(line_total + coalesce(vat, 0)), 0) FROM erp.document_line""",
+          """    'gross', CASE WHEN p_obj = 18 THEN (SELECT coalesce(sum(CASE WHEN d.total_fc IS NOT NULL THEN coalesce(line_total_fc, 0) + coalesce(vat_fc, 0) ELSE line_total + coalesce(vat, 0) END), 0) FROM erp.document_line""", label='pv gross')
+t = patch(t, """    'open_amount', CASE WHEN p_obj IN (18, 204) AND d.source = 'erp' THEN erp._bk_doc_open(p_company, p_obj, p_doc_entry) END,""",
+          """    'open_amount', CASE WHEN p_obj IN (18, 204) AND d.source = 'erp' THEN coalesce(erp._bk_doc_open_fc(p_company, p_obj, p_doc_entry), erp._bk_doc_open(p_company, p_obj, p_doc_entry)) END,
+    'open_amount_lc', CASE WHEN p_obj IN (18, 204) AND d.source = 'erp' THEN erp._bk_doc_open(p_company, p_obj, p_doc_entry) END,""", label='pv open')
+t = patch(t, """                                                                                      'amount', x.amount) ORDER BY x.dp_entry)""",
+          """                                                                                      'amount', coalesce(x.amount_fc, x.amount), 'amount_lc', x.amount) ORDER BY x.dp_entry)""", label='pv draws')
+t = patch(t, """                                                                                          'amount', x.amount) ORDER BY x.invoice_entry)""",
+          """                                                                                          'amount', coalesce(x.amount_fc, x.amount), 'amount_lc', x.amount) ORDER BY x.invoice_entry)""", label='pv drawn_by')
+add('purchase_view', '21_purchasing.sql', ln, t + "\n-- B4: gross, open amount and draws in the document currency (open_amount_lc / amount_lc in LC).")
+
+# ---- purchase order page: deposits in the order's currency
+t, ln = extract('31_approvals.sql', 'erp.purchase_doc_info(')
+t = patch(t, """      SELECT jsonb_agg(jsonb_build_object('doc_entry', dd.doc_entry, 'doc_no', dw.doc_no, 'doc_date', dd.doc_date, 'total', dd.total, 'paid', coalesce(dd.paid, 0),
+               'drawn', (SELECT coalesce(sum(x.amount), 0) FROM erp.ap_dp_draw x WHERE x.company_code = dd.company_code AND x.dp_entry = dd.doc_entry),""",
+          """      SELECT jsonb_agg(jsonb_build_object('doc_entry', dd.doc_entry, 'doc_no', dw.doc_no, 'doc_date', dd.doc_date,
+               'total', CASE WHEN dd.total_fc IS NOT NULL THEN dd.total_fc ELSE dd.total END,
+               'paid', CASE WHEN dd.total_fc IS NOT NULL THEN coalesce(dd.paid_fc, 0) ELSE coalesce(dd.paid, 0) END, 'currency', dd.currency, 'fx_rate', dd.fx_rate,
+               'drawn', (SELECT coalesce(sum(CASE WHEN dd.total_fc IS NOT NULL THEN x.amount_fc ELSE x.amount END), 0) FROM erp.ap_dp_draw x WHERE x.company_code = dd.company_code AND x.dp_entry = dd.doc_entry),""", label='pdi deposits')
+add('purchase_doc_info', '31_approvals.sql', ln, t + "\n-- B4: deposits in the order's currency.")
+
 # ---- purchasing evaluator
 t, ln = extract('31_approvals.sql', 'erp._pd_eval(')
 t = patch(t, """  r        record;
@@ -708,6 +751,19 @@ t = patch(t, """                                  'doc_date', d.doc_date, 'due_d
                                   'open', coalesce(erp._bk_doc_open_fc(p_company, d.obj_type, d.doc_entry), erp._bk_doc_open(p_company, d.obj_type, d.doc_entry)),
                                   'open_lc', erp._bk_doc_open(p_company, d.obj_type, d.doc_entry),""", label='pod docs')
 add('payment_open_docs', '20_banking.sql', ln, t + "\n-- B4: each document's currency; total and open in that currency (open_lc / total_lc in LC).")
+
+t, ln = extract('20_banking.sql', 'erp.payment_info(')
+t = patch(t, """'doc_no', erp._sd_no(p_company, a.target_obj_type, a.target_doc_entry), 'applied', a.applied,""",
+          """'doc_no', erp._sd_no(p_company, a.target_obj_type, a.target_doc_entry), 'applied', a.applied, 'applied_fc', a.applied_fc,""", label='pi alloc')
+add('payment_info', '20_banking.sql', ln, t + "\n-- B4: + applied_fc.")
+
+# ---- item form: each item group's batch / serial method (B3 follow-up: the form prefills it)
+t, ln = extract('23_master_data.sql', 'erp.master_data_setup(')
+t = patch(t, """    'item_groups', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', group_code, 'name', name) ORDER BY group_code), '[]'::jsonb)""",
+          """    'item_groups', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', group_code, 'name', name,
+                                     'manage_method', (SELECT s.manage_method FROM erp.item_group_setting s
+                                                        WHERE s.company_code = item_group.company_code AND s.group_code = item_group.group_code)) ORDER BY group_code), '[]'::jsonb)""", label='mds groups')
+add('master_data_setup', '23_master_data.sql', ln, t + "\n-- B4: item groups carry their management method (none / batch / serial) for the item form.")
 
 # ================================================================ health
 t, ln = extract('32_gl_setup.sql', 'erp._health_files(')

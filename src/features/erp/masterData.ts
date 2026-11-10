@@ -11,7 +11,7 @@ export interface MdRule { rule_code: string; step: number; approver_position: st
 export interface MdSetup {
   company_currency: string; company_country: string; currencies: string[];
   bp_groups: Array<Code & { kind: 'C' | 'S' | null }>; payment_terms: Code[]; price_lists: Code[]; salespeople: Code[];
-  item_groups: Code[]; brands: Code[]; tax_codes: Array<Code<string> & { rate: number }>; uoms: string[]; sourcing_types: string[];
+  item_groups: Array<Code & { manage_method?: 'none' | 'batch' | 'serial' | null }>; brands: Code[]; tax_codes: Array<Code<string> & { rate: number }>; uoms: string[]; sourcing_types: string[];
   bp_required: string[]; item_required: string[]; dup_name_similarity: number;
   numbering: Partial<Record<BpKind, string>> | null;
   credit_approvers: MdRule[]; bank_approvers: MdRule[];

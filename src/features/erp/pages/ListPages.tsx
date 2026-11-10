@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { erp } from '@/lib/supabase';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
 import { LiveBadge, PageTitle, StatusTag, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
+import { lcLabel, useLocalCurrencies } from '../currency';
 import { RequireModule } from '../components/Guard';
 import { DOC_KINDS, moduleByKey, type DocKind, type ModuleKey } from '../modules';
 import type { Row } from '../api';
@@ -107,6 +108,7 @@ export function ItemsPage() {
 // ---------- Documents (all 19 SAP marketing / inventory document types) ----------
 export function DocumentsPage() {
   const { t } = useTranslation();
+  const localOf = useLocalCurrencies();
   const { kind = '' } = useParams();
   const def = DOC_KINDS[kind as DocKind];
   // Sales orders read sales_order_list (17); quotations, deliveries, invoices and credit memos read sales_doc_list (19): both carry
@@ -154,7 +156,7 @@ export function DocumentsPage() {
         csv: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? r.state : r.status) },
       ...(pu ? [{ key: 'china_office', header: t('pu.office'), hideBelow: 'lg' as const, cell: (r: R) => r.china_office ?? '—' }] : []),
       ...(so ? [{ key: 'source', header: t('erp.col.source'), hideBelow: 'lg' as const, cell: (r: R) => (r.source === 'erp' ? 'Super ERP' : r.source === 'sap' ? 'SAP' : t('erp.sampleData')) }] : []),
-      { key: 'total', header: t('erp.col.total'), align: 'end', cell: (r) => fmtMoney(r.total, r.currency) },
+      { key: 'total', header: t('erp.col.total'), align: 'end', cell: (r) => lcLabel(r.total, r.currency, localOf(r.company_code), fmtMoney) },
       ...(kind.endsWith('invoice') ? [{ key: 'paid', header: t('erp.col.openAmount'), align: 'end' as const, sortable: false,
         cell: (r: R) => fmtMoney(Number(r.total) - Number(r.paid ?? 0)), csv: (r: R) => Number(r.total) - Number(r.paid ?? 0) }] : []),
     ],

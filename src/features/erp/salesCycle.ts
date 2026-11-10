@@ -22,13 +22,15 @@ export interface CopyLine {
   item_code: string; description: string | null; uom: string | null; quantity: number; open_qty: number; price: number; discount_pct: number | null;
   tax_code: string | null; tax_rate: number | null; whs_code: string | null; line_total: number; vat: number; cost: number | null; is_stock: boolean;
   on_hand: number | null;
+  /** B4: the base document's currency and rate. */
+  currency?: string | null; fx_rate?: number | null; line_total_fc?: number | null; vat_fc?: number | null;
 }
 export interface CopySource {
   obj_type: number;
   header: {
     doc_entry: number; doc_no: string; card_code: string; card_name: string | null; doc_date: string; due_date: string | null;
     price_list: number | null; payment_terms: number | null; slp_code: number | null; whs_code: string | null; customer_ref: string | null;
-    comments: string | null; currency: string;
+    comments: string | null; currency: string; fx_rate?: number | null;
   } | null;
   lines: CopyLine[];
 }
@@ -98,6 +100,8 @@ export interface PrintData {
   doc: {
     obj_type: number; doc_no: string; doc_date: string; due_date: string | null; customer_ref: string | null; comments: string | null; total: number;
     vat_total: number; currency: string; status: string; source: string; salesperson: string | null; base_docs: string[] | null;
+    /** B4: foreign-currency documents: amounts above are in the document currency; these are LC. */
+    fx_rate?: number | null; total_lc?: number | null; vat_total_lc?: number | null;
   };
   lines: Array<{ line_num: number; item_code: string; description: string | null; foreign_name: string | null; qty: number; uom: string | null; price: number;
     discount_pct: number | null; line_total: number; tax_code: string | null; vat: number; whs_code: string | null }>;

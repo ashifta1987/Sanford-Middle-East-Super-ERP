@@ -1462,6 +1462,234 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
 $$;
 -- B4: + currency and rate.
 
+-- ---- sales_print_data: copied from 19_sales_cycle.sql:1986.
+CREATE OR REPLACE FUNCTION erp.sales_print_data(p_company varchar, p_obj integer, p_doc_entry integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  u  erp.app_user;
+  d  erp.document;
+  c  erp.company;
+  bp erp.business_partner;
+  v_fc boolean;
+BEGIN
+  u := erp._so_guard(p_company, false);
+  IF p_obj IS NULL OR p_obj NOT IN (23, 17, 15, 13, 14) THEN
+    RAISE EXCEPTION 'Printing works for quotations, orders, deliveries, invoices and credit memos.' USING ERRCODE = 'P0001';
+  END IF;
+  SELECT * INTO d FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO c FROM erp.company WHERE company_code = p_company;
+  SELECT * INTO bp FROM erp.business_partner WHERE company_code = p_company AND card_code = d.card_code;
+  v_fc := d.total_fc IS NOT NULL AND d.total_fc <> 0 AND d.currency IS DISTINCT FROM c.currency;
+  RETURN jsonb_build_object(
+    'company', jsonb_build_object('code', c.company_code, 'legal_name', c.legal_name, 'short_name', c.short_name, 'tax_id', c.tax_id,
+                                  'licence_authority', c.licence_authority, 'country', c.country, 'currency', c.currency),
+    'customer', jsonb_build_object('card_code', d.card_code, 'name', coalesce(bp.name, d.card_name), 'foreign_name', bp.foreign_name,
+                                   'trn', bp.trn, 'phone', coalesce(bp.phone, bp.mobile), 'email', bp.email, 'city', bp.city, 'country', bp.country,
+                                   'address', (SELECT jsonb_build_object('street', a.street, 'block', a.block, 'building', a.building, 'city', a.city,
+                                                                         'country', a.country)
+                                                 FROM erp.bp_address a WHERE a.company_code = p_company AND a.card_code = d.card_code
+                                                ORDER BY (a.kind = 'B') DESC, a.address_name LIMIT 1)),
+    'doc', jsonb_build_object('obj_type', d.obj_type, 'doc_no', erp._sd_no(p_company, p_obj, p_doc_entry), 'doc_date', d.doc_date,
+                              'due_date', d.due_date, 'customer_ref', d.customer_ref, 'comments', d.comments,
+                              'total', CASE WHEN v_fc THEN d.total_fc ELSE d.total END, 'vat_total', CASE WHEN v_fc THEN d.vat_total_fc ELSE d.vat_total END,
+                              'currency', d.currency, 'fx_rate', CASE WHEN v_fc THEN d.fx_rate END, 'total_lc', d.total, 'vat_total_lc', d.vat_total, 'status', d.status, 'source', d.source,
+                              'salesperson', (SELECT name FROM erp.salesperson WHERE company_code = p_company AND slp_code = d.slp_code),
+                              'base_docs', (SELECT jsonb_agg(DISTINCT erp._sd_no(p_company, l.base_obj_type, l.base_doc_entry))
+                                              FROM erp.document_line l WHERE l.company_code = p_company AND l.obj_type = p_obj
+                                               AND l.doc_entry = p_doc_entry AND l.base_doc_entry IS NOT NULL)),
+    'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('line_num', l.line_num, 'item_code', l.item_code, 'description', l.description,
+                                                          'foreign_name', i.foreign_name, 'qty', l.quantity, 'uom', l.uom, 'price', l.price,
+                                                          'discount_pct', l.discount_pct, 'line_total', CASE WHEN v_fc THEN l.line_total_fc ELSE l.line_total END, 'tax_code', l.tax_code,
+                                                          'vat', CASE WHEN v_fc THEN l.vat_fc ELSE l.vat END, 'whs_code', l.whs_code) ORDER BY l.line_num)
+                         FROM erp.document_line l LEFT JOIN erp.item i ON i.company_code = l.company_code AND i.item_code = l.item_code
+                        WHERE l.company_code = p_company AND l.obj_type = p_obj AND l.doc_entry = p_doc_entry), '[]'::jsonb),
+    'vat', coalesce((SELECT jsonb_agg(jsonb_build_object('tax_code', s.tax_code, 'rate', s.rate, 'net', s.net, 'vat', s.vat) ORDER BY s.tax_code)
+                       FROM (SELECT l.tax_code, max(t.rate) AS rate, sum(CASE WHEN v_fc THEN l.line_total_fc ELSE l.line_total END) AS net, sum(CASE WHEN v_fc THEN l.vat_fc ELSE l.vat END) AS vat
+                               FROM erp.document_line l LEFT JOIN erp.tax_code t ON t.company_code = l.company_code AND t.code = l.tax_code
+                              WHERE l.company_code = p_company AND l.obj_type = p_obj AND l.doc_entry = p_doc_entry GROUP BY l.tax_code) s), '[]'::jsonb));
+END $$;
+-- B4: amounts in the document currency; total_lc / vat_total_lc and the rate for foreign-currency documents.
+
+-- ---- purchase_view: copied from 21_purchasing.sql:2699.
+CREATE OR REPLACE FUNCTION erp.purchase_view(p_company varchar, p_obj integer, p_doc_entry integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  u      erp.app_user;
+  d      erp.document;
+  w      erp.doc_workflow;
+  v_open boolean;
+  v_wr   boolean;
+  v_obj  text := erp._pd_object(p_obj);
+BEGIN
+  u := erp._pd_guard(p_company, false);
+  IF p_obj IS NULL OR p_obj NOT IN (20, 204, 18) THEN
+    RAISE EXCEPTION 'This page shows goods receipts, A/P down payment invoices and A/P invoices only.' USING ERRCODE = 'P0001';
+  END IF;
+  SELECT * INTO d FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO w FROM erp.doc_workflow WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry;
+  v_open := EXISTS (SELECT 1 FROM erp.document_line WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry
+                       AND coalesce(line_status, 'O') = 'O' AND open_qty > 0);
+  v_wr := erp.can_write('purchase') OR erp.can_write('finance');
+  RETURN jsonb_build_object(
+    'workflow', w.doc_entry IS NOT NULL,
+    'source', d.source,
+    'doc_no', coalesce(w.doc_no, d.doc_num::text),
+    'status', d.status,
+    'china_office', w.china_office,
+    'created_by_name', (SELECT display_name FROM erp.app_user WHERE user_id = w.created_by),
+    'created_at', w.created_at,
+    'trans_id', (SELECT trans_id FROM erp.document_posting WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry),
+    'can_read_journal', erp.can_read('finance'),
+    'can_copy', d.source = 'erp' AND p_obj = 20 AND d.status = 'open' AND v_open AND v_wr,
+    'can_landed_cost', d.source = 'erp' AND p_obj = 20 AND d.status <> 'cancelled' AND v_wr,
+    'copy_block', CASE WHEN d.source <> 'erp' THEN 'source' WHEN d.status <> 'open' OR NOT v_open THEN 'closed' WHEN NOT v_wr THEN 'read_only' END,
+    'gross', CASE WHEN p_obj = 18 THEN (SELECT coalesce(sum(CASE WHEN d.total_fc IS NOT NULL THEN coalesce(line_total_fc, 0) + coalesce(vat_fc, 0) ELSE line_total + coalesce(vat, 0) END), 0) FROM erp.document_line
+                                          WHERE company_code = p_company AND obj_type = 18 AND doc_entry = p_doc_entry) END,
+    'open_amount', CASE WHEN p_obj IN (18, 204) AND d.source = 'erp' THEN coalesce(erp._bk_doc_open_fc(p_company, p_obj, p_doc_entry), erp._bk_doc_open(p_company, p_obj, p_doc_entry)) END,
+    'open_amount_lc', CASE WHEN p_obj IN (18, 204) AND d.source = 'erp' THEN erp._bk_doc_open(p_company, p_obj, p_doc_entry) END,
+    'draws', CASE WHEN p_obj = 18 THEN coalesce((SELECT jsonb_agg(jsonb_build_object('dp_entry', x.dp_entry, 'doc_no', erp._sd_no(p_company, 204, x.dp_entry),
+                                                                                      'amount', coalesce(x.amount_fc, x.amount), 'amount_lc', x.amount) ORDER BY x.dp_entry)
+                                                   FROM erp.ap_dp_draw x WHERE x.company_code = p_company AND x.invoice_entry = p_doc_entry), '[]'::jsonb) END,
+    'drawn_by', CASE WHEN p_obj = 204 THEN coalesce((SELECT jsonb_agg(jsonb_build_object('invoice_entry', x.invoice_entry, 'doc_no', erp._sd_no(p_company, 18, x.invoice_entry),
+                                                                                          'amount', coalesce(x.amount_fc, x.amount), 'amount_lc', x.amount) ORDER BY x.invoice_entry)
+                                                       FROM erp.ap_dp_draw x WHERE x.company_code = p_company AND x.dp_entry = p_doc_entry), '[]'::jsonb) END,
+    'po_doc_entry', CASE WHEN p_obj = 204 THEN (SELECT base_doc_entry FROM erp.document_line WHERE company_code = p_company AND obj_type = 204
+                                                  AND doc_entry = p_doc_entry AND base_obj_type = 22 LIMIT 1) END,
+    'landed_costs', CASE WHEN p_obj = 20 THEN coalesce((SELECT jsonb_agg(jsonb_build_object('doc_entry', lc.doc_entry, 'doc_no', lc.doc_no, 'total', lc.total) ORDER BY lc.doc_entry)
+                                                         FROM erp.landed_cost lc WHERE lc.company_code = p_company
+                                                          AND EXISTS (SELECT 1 FROM erp.landed_cost_line l WHERE l.company_code = lc.company_code
+                                                                         AND l.doc_entry = lc.doc_entry AND l.grpo_entry = p_doc_entry)), '[]'::jsonb) END,
+    'activity', coalesce((SELECT jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'actor_name', coalesce(au.display_name, l.actor), 'detail', l.detail)
+                                           ORDER BY l.at, l.audit_id)
+                            FROM erp.audit_log l LEFT JOIN erp.app_user au ON au.user_id::text = l.actor
+                           WHERE l.company_code = p_company AND l.object = v_obj AND l.object_ref = p_doc_entry::text), '[]'::jsonb));
+END $$;
+-- B4: gross, open amount and draws in the document currency (open_amount_lc / amount_lc in LC).
+
+-- ---- purchase_doc_info: copied from 31_approvals.sql:2872.
+CREATE OR REPLACE FUNCTION erp.purchase_doc_info(p_company varchar, p_obj integer, p_doc_entry integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  u        erp.app_user;
+  d        erp.document;
+  w        erp.doc_workflow;
+  st       erp.purchase_setting;
+  v_write  boolean;
+  v_step   smallint;
+  v_mine   boolean;
+  v_appr   boolean;
+  v_live_child boolean;
+  v_open   boolean;
+  v_obj    text := erp._pd_object(p_obj);
+  v_lastqc text;
+BEGIN
+  PERFORM erp._pd_check_obj(p_obj);
+  u := erp._pd_guard(p_company, false);
+  SELECT * INTO d FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO w FROM erp.doc_workflow WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry;
+  IF NOT FOUND THEN RETURN jsonb_build_object('workflow', false, 'source', d.source); END IF;
+  SELECT * INTO st FROM erp.purchase_setting WHERE company_code = p_company;
+
+  v_write := erp.can_write('purchase') OR (p_obj = 1470000113 AND erp.can_read('purchase'));
+  SELECT min(step) INTO v_step FROM erp.approval
+   WHERE company_code = p_company AND object = v_obj AND object_ref = p_doc_entry::text AND decision IS NULL AND NOT superseded;
+  v_mine := EXISTS (SELECT 1 FROM erp.approval WHERE company_code = p_company AND object = v_obj AND object_ref = p_doc_entry::text
+                       AND decision IS NULL AND NOT superseded AND step = v_step AND erp._apr_is_mine(approval_id, u));
+  v_appr := EXISTS (SELECT 1 FROM erp.approval WHERE company_code = p_company AND object = v_obj AND object_ref = p_doc_entry::text
+                       AND erp._apr_can_act(approval_id, u));
+  v_live_child := EXISTS (SELECT 1 FROM erp.document_line l JOIN erp.document o ON o.company_code = l.company_code AND o.obj_type = l.obj_type AND o.doc_entry = l.doc_entry
+                           WHERE l.company_code = p_company AND l.base_obj_type = p_obj AND l.base_doc_entry = p_doc_entry AND o.status <> 'cancelled'
+                             AND (p_obj = 22 OR l.obj_type = 22))
+                  OR (p_obj = 22 AND EXISTS (SELECT 1 FROM erp.purchase_shipment WHERE company_code = p_company AND po_doc_entry = p_doc_entry));
+  v_open := EXISTS (SELECT 1 FROM erp.document_line WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry AND coalesce(line_status, 'O') = 'O');
+  SELECT result INTO v_lastqc FROM erp.qc_inspection WHERE company_code = p_company AND po_doc_entry = p_doc_entry ORDER BY qc_id DESC LIMIT 1;
+
+  RETURN jsonb_build_object(
+    'workflow', true,
+    'obj_type', p_obj,
+    'source', d.source,
+    'doc_no', w.doc_no,
+    'state', w.state,
+    'status', d.status,
+    'china_office', w.china_office,
+    'china_office_name', (SELECT name FROM erp.china_office WHERE company_code = p_company AND code = w.china_office),
+    'whs_code', w.whs_code, 'payment_terms', w.payment_terms,
+    'created_by_name', (SELECT display_name FROM erp.app_user WHERE user_id = w.created_by),
+    'created_at', w.created_at,
+    'submitted_by_name', (SELECT display_name FROM erp.app_user WHERE user_id = w.submitted_by),
+    'submitted_at', w.submitted_at,
+    'reason', w.reason,
+    'cancel_note', w.cancel_note,
+    'cancelled_at', w.cancelled_at,
+    'is_creator', w.created_by = u.user_id,
+    'is_submitter', w.submitted_by = u.user_id,
+    'can_edit', v_write AND w.created_by = u.user_id AND w.state IN ('draft', 'rejected'),
+    'can_submit', v_write AND w.created_by = u.user_id AND w.state IN ('draft', 'rejected'),
+    'can_cancel', v_write AND w.state <> 'cancelled' AND NOT v_live_child AND (w.created_by = u.user_id OR v_appr),
+    'can_decide', erp.can_write('purchase') AND w.state = 'pending_approval' AND w.submitted_by IS DISTINCT FROM u.user_id AND v_mine,
+    'can_copy', erp.can_write('purchase') AND w.state = 'approved' AND d.status = 'open' AND v_open,
+    'copy_block', CASE WHEN w.state <> 'approved' THEN 'not_approved' WHEN d.status <> 'open' OR NOT v_open THEN 'closed'
+                       WHEN NOT erp.can_write('purchase') THEN 'read_only' END,
+    'can_write', erp.can_write('purchase'),
+    'can_finance', erp.can_write('finance'),
+    'require_qc_pass', coalesce(st.require_qc_pass, false),
+    'last_qc', v_lastqc,
+    'approvals', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+               'approval_id', a.approval_id, 'step', a.step, 'template_name', a.template_name, 'stage_name', a.stage_name, 'need_approvals', a.need_approvals, 'votes', erp._apr_votes(a.approval_id), 'rule_code', a.rule_code, 'approver_position', a.approver_position,
+               'approver_position_name', erp._apr_row_who(a.approval_id, p.name), 'decision', a.decision, 'note', a.note, 'decided_at', a.decided_at,
+               'decided_by_name', du.display_name, 'decided_by_me', a.approver_user = u.user_id,
+               'requested_by_name', ru.display_name, 'requested_at', a.requested_at, 'detail', a.detail, 'superseded', a.superseded,
+               'current', a.decision IS NULL AND NOT a.superseded AND a.step = v_step,
+               'mine', erp._apr_is_mine(a.approval_id, u)) ORDER BY a.approval_id)
+        FROM erp.approval a
+        LEFT JOIN erp.position p ON p.position_code = a.approver_position
+        LEFT JOIN erp.app_user du ON du.user_id = a.approver_user
+        LEFT JOIN erp.app_user ru ON ru.user_id = a.requested_by
+       WHERE a.company_code = p_company AND a.object = v_obj AND a.object_ref = p_doc_entry::text), '[]'::jsonb),
+    'pis', CASE WHEN p_obj = 22 THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object('pi_id', pi.pi_id, 'vendor_pi_no', pi.vendor_pi_no, 'pi_date', pi.pi_date, 'amount', pi.amount, 'eta', pi.eta,
+               'status', pi.status, 'status_name', ps.name, 'deposit_doc_entry', pi.deposit_doc_entry, 'note', pi.note, 'updated_at', pi.updated_at,
+               'deposit_doc_no', (SELECT doc_no FROM erp.doc_workflow WHERE company_code = pi.company_code AND obj_type = 204 AND doc_entry = pi.deposit_doc_entry))
+             ORDER BY pi.pi_id)
+        FROM erp.purchase_pi pi LEFT JOIN erp.pi_status ps ON ps.company_code = pi.company_code AND ps.code = pi.status
+       WHERE pi.company_code = p_company AND pi.po_doc_entry = p_doc_entry), '[]'::jsonb) END,
+    'deposits', CASE WHEN p_obj = 22 THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object('doc_entry', dd.doc_entry, 'doc_no', dw.doc_no, 'doc_date', dd.doc_date,
+               'total', CASE WHEN dd.total_fc IS NOT NULL THEN dd.total_fc ELSE dd.total END,
+               'paid', CASE WHEN dd.total_fc IS NOT NULL THEN coalesce(dd.paid_fc, 0) ELSE coalesce(dd.paid, 0) END, 'currency', dd.currency, 'fx_rate', dd.fx_rate,
+               'drawn', (SELECT coalesce(sum(CASE WHEN dd.total_fc IS NOT NULL THEN x.amount_fc ELSE x.amount END), 0) FROM erp.ap_dp_draw x WHERE x.company_code = dd.company_code AND x.dp_entry = dd.doc_entry),
+               'status', dd.status) ORDER BY dd.doc_entry)
+        FROM erp.document dd JOIN erp.doc_workflow dw ON dw.company_code = dd.company_code AND dw.obj_type = dd.obj_type AND dw.doc_entry = dd.doc_entry
+       WHERE dd.company_code = p_company AND dd.obj_type = 204 AND dd.source = 'erp' AND dd.status <> 'cancelled'
+         AND EXISTS (SELECT 1 FROM erp.document_line l WHERE l.company_code = dd.company_code AND l.obj_type = 204 AND l.doc_entry = dd.doc_entry
+                        AND l.base_obj_type = 22 AND l.base_doc_entry = p_doc_entry)), '[]'::jsonb) END,
+    'qcs', CASE WHEN p_obj = 22 THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object('qc_id', q.qc_id, 'inspected_on', q.inspected_on, 'inspector', q.inspector, 'result', q.result,
+               'checklist', q.checklist, 'photos', to_jsonb(q.photos), 'note', q.note, 'created_at', q.created_at,
+               'created_by_name', (SELECT display_name FROM erp.app_user WHERE user_id = q.created_by)) ORDER BY q.qc_id)
+        FROM erp.qc_inspection q WHERE q.company_code = p_company AND q.po_doc_entry = p_doc_entry), '[]'::jsonb) END,
+    'shipments', CASE WHEN p_obj = 22 THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object('shipment_id', s.shipment_id, 'container_no', s.container_no, 'shipping_mark', s.shipping_mark,
+               'shipment_mode', s.shipment_mode, 'etd', s.etd, 'eta', s.eta, 'status', s.status, 'note', s.note,
+               'lines', (SELECT jsonb_agg(jsonb_build_object('po_line', sl.po_line, 'item_code', sl.item_code, 'whs_code', sl.whs_code,
+                                                              'qty', sl.qty, 'received_qty', sl.received_qty) ORDER BY sl.po_line)
+                           FROM erp.purchase_shipment_line sl WHERE sl.shipment_id = s.shipment_id)) ORDER BY s.shipment_id)
+        FROM erp.purchase_shipment s WHERE s.company_code = p_company AND s.po_doc_entry = p_doc_entry), '[]'::jsonb) END,
+    'activity', coalesce((
+      SELECT jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'actor_name', coalesce(au.display_name, l.actor), 'detail', l.detail)
+                       ORDER BY l.at, l.audit_id)
+        FROM erp.audit_log l
+        LEFT JOIN erp.app_user au ON au.user_id::text = l.actor
+       WHERE l.company_code = p_company
+         AND ((l.object = v_obj AND l.object_ref = p_doc_entry::text)
+              OR (p_obj = 22 AND l.object IN ('purchase_pi', 'qc_inspection', 'purchase_shipment') AND l.detail->>'po_doc_entry' = p_doc_entry::text))), '[]'::jsonb));
+END $$;
+-- B4: deposits in the order's currency.
+
 -- ---- _pd_eval: copied from 31_approvals.sql:1203.
 CREATE OR REPLACE FUNCTION erp._pd_eval(p_company varchar, p_obj integer, p_header jsonb, p_lines jsonb, p_position text, p_doc_entry integer)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
@@ -3156,6 +3384,116 @@ BEGIN
                      AND d.source <> 'erp' AND d.status = 'open'));
 END $$;
 -- B4: each document's currency; total and open in that currency (open_lc / total_lc in LC).
+
+-- ---- payment_info: copied from 20_banking.sql:1022.
+CREATE OR REPLACE FUNCTION erp.payment_info(p_company varchar, p_dir text, p_doc_entry integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  u  erp.app_user;
+  p  erp.payment;
+  x  erp.payment_extra;
+  v_block text;
+BEGIN
+  u := erp._bk_guard(p_company, false);
+  SELECT * INTO p FROM erp.payment WHERE company_code = p_company AND direction = p_dir AND doc_entry = p_doc_entry;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO x FROM erp.payment_extra WHERE company_code = p_company AND direction = p_dir AND doc_entry = p_doc_entry;
+  v_block := CASE WHEN NOT (erp.can_write('banking') OR erp.can_write('finance')) THEN 'read_only' ELSE erp._pay_cancel_block(p_company, p_dir, p_doc_entry) END;
+  RETURN to_jsonb(p) || jsonb_build_object(
+    'doc_no', coalesce(x.doc_no, p.doc_num::text),
+    'transfer_bank', x.transfer_bank, 'transfer_bank_name', (SELECT name FROM erp.bank_account WHERE company_code = p_company AND bank_code = x.transfer_bank),
+    'transfer_ref', x.transfer_ref, 'cheque_bank', x.cheque_bank, 'card_ref', x.card_ref, 'draft_id', x.draft_id,
+    'created_by_name', (SELECT display_name FROM erp.app_user WHERE user_id = x.created_by), 'created_at', x.created_at,
+    'cancelled_at', x.cancelled_at, 'cancel_note', x.cancel_note, 'cancel_trans_id', x.cancel_trans_id,
+    'can_read_journal', erp.can_read('finance'),
+    'can_cancel', v_block IS NULL, 'cancel_block', v_block,
+    'allocations', coalesce((SELECT jsonb_agg(jsonb_build_object('line_no', a.line_no, 'obj_type', a.target_obj_type, 'doc_entry', a.target_doc_entry,
+                                                                 'doc_no', erp._sd_no(p_company, a.target_obj_type, a.target_doc_entry), 'applied', a.applied, 'applied_fc', a.applied_fc,
+                                                                 'doc_total', d.total, 'doc_date', d.doc_date) ORDER BY a.line_no)
+                               FROM erp.payment_allocation a
+                               LEFT JOIN erp.document d ON d.company_code = a.company_code AND d.obj_type = a.target_obj_type AND d.doc_entry = a.target_doc_entry
+                              WHERE a.company_code = p_company AND a.direction = p_dir AND a.doc_entry = p_doc_entry), '[]'::jsonb),
+    'cheques', coalesce((SELECT jsonb_agg(jsonb_build_object('cheque_id', c.cheque_id, 'cheque_no', c.cheque_no, 'bank_name', c.bank_name, 'due_date', c.due_date,
+                                                             'amount', c.amount, 'post_dated', c.due_date > p.doc_date, 'deposit_id', c.deposit_id,
+                                                             'deposit_no', dp.doc_no) ORDER BY c.line_no)
+                           FROM erp.payment_cheque c LEFT JOIN erp.deposit dp ON dp.deposit_id = c.deposit_id
+                          WHERE c.company_code = p_company AND c.direction = p_dir AND c.doc_entry = p_doc_entry), '[]'::jsonb),
+    'activity', coalesce((
+      SELECT jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'actor_name', coalesce(au.display_name, l.actor), 'detail', l.detail)
+                       ORDER BY l.at, l.audit_id)
+        FROM erp.audit_log l LEFT JOIN erp.app_user au ON au.user_id::text = l.actor
+       WHERE l.company_code = p_company AND ((l.object = 'payment' AND l.object_ref = p_dir || '/' || p_doc_entry)
+                                          OR (x.draft_id IS NOT NULL AND l.object = 'payment_draft' AND l.object_ref = x.draft_id::text))), '[]'::jsonb));
+END $$;
+-- B4: + applied_fc.
+
+-- ---- master_data_setup: copied from 23_master_data.sql:1216.
+CREATE OR REPLACE FUNCTION erp.master_data_setup(p_company varchar) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+DECLARE
+  u  erp.app_user;
+  co erp.company;
+  st erp.master_setting;
+  v_bp boolean; v_it boolean;
+BEGIN
+  IF erp.current_user_id() IS NULL THEN
+    RAISE EXCEPTION 'Sign in first.' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO u FROM erp.app_user WHERE user_id = erp.current_user_id() AND active;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Your sign-in has no active Super ERP profile. Ask the system admin to set one up.' USING ERRCODE = '42501';
+  END IF;
+  IF p_company IS NULL OR NOT erp.can_see(p_company) THEN
+    RAISE EXCEPTION 'You don''t have access to company %.', coalesce(p_company, '(none)') USING ERRCODE = '42501';
+  END IF;
+  v_bp := erp.can_read('bp') OR erp.can_read('sales') OR erp.can_read('purchase') OR erp.can_read('finance');
+  v_it := erp.can_read('inventory') OR erp.can_read('sales') OR erp.can_read('purchase');
+  IF NOT (v_bp OR v_it) THEN
+    RAISE EXCEPTION 'Your position does not include Business Partners or Inventory. Ask the system admin if you need it.' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO co FROM erp.company WHERE company_code = p_company;
+  SELECT * INTO st FROM erp.master_setting WHERE company_code = p_company;
+  RETURN jsonb_build_object(
+    'company_currency', co.currency, 'company_country', co.country,
+    'currencies', (SELECT coalesce(jsonb_agg(c ORDER BY c <> co.currency, c), '[]'::jsonb) FROM (
+                     SELECT co.currency AS c UNION SELECT currency FROM erp.fx_rate WHERE company_code = p_company
+                     UNION SELECT currency FROM erp.business_partner WHERE company_code = p_company AND currency IS NOT NULL) x),
+    'bp_groups', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', group_code, 'name', name, 'kind', kind) ORDER BY group_code), '[]'::jsonb)
+                    FROM erp.bp_group WHERE company_code = p_company),
+    'payment_terms', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', group_num, 'name', name) ORDER BY group_num), '[]'::jsonb)
+                        FROM erp.payment_terms WHERE company_code = p_company),
+    'price_lists', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', list_num, 'name', name) ORDER BY list_num), '[]'::jsonb)
+                      FROM erp.price_list WHERE company_code = p_company),
+    'salespeople', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', slp_code, 'name', name) ORDER BY slp_code), '[]'::jsonb)
+                      FROM erp.salesperson WHERE company_code = p_company AND active),
+    'item_groups', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', group_code, 'name', name,
+                                     'manage_method', (SELECT s.manage_method FROM erp.item_group_setting s
+                                                        WHERE s.company_code = item_group.company_code AND s.group_code = item_group.group_code)) ORDER BY group_code), '[]'::jsonb)
+                      FROM erp.item_group WHERE company_code = p_company),
+    'brands', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', firm_code, 'name', name) ORDER BY name), '[]'::jsonb)
+                 FROM erp.brand WHERE company_code = p_company),
+    'tax_codes', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', code, 'name', name, 'rate', rate) ORDER BY code), '[]'::jsonb)
+                    FROM erp.tax_code WHERE company_code = p_company AND active),
+    'uoms', (SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb) FROM (
+               SELECT sales_uom AS x FROM erp.item WHERE company_code = p_company AND sales_uom IS NOT NULL
+               UNION SELECT purchase_uom FROM erp.item WHERE company_code = p_company AND purchase_uom IS NOT NULL
+               UNION SELECT inventory_uom FROM erp.item WHERE company_code = p_company AND inventory_uom IS NOT NULL) s),
+    'sourcing_types', to_jsonb(coalesce(st.sourcing_types, '{OEM,ODM}')),
+    'bp_required', to_jsonb(coalesce(st.bp_required, '{}')), 'item_required', to_jsonb(coalesce(st.item_required, '{}')),
+    'dup_name_similarity', coalesce(st.dup_name_similarity, 0.8),
+    'numbering', (SELECT jsonb_object_agg(CASE obj_type WHEN 2001 THEN 'customer' WHEN 2002 THEN 'supplier' ELSE 'lead' END,
+                                          prefix || lpad(next_num::text, pad, '0'))
+                    FROM erp.number_series WHERE company_code = p_company AND obj_type IN (2001, 2002, 2003) AND active),
+    'credit_approvers', erp._md_rules(p_company, 'bp_credit_limit', u.position_code),
+    'bank_approvers', erp._md_rules(p_company, 'bp_bank_detail', u.position_code),
+    'can_read_bp', v_bp, 'can_read_items', v_it,
+    'can_write_bp', jsonb_build_object(
+       'customer', v_bp AND (erp.can_write('bp') OR erp.can_write('finance') OR erp.can_write('sales')),
+       'lead', v_bp AND (erp.can_write('bp') OR erp.can_write('finance') OR erp.can_write('sales')),
+       'supplier', v_bp AND (erp.can_write('bp') OR erp.can_write('finance') OR erp.can_write('purchase'))),
+    'can_write_items', v_it AND (erp.can_write('inventory') OR erp.can_write('purchase')));
+END $$;
+-- B4: item groups carry their management method (none / batch / serial) for the item form.
 
 -- ---- _health_files: copied from 32_gl_setup.sql:2237.
 CREATE OR REPLACE FUNCTION erp._health_files() RETURNS TABLE (file_name text, object text) LANGUAGE sql IMMUTABLE AS $$

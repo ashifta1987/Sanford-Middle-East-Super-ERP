@@ -56,10 +56,12 @@ export interface PuEvalLine {
 }
 export interface PuEval {
   errors: PuProblem[]; checks: PuCheck[]; lines: PuEvalLine[];
-  header: Record<string, unknown>; totals: { net: number; vat: number; total: number; currency: string };
+  header: Record<string, unknown>; totals: { net: number; vat: number; total: number; currency: string; rate?: number | null; local_currency?: string; total_lc?: number | null };
 }
 export interface PuHeaderInput {
   card_code: string; doc_date: string; due_date: string; whs_code: string; china_office: string; payment_terms: number | ''; customer_ref: string; comments: string;
+  /** B4: document currency ('' = the supplier's own) and a typed rate ('' = the posting date's rate; Financials only). */
+  currency?: string; fx_rate?: string;
 }
 export interface PuLineInput {
   item_code: string; qty: string; price: string; tax_code: string; whs_code?: string; cbm: string;
@@ -68,6 +70,7 @@ export interface PuLineInput {
 const headerPayload = (h: PuHeaderInput) => ({
   card_code: h.card_code || null, doc_date: h.doc_date, due_date: h.due_date || null, whs_code: h.whs_code || null, china_office: h.china_office || null,
   payment_terms: h.payment_terms === '' ? null : h.payment_terms, customer_ref: h.customer_ref, comments: h.comments,
+  currency: h.currency || null, fx_rate: h.fx_rate || null,
 });
 const linesPayload = (ls: PuLineInput[]) => ls.map((l) => ({
   item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, tax_code: l.tax_code || null, whs_code: l.whs_code || null,
@@ -120,11 +123,13 @@ export interface PuCopyLine {
   description: string | null; uom: string | null; quantity: number; open_qty: number; price: number | null; discount_pct: number; tax_code: string | null;
   tax_rate: number | null; whs_code: string | null; line_total: number; vat: number; cbm: number | null; cost: number | null; is_stock: boolean;
   on_hand: number | null; in_transit: number | null;
+  currency?: string | null; fx_rate?: number | null; line_total_fc?: number | null; vat_fc?: number | null;
 }
 export interface PuCopySource {
   obj_type: number;
   header: { doc_entry: number; doc_no: string; card_code: string | null; card_name: string | null; doc_date: string; due_date: string | null; payment_terms: number | null;
-    whs_code: string | null; china_office: string | null; customer_ref: string | null; comments: string | null; currency: string; total: number } | null;
+    whs_code: string | null; china_office: string | null; customer_ref: string | null; comments: string | null; currency: string; total: number;
+    fx_rate?: number | null; total_fc?: number | null } | null;
   lines: PuCopyLine[];
 }
 export const puCopySource = (company: string, obj: number, entry: number | null, card: string | null = null) =>

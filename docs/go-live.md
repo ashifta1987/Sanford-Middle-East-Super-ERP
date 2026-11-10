@@ -62,9 +62,10 @@ The list is also in `scripts/local-stack/sql-order-supabase.txt`.
 | 14 | `28_production_service.sql` | A13 |
 | 15 | `29_go_live.sql` | A14: go-live checklist, release log, `system_health()`, checklist gate on `company_go_live` |
 | 16 | `30_numbering_company.sql` | B1: pilot company AE05 (also added to `sap._company`), Document Numbering (several series per type, user defaults), decided rule changes (decisions of 10 Nov 2026) |
+| 17 | `31_approvals.sql` | B2: Approval Process (Approval Stages, Approval Templates, Approval Status Report). Migrates the existing `approval_rule` rows into templates; incoming payments can need approval. No templates are seeded for AE01–AE05 |
 
 - **Never** run `15_sample_company.sql` or `scripts/local-stack/test-users.sql` on live. They are a fictional company and fictional users. On a throwaway branch they are fine for running the test suites (3.3).
-- Files 15–30 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
+- Files 15–31 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
 - **How to run each file:** in the SQL editor, paste the whole file and run it once. Or use `psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/sql/<file>`. Stop at the first error and don't carry on with later files.
 
 ### 3.3 Tests on the branch
@@ -105,7 +106,7 @@ Use the same files in the same order, in a quiet window (no migration run active
 select erp.schema_release_record(f, 'live', 'Ashif', 'A14 go-live apply')
   from unnest(array['15_stage1_overview.sql','16_module_access.sql','17_sales_order.sql','18_posting.sql','19_sales_cycle.sql','20_banking.sql',
                     '21_purchasing.sql','22_inventory.sql','23_master_data.sql','24_hr.sql','25_admin.sql','26_reports.sql',
-                    '27_migration_more.sql','28_production_service.sql','29_go_live.sql','30_numbering_company.sql']) f;
+                    '27_migration_more.sql','28_production_service.sql','29_go_live.sql','30_numbering_company.sql','31_approvals.sql']) f;
 ```
 Do the same on the branch with `'branch'`. `schema_release_record` can only be run from the SQL editor (postgres) or with the service role. Signed-in users can only read the log, on the System health page.
 

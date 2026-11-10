@@ -2545,7 +2545,7 @@ BEGIN
   IF jsonb_array_length(v_tpl) > 0 THEN
     INSERT INTO erp.approval (company_code, object, object_ref, step, approver_position, rule_code, requested_by, requested_at, detail)
     SELECT p_company, 'company_details', v_id::text, (x->>'step')::smallint, x->>'approver_position', 'company_details', me.user_id, now(),
-           jsonb_build_object('checks', jsonb_build_array(x || jsonb_build_object('message', format('Company details change needs approval (%s).', x->>'stage_name')))))
+           jsonb_build_object('checks', jsonb_build_array(x || jsonb_build_object('message', format('Company details change needs approval (%s).', x->>'stage_name'))))
       FROM jsonb_array_elements(v_tpl) x;
     v_own := v_tpl->0->>'approver_position';
   ELSE
@@ -3673,7 +3673,7 @@ BEGIN
     DELETE FROM erp.apr_template_condition WHERE template_id = v_id;
   END IF;
   INSERT INTO erp.apr_template_originator (template_id, position_code, user_id)
-  SELECT v_id, x->>'position_code', (x->>'user_id')::uuid FROM jsonb_array_elements(v_orig) x;
+  SELECT v_id, o->>'position_code', (o->>'user_id')::uuid FROM jsonb_array_elements(v_orig) o;
   FOR x IN SELECT value FROM jsonb_array_elements(v_st) LOOP
     v_seq := v_seq + 1;
     INSERT INTO erp.apr_template_stage (template_id, seq, stage_id)
@@ -3764,8 +3764,14 @@ BEGIN
 END $$;
 
 -- ============ 6. All approval requests (inbox + status report) ============
--- One row per erp.approval row the caller may see, with its document. Module read rights as in A2–B1.
-CREATE OR REPLACE FUNCTION erp._apr_base()
+-- One row per erp.approval row the caller may see, with its document. Module read rights as in A2–B1
+-- (p_all = true: the Administration status report, which lists every request of the company).
+CREATE OR REPLACE FUNCTION erp._apr_can_read(p_all boolean, p_module text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+  SELECT p_all OR erp.can_read(p_module)
+$$;
+DROP FUNCTION IF EXISTS erp._apr_base();
+CREATE OR REPLACE FUNCTION erp._apr_base(p_all boolean DEFAULT false)
 RETURNS TABLE (approval_id bigint, company_code varchar, object text, object_ref text, step smallint, approver_position text, approver_user uuid,
                decision text, note text, decided_at timestamptz, rule_code text, requested_by uuid, requested_at timestamptz, detail jsonb, superseded boolean,
                template_id bigint, template_version integer, template_name text, stage_id bigint, stage_name text, need_approvals smallint, need_rejections smallint,
@@ -3786,33 +3792,33 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
       UNION ALL
       SELECT 'journal', j.draft_id::text, j.state, j.reason, j.submitted_by, j.draft_id, NULL::varchar, j.memo, j.total, j.currency
         FROM erp.journal_draft j
-       WHERE a.object = 'journal' AND erp.can_read('finance') AND j.company_code = a.company_code AND j.draft_id::text = a.object_ref
+       WHERE a.object = 'journal' AND erp._apr_can_read(p_all, 'finance') AND j.company_code = a.company_code AND j.draft_id::text = a.object_ref
       UNION ALL
       SELECT 'payment', p.draft_id::text, p.state, p.reason, p.created_by, p.draft_id, p.card_code, p.card_name, p.total, p.currency
         FROM erp.payment_draft p
-       WHERE a.object = 'payment' AND (erp.can_read('banking') OR erp.can_read('finance')) AND p.company_code = a.company_code AND p.draft_id::text = a.object_ref
+       WHERE a.object = 'payment' AND (erp._apr_can_read(p_all, 'banking') OR erp._apr_can_read(p_all, 'finance')) AND p.company_code = a.company_code AND p.draft_id::text = a.object_ref
       UNION ALL
       SELECT 'purchase_order', w.doc_no, w.state, w.reason, w.submitted_by, d.doc_entry, d.card_code, d.card_name, d.total, d.currency
         FROM erp.doc_workflow w JOIN erp.document d ON d.company_code = w.company_code AND d.obj_type = w.obj_type AND d.doc_entry = w.doc_entry
-       WHERE a.object = 'purchase_order' AND (erp.can_read('purchase') OR erp.can_read('finance'))
+       WHERE a.object = 'purchase_order' AND (erp._apr_can_read(p_all, 'purchase') OR erp._apr_can_read(p_all, 'finance'))
          AND w.company_code = a.company_code AND w.obj_type = 22 AND w.doc_entry::text = a.object_ref
       UNION ALL
       SELECT a.object, w.doc_no, w.state, w.reason, w.submitted_by, d.doc_entry, w.whs_code::varchar,
              (SELECT r.name FROM erp.inventory_reason r WHERE r.company_code = w.company_code AND r.code = w.reason_code), d.total, d.currency
         FROM erp.doc_workflow w JOIN erp.document d ON d.company_code = w.company_code AND d.obj_type = w.obj_type AND d.doc_entry = w.doc_entry
-       WHERE a.object IN ('goods_receipt', 'goods_issue') AND erp.can_read('inventory') AND w.company_code = a.company_code
+       WHERE a.object IN ('goods_receipt', 'goods_issue') AND erp._apr_can_read(p_all, 'inventory') AND w.company_code = a.company_code
          AND w.obj_type = CASE a.object WHEN 'goods_receipt' THEN 59 ELSE 60 END AND w.doc_entry::text = a.object_ref
       UNION ALL
       SELECT 'inventory_count', c.doc_no, c.state, c.reason, c.submitted_by, c.count_id, c.whs_code::varchar,
              (SELECT wh.name FROM erp.warehouse wh WHERE wh.company_code = c.company_code AND wh.whs_code = c.whs_code),
              coalesce(c.gain_value, 0) + coalesce(c.loss_value, 0), (SELECT co.currency FROM erp.company co WHERE co.company_code = c.company_code)
         FROM erp.inv_count c
-       WHERE a.object = 'inventory_count' AND erp.can_read('inventory') AND c.company_code = a.company_code AND c.count_id::text = a.object_ref
+       WHERE a.object = 'inventory_count' AND erp._apr_can_read(p_all, 'inventory') AND c.company_code = a.company_code AND c.count_id::text = a.object_ref
       UNION ALL
       SELECT 'bp_change', q.card_code::text, q.state, q.reason, q.requested_by, q.request_id, q.card_code::varchar, bp.name,
              CASE WHEN q.kind = 'credit_limit' THEN (q.after->>'credit_limit')::numeric END, bp.currency
         FROM erp.bp_change_request q JOIN erp.business_partner bp ON bp.company_code = q.company_code AND bp.card_code = q.card_code
-       WHERE a.object = 'bp_change' AND (erp.can_read('bp') OR erp.can_read('sales') OR erp.can_read('purchase') OR erp.can_read('finance') OR erp.can_read('banking'))
+       WHERE a.object = 'bp_change' AND (erp._apr_can_read(p_all, 'bp') OR erp._apr_can_read(p_all, 'sales') OR erp._apr_can_read(p_all, 'purchase') OR erp._apr_can_read(p_all, 'finance') OR erp._apr_can_read(p_all, 'banking'))
          AND q.company_code = a.company_code AND q.request_id::text = a.object_ref
       UNION ALL
       SELECT 'leave', q.request_id::text, q.state, q.reason, q.requested_by, q.request_id, e.hr_code::varchar, concat_ws(' ', e.first_name, e.last_name), q.days, NULL::varchar
@@ -3825,7 +3831,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
       UNION ALL
       SELECT 'sales_doc_request', 'REQ-' || q.request_id, q.state, q.reason, q.requested_by, q.request_id::integer, q.card_code, q.card_name, q.total, q.currency
         FROM erp.sales_doc_request q
-       WHERE a.object = 'sales_doc_request' AND (erp.can_read('sales') OR erp.can_read('finance')) AND q.company_code = a.company_code AND q.request_id::text = a.object_ref
+       WHERE a.object = 'sales_doc_request' AND (erp._apr_can_read(p_all, 'sales') OR erp._apr_can_read(p_all, 'finance')) AND q.company_code = a.company_code AND q.request_id::text = a.object_ref
     ) b
    WHERE erp.can_see(a.company_code)
 $$;
@@ -3916,7 +3922,7 @@ BEGIN
     RAISE EXCEPTION 'The "to" date is before the "from" date.' USING ERRCODE = 'P0001';
   END IF;
   RETURN (
-    WITH b AS (SELECT * FROM erp._apr_base() x WHERE x.company_code = p_company),
+    WITH b AS (SELECT * FROM erp._apr_base(true) x WHERE x.company_code = p_company),
     g AS (
       SELECT b.object, b.object_ref, min(b.kind) AS kind, min(b.doc_no) AS doc_no, min(b.doc_entry) AS doc_entry, min(b.state) AS state,
              min(b.card_code) AS card_code, min(b.card_name) AS card_name, min(b.total) AS total, min(b.currency) AS currency,
@@ -3953,7 +3959,7 @@ BEGIN
                AND (v_kind IS NULL OR s.kind = v_kind OR s.object = v_kind)
                AND (v_tpl IS NULL OR s.has_tpl)
                AND (v_from IS NULL OR s.requested_at::date >= v_from)
-               AND (v_to IS NULL OR s.requested_at::date <= v_to)), '[]'::jsonb));
+               AND (v_to IS NULL OR s.requested_at::date <= v_to)), '[]'::jsonb)));
 END $$;
 
 -- ============ 7. Compatibility: approval_rule (A2–B1) synchronised into templates ============
@@ -4325,7 +4331,7 @@ REVOKE ALL ON FUNCTION erp._apr_kinds(), erp._apr_kind_label(text), erp._apr_kin
   erp._apr_authorizer(bigint, uuid, text), erp._apr_is_mine(bigint, erp.app_user), erp._apr_can_act(bigint, erp.app_user),
   erp._apr_vote(bigint[], erp.app_user, text, text, jsonb), erp._apr_who(varchar, text, text, smallint), erp._apr_row_who(bigint, text),
   erp._apr_votes(bigint), erp._apr_trail(varchar, text, text), erp._apr_company_user(varchar, uuid), erp._apr_snapshot(bigint),
-  erp._apr_version(bigint, uuid, text), erp._apr_people(varchar, jsonb, text), erp._apr_base(), erp._apr_legacy_stage(varchar, text, uuid),
+  erp._apr_version(bigint, uuid, text), erp._apr_people(varchar, jsonb, text), erp._apr_base(boolean), erp._apr_can_read(boolean, text), erp._apr_legacy_stage(varchar, text, uuid),
   erp._apr_sync_legacy(varchar, integer, text, text, uuid), erp._adm_rule_spec(), erp._health_files()
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION erp.approval_setup(varchar), erp.approval_stage_save(varchar, jsonb), erp.approval_stage_delete(varchar, bigint),

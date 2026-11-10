@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION erp._mig_check(p_run uuid, p_co varchar, p_area text,
 RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = erp, pg_temp AS $$
   INSERT INTO erp.migration_check (run_id, company_code, area, check_name, sap_value, raw_value, app_value, difference, ok, detail)
   VALUES (p_run, p_co, p_area, p_name, p_sap, p_raw, p_app,
-          CASE WHEN p_app IS NULL AND p_raw IS NULL THEN NULL ELSE coalesce(p_app, p_raw, 0) - coalesce(p_sap, p_raw, 0) END, p_ok, p_detail)
+          CASE WHEN p_sap IS NULL AND (p_app IS NULL OR p_raw IS NULL) THEN NULL ELSE coalesce(p_app, p_raw, 0) - coalesce(p_sap, p_raw, 0) END, p_ok, p_detail)
 $$;
 
 -- a check that could not run: written as skipped (ok) with an info issue; returns the issue key
@@ -994,7 +994,7 @@ BEGIN
   SELECT count(*) n, count(*) FILTER (WHERE decision = 'drop' AND drop_state = 'pending') pend,
          count(*) FILTER (WHERE decision = 'mapped') mapped, count(*) FILTER (WHERE decision = 'drop' AND drop_state = 'approved') dropped
     INTO s FROM erp.custom_field_register WHERE company_code = co;
-  PERFORM erp._mig_check(p_run, co, 'custom_fields', 'custom fields on the register', NULL, s.n, s.mapped, true,
+  PERFORM erp._mig_check(p_run, co, 'custom_fields', 'custom fields on the register', NULL, s.n, NULL, true,
                          jsonb_build_object('mapped', s.mapped, 'drop_approved', s.dropped, 'drop_pending', s.pend));
   PERFORM erp._mig_check(p_run, co, 'custom_fields', 'proposed drops waiting for the owner', 0, s.pend, s.pend, s.pend = 0, NULL);
   IF s.pend > 0 THEN

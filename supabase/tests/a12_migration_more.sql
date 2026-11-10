@@ -179,7 +179,7 @@ BEGIN
   PERFORM pg_temp.check(r->>'opening_clearing_acct' = '3990' AND r->'net_pay_wage_codes' = '["1001","1002"]', 'admin saves opening date, clearing account and wage codes', r::text);
   PERFORM pg_temp.check(EXISTS (SELECT 1 FROM erp.audit_log WHERE action = 'migration_setting_save' AND company_code = 'ZZ98'), 'settings change audited', '');
   PERFORM pg_temp.check((pg_temp.call(stock, 'SELECT to_jsonb(count(*)) FROM erp.migration_setting'))::text = '0', 'a user who is neither admin/IT nor a sign-off role cannot read migration settings', '');
-  PERFORM pg_temp.check((pg_temp.call(sales, 'SELECT to_jsonb(count(*)) FROM erp.migration_setting'))::text = '1', 'business sign-off users (sales) can read them', '');
+  PERFORM pg_temp.check((pg_temp.call(sales, 'SELECT to_jsonb(count(*)) FROM erp.migration_setting WHERE company_code = ''ZZ98'''))::text = '1', 'business sign-off users (sales) can read them', '');
   r := pg_temp.call(admin, 'SELECT to_jsonb(erp.migration_request(''ZZ98'', ''opening_only'', ''A12 test''))');
   PERFORM pg_temp.check(r->>'error' IS NULL AND EXISTS (SELECT 1 FROM erp.migration_run WHERE run_id = (r#>>'{}')::uuid AND kind = 'opening_only'),
     'opening_only run accepted once the settings exist', r::text);

@@ -713,7 +713,8 @@
       "inventory_count": "Inventory count",
       "bp_change": "Partner change",
       "leave": "Leave",
-      "company_details": "Company details"
+      "company_details": "Company details",
+      "sales_doc_request": "Credit memo / service invoice"
     }
   },
   "account": {
@@ -1093,7 +1094,8 @@
       "leave_manager": "Leave · manager",
       "leave_hr": "Leave · HR",
       "leave_long": "Long leave · owner",
-      "company_details": "Company details change"
+      "company_details": "Company details change",
+      "credit_memo_amount": "Credit memo above the limit"
     },
     "askAi": "Ask AI about this order",
     "askAiBody": "Comes with Add-Ons › AI Assistant. It will compare this order with the customer’s history.",
@@ -2152,7 +2154,7 @@
       "receipts": "Goods receipts",
       "broker": "Broker",
       "toInventory": "To inventory",
-      "toCogs": "To cost of goods sold",
+      "toCogs": "To price difference",
       "reference": "Forwarder / broker reference",
       "lines": "Goods receipt lines",
       "addReceipt": "Add a goods receipt",
@@ -2160,7 +2162,7 @@
       "weight": "Weight (kg)",
       "allocated": "Landed cost",
       "avg": "Average cost {{from}} → {{to}} ({{oh}} on hand)",
-      "cogsShare": "{{n}} on goods already sold",
+      "cogsShare": "{{n}} on goods already sold (price difference)",
       "charges": "Costs",
       "code": "Landed cost",
       "amount": "Amount ({{cur}})",
@@ -2170,7 +2172,7 @@
       "remainder": "Amounts are rounded to 2 decimals; the rounding remainder goes on the last line, so every cost adds up exactly.",
       "summary": "Summary",
       "fill": "Add lines and costs to see the split.",
-      "what": "Posts Dr inventory (and cost of goods sold for goods already sold) / Cr landed costs accrued. The forwarder’s invoice clears the accrual.",
+      "what": "Posts Dr inventory (and the price difference account for goods already sold) / Cr landed costs accrued. The forwarder’s invoice clears the accrual.",
       "post": "Post landed costs",
       "posted": "Posted",
       "postedNote": "Posted. Average cost updated.",
@@ -2208,7 +2210,8 @@
       "activate": "Make active",
       "deactivate": "Make inactive",
       "rules": "Purchase order approval",
-      "rulesBody": "Approval rules live in Administration › Approval Templates. Your limit: {{limit}}. Price more than {{pct}}% above the last purchase price needs approval."
+      "rulesBody": "Approval rules live in Administration › Approval Templates. Your limit: {{limit}}. Price more than {{pct}}% above the last purchase price needs approval.",
+      "qcAlways": "Always on: QC must pass before goods can ship (decision of 10 Nov 2026)."
     },
     "activity": {
       "create": "created the document",
@@ -3218,7 +3221,7 @@
         "days": "Changed within (days)"
       },
       "cond": {
-        "discount_pct": "Sales orders and quotations: a line discount above the requester’s limit.",
+        "discount_pct": "Sales orders, quotations and direct service invoices: a line discount above the requester’s limit.",
         "credit_limit": "Sales orders: customer balance plus the order is above the credit limit.",
         "below_cost": "Sales orders and quotations: a unit price below cost.",
         "po_amount": "Purchase orders: total above the requester’s limit.",
@@ -3230,7 +3233,8 @@
         "count_variance_pct": "Inventory counts: a line variance above this %.",
         "count_variance_value": "Inventory counts: total gains and losses above this value.",
         "bp_credit_limit": "Business partners: a new or raised credit limit.",
-        "bp_bank_detail": "Business partners: new or changed bank details."
+        "bp_bank_detail": "Business partners: new or changed bank details.",
+        "credit_memo_amount": "A/R credit memos: total above the limit (no limit = every credit memo)."
       },
       "leaveTitle": "Long leave (Human Resources)",
       "leaveBody": "Leave longer than {{n}} days also needs the owner position ({{owner}}) after HR ({{hr}}).",
@@ -3700,7 +3704,8 @@
       "status": {
         "ok": "On schedule",
         "overdue": "Maintenance overdue",
-        "not_scheduled": "Not scheduled"
+        "not_scheduled": "Not scheduled",
+        "due_soon": "Maintenance due soon"
       },
       "nextDue": "Next maintenance",
       "atShots": "at {{n}} shots",
@@ -3723,7 +3728,9 @@
       },
       "maintSaved": "Maintenance recorded. The schedule starts again from today.",
       "history": "Maintenance history",
-      "noHistory": "No maintenance recorded yet."
+      "noHistory": "No maintenance recorded yet.",
+      "warnPct": "Warn at (% of interval and life)",
+      "defaultsNote": "New moulds start with maintenance every 50,000 shots, a rated life of 500,000 shots and a warning at 80 %. Change them per mould."
     },
     "setup": {
       "title": "Production setup",
@@ -3938,6 +3945,17 @@
       "itemGroup": "Item group",
       "months": "Months",
       "add": "Add warranty period"
+    },
+    "issuers": {
+      "title": "Who may issue spare parts",
+      "help": "Spare parts can be issued to a service call by the positions or users ticked below. With none ticked, the service manager position may issue them.",
+      "manager": "Service manager position",
+      "positions": "Positions that may issue spare parts",
+      "users": "Users who may issue spare parts",
+      "ruleList": "{{n}} positions or users may issue spare parts.",
+      "ruleManager": "Only the service manager position ({{pos}}) may issue spare parts.",
+      "ruleNobody": "Nobody may issue spare parts yet.",
+      "notAllowed": "You aren't allowed to issue spare parts in this company. Ask the service manager (Service Setup)."
     }
   },
   "gl": {
@@ -4106,5 +4124,177 @@
       "releases": "Release log",
       "noReleases": "No release recorded yet. After applying each file, record it with erp.schema_release_record (docs/go-live.md)."
     }
+  },
+  "num": {
+    "title": "Document Numbering",
+    "desc": "Number series for each document type, per company: several series per type, a company default and a default per user. Numbers only move forward.",
+    "types": "Document types",
+    "objType": "object {{n}}",
+    "new": "New series",
+    "notUsedNote": "Super ERP doesn't create this document yet. Its series are ready for when it does.",
+    "noSeries": "No series yet",
+    "noSeriesBody": "Add a series so this document can be created in this company.",
+    "f": {
+      "name": "Series name",
+      "prefix": "Prefix",
+      "first": "First number",
+      "next": "Next number",
+      "last": "Last number",
+      "lastOpt": "Last number (optional)",
+      "pad": "Digits",
+      "from": "Valid from (optional)",
+      "to": "Valid to (optional)",
+      "whs": "Warehouse",
+      "branch": "Branch",
+      "remarks": "Remarks",
+      "default": "Company default",
+      "locked": "Locked",
+      "period": "Period"
+    },
+    "full": "Used up",
+    "branchN": "branch {{n}}",
+    "default": "Default",
+    "locked": "Locked",
+    "nUsers_one": "{{count}} user",
+    "nUsers_other": "{{count}} users",
+    "nSeries_one": "{{count}} series",
+    "nSeries_other": "{{count}} series",
+    "nSeries_zero": "No series",
+    "notSet": "Not set up",
+    "notUsed": "Not created in Super ERP yet",
+    "editTitle": "Change series {{name}}",
+    "newTitle": "New series for {{doc}}",
+    "any": "Any",
+    "preview": "Next document",
+    "saveSeries": "Save series",
+    "saved": "{{doc}} series {{name}} saved. Next number: {{ex}}.",
+    "deleted": "Series {{name}} deleted.",
+    "deleteTitle": "Delete series {{name}}?",
+    "deleteBody": "Only a series that never numbered a document can be deleted. Used series are locked instead.",
+    "ud": {
+      "saved": "Default series for {{doc}} saved.",
+      "title": "Default series per user · {{doc}}",
+      "body": "Each user starts new documents with their default series; without one they get the company default. Users can still pick another series on the form.",
+      "none": "No active users have access to this company yet.",
+      "user": "User",
+      "position": "Position",
+      "series": "Default series",
+      "seriesFor": "Default series for {{name}}",
+      "companyDefault": "Company default"
+    },
+    "rulesTitle": "Rules",
+    "rule1": "A document type without a series can't be created in Super ERP.",
+    "rule2": "Next numbers only go up. Once a series has numbered documents its prefix and first number are fixed.",
+    "rule3": "Each prefix belongs to one series in the company.",
+    "rule4": "A series with a last number stops there: add a new series before it is used up.",
+    "rule5": "Locked series stay visible but can't number new documents. A series for a period or warehouse only numbers documents of that period or warehouse.",
+    "rule6": "SAP documents keep their SAP numbers.",
+    "pick": {
+      "label": "Series",
+      "none": "No numbering series is set up for this document. Ask the system admin (Administration › Document Numbering).",
+      "mine": "your default",
+      "default": "company default",
+      "itemLabel": "Item code series",
+      "itemHelp": "Leave the code empty to take the next code from the series.",
+      "empLabel": "Employee code series",
+      "problem": {
+        "period": "other period",
+        "whs": "other warehouse",
+        "full": "used up"
+      },
+      "problemLong": {
+        "period": "This series is for documents dated {{from}} to {{to}}. Choose another series or change the date.",
+        "whs": "This series is for warehouse {{whs}}. Choose another series or change the warehouse.",
+        "full": "This series has used its last number. Choose another series."
+      }
+    }
+  },
+  "cmp": {
+    "title": "Choose/Create Company",
+    "desc": "Every company in the group. Each company keeps its own books, stock, users, numbering and settings.",
+    "new": "New company",
+    "list": "Companies",
+    "none": "No companies",
+    "noneBody": "Companies you have access to are listed here.",
+    "f": {
+      "code": "Company code",
+      "legal_name": "Legal name",
+      "short_name": "Short name",
+      "country": "Country",
+      "currency": "Local currency",
+      "licence_type": "Licence type",
+      "licence_authority": "Licence authority",
+      "tax_id": "Tax registration number (TRN)",
+      "sap_schema": "SAP database (schema)",
+      "active": "Active"
+    },
+    "users": "Users",
+    "series": "Series",
+    "lic": {
+      "free_zone": "Free zone",
+      "mainland": "Mainland",
+      "foreign": "Foreign",
+      "tbc": "To be confirmed"
+    },
+    "live": "Live on Super ERP",
+    "notLive": "Before go-live",
+    "noRegister": "Not in the migration register",
+    "note": "A new company starts empty: no numbering, accounts, limits or users. Sanford enters them in the setup screens before the first document.",
+    "saved": "Company {{code}} saved.",
+    "newTitle": "New company",
+    "editTitle": "Company {{code}}",
+    "newDesc": "Add a company to the group. It is added to the migration register so its SAP backup can be uploaded later.",
+    "editDesc": "Basic company details. Printed details (address, logo, TRN on documents) are changed in Company Details with the owner's approval.",
+    "notFound": "Company {{code}} was not found, or you don't have access to it.",
+    "created": "Company {{code}} created",
+    "createdBody": "{{code}} is in the group and in the migration register. You have access to it. Next steps:",
+    "next": {
+      "numbering": "Set up its document numbering",
+      "users": "Give users access",
+      "golive": "Open its go-live checklist",
+      "migration": "Upload its SAP backup in the Migration console"
+    },
+    "basics": "Company basics",
+    "currencyFixed": "The local currency is fixed: the company already has documents or journal entries.",
+    "printNote": "Address, logo and the details printed on documents:",
+    "printLink": "Company Details",
+    "create": "Create company"
+  },
+  "sreq": {
+    "flash": {
+      "sent": "Sent for approval as {{no}}. The document is created when it is approved.",
+      "approved": "Approved. {{no}} is created and posted.",
+      "rejected": "Rejected. The requester can see your note.",
+      "nextStep": "Approved. It now waits for the next approval step.",
+      "cancelled": "Request cancelled."
+    },
+    "reasonField": "Reason for the approver (only if approval is needed)",
+    "reasonPhInvoice": "e.g. Agreed with the customer for the repair",
+    "reasonPhCredit": "e.g. Wrong price billed",
+    "titleN": "Request {{n}}",
+    "kind": {
+      "ar_credit_note": "A/R credit memo waiting for approval",
+      "ar_invoice": "A/R invoice waiting for approval"
+    },
+    "desc": "Nothing is posted until the last approval. Then the document is created with the series chosen on the form.",
+    "what": "What was asked",
+    "requestedBy": "Requested by",
+    "document": "Document",
+    "notYet": "Created when approved",
+    "why": "Why it needs approval",
+    "lines": "Lines",
+    "line": "Invoice line / item",
+    "baseLine": "doc {{entry}} · line {{line}}",
+    "yourApproval": "Your approval is needed",
+    "yourApprovalBody": "Approving the last step creates and posts the document.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "yours": "Your request",
+    "yoursBody": "Cancel it if it is no longer needed.",
+    "cancel": "Cancel request",
+    "steps": "Approval steps",
+    "stepN": "Step {{n}}",
+    "rejectTitle": "Reject {{no}}?",
+    "rejectNote": "Why do you reject it? The requester sees this note."
   }
 }

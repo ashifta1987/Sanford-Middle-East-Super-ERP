@@ -119,6 +119,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   administration: {
     'Exchange Rates and Indexes': '/admin/exchange-rates', 'Approval Process': '/admin/approval-templates', License: '/admin/users',
     'Data Import/Export': '/backoffice/migration',
+    // B1 · companies are created from the front end
+    'Choose/Create Company': '/admin/companies',
   },
   financials: {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
@@ -225,6 +227,8 @@ const LIVE_ITEMS: Record<string, string> = {
   'Check in and out': '/portal', 'Leave and payslips': '/portal',
   // A10 · Administration
   'Company Details': '/admin/company', 'Authorizations ›': '/admin/authorizations', 'Document Numbering': '/admin/numbering',
+  // B1 · Choose/Create Company, Document Numbering check
+  'Create new company': '/admin/companies/new', 'Sanford Middle East DWC Group': '/admin/companies', 'Check Document Numbering': '/admin/numbering',
   'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approval-templates', 'Approval Stages': '/admin/approval-templates',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
   // A14 · go-live checklist and system health
@@ -260,7 +264,7 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   inventory: { 'Inventory Transactions': '/inventory/transfer/new', 'Item Master Data': '/items/new' },
   bp: { 'Business Partner Master Data': '/bp/new' },
   hr: { 'Employee Master Data': '/hr/employees/new', Leave: '/portal' },
-  administration: { License: '/admin/users/invite' },
+  administration: { License: '/admin/users/invite', 'Choose/Create Company': '/admin/companies/new' },
   production: { 'Bill of Materials': '/production/boms/new', 'Production Order': '/production/orders/new' },
   service: { 'Service Call': '/service/calls/new', 'Service Contract': '/service/contracts/new', 'Equipment Card': '/service/equipment/new' },
 };

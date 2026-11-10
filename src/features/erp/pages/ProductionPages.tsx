@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, fmtDay, fmtMoney, fmtQty } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule } from '../components/Guard';
 import { useAuth } from '@/auth/AuthProvider';
 import { Combobox } from '../components/Combobox';
@@ -145,7 +146,7 @@ export function OrderStatePill({ state }: { state: OrderState }) {
 }
 function MaintPill({ status }: { status: string }) {
   const { t } = useTranslation();
-  return <span className={clsx('pill', status === 'overdue' ? 'pill-crit' : status === 'ok' ? 'pill-ok' : 'pill-neutral')}>{t(`ps.mould.status.${status}`)}</span>;
+  return <span className={clsx('pill', status === 'overdue' ? 'pill-crit' : status === 'due_soon' ? 'pill-warning' : status === 'ok' ? 'pill-ok' : 'pill-neutral')}>{t(`ps.mould.status.${status}`)}</span>;
 }
 const BOM_TYPES = ['production', 'assembly', 'sales'] as const;
 
@@ -373,12 +374,13 @@ export function ProdOrderNewPage() {
   const [post, setPost] = useState(today());
   const [whs, setWhs] = useState('');
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function go() {
     setErr(null); setBusy(true);
     try {
-      const r = await orderCreate(company, { item_code: item, planned_qty: qty, due_date: due, post_date: post, whs_code: whs || null, comments });
+      const r = await orderCreate(company, { item_code: item, planned_qty: qty, due_date: due, post_date: post, whs_code: whs || null, comments }, series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       nav(`/production/orders/${company}/${r.order_id}`, { state: { flash: t('ps.order.created', { no: r.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -399,6 +401,7 @@ export function ProdOrderNewPage() {
           <label className={label}>{t('ps.bom.receiveWhs')}
             <select id="order-whs" className={inputCls} value={whs} onChange={(e) => setWhs(e.target.value)}><option value="">{t('ps.order.bomWhs')}</option>{(setup.data?.warehouses ?? []).map((w) => <option key={w.code} value={w.code}>{w.code} · {w.name}</option>)}</select></label>
           <label className={label}>{t('erp.col.remarks')}<input id="order-comments" dir="auto" className={inputCls} value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+          <SeriesPicker company={company} obj={202} value={series} onChange={setSeries} date={post} />
         </div>
         <div className="flex flex-wrap gap-2 border-t border-line p-5">
           <Button variant="primary" id="order-create" disabled={busy || !canWrite} disabledReason={!canWrite ? readOnlyReason : undefined} onClick={go}>{busy ? t('so.saving') : t('ps.order.create')}</Button>
@@ -565,7 +568,7 @@ export function MouldsPage() {
     searchCols: ['res_code', 'name', 'location', 'asset_no'], searchLabel: t('ps.mould.search'),
     filters: [
       { key: 'kind', label: t('ps.mould.kind'), options: (['mould', 'machine', 'labour', 'other'] as const).map((k) => [k, t(`ps.res.kind.${k}`)] as [string, string]) },
-      { key: 'maint_status', label: t('ps.mould.maint'), options: (['overdue', 'ok', 'not_scheduled'] as const).map((k) => [k, t(`ps.mould.status.${k}`)] as [string, string]) },
+      { key: 'maint_status', label: t('ps.mould.maint'), options: (['overdue', 'due_soon', 'ok', 'not_scheduled'] as const).map((k) => [k, t(`ps.mould.status.${k}`)] as [string, string]) },
       { key: 'life_warn', label: t('ps.mould.lifeWarn'), options: [['true', t('erp.yes')], ['false', t('erp.no')]], type: 'boolean' },
     ],
     defaultSort: { col: 'res_code', asc: true },
@@ -584,7 +587,9 @@ export function MouldsPage() {
   return <PsListFrame module="production" title={t('ps.mould.title')} desc={t('ps.mould.desc')} newTo="/production/moulds/new" newLabel={t('ps.mould.new')} newId="mould-new"><ListScreen config={cfg} /></PsListFrame>;
 }
 
-const RES_FIELDS = ['name', 'kind', 'unit', 'unit_cost', 'acct_code', 'cavities', 'rated_life_shots', 'shots_done', 'location', 'asset_no', 'maint_every_shots', 'maint_every_days', 'note'] as const;
+const RES_FIELDS = ['name', 'kind', 'unit', 'unit_cost', 'acct_code', 'cavities', 'rated_life_shots', 'shots_done', 'location', 'asset_no', 'maint_every_shots', 'maint_every_days', 'warn_pct', 'note'] as const;
+// B1 decision: sensible defaults for a new mould (editable per mould).
+const MOULD_DEFAULTS = { maint_every_shots: '50000', rated_life_shots: '500000', warn_pct: '80' };
 export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
   const { t } = useTranslation();
   const nav = useNavigate();
@@ -599,7 +604,7 @@ export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
   const [flash, setFlash] = useFlash();
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState<Record<string, string>>({ kind: 'mould', unit: 'shot' });
+  const [f, setF] = useState<Record<string, string>>({ kind: 'mould', unit: 'shot', ...MOULD_DEFAULTS });
   const [newCode, setNewCode] = useState('');
   const [mDate, setMDate] = useState(today());
   const [mKind, setMKind] = useState('preventive');
@@ -607,7 +612,8 @@ export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
   useEffect(() => {
     const m = q.data?.mould;
     if (!m) return;
-    setF(Object.fromEntries(RES_FIELDS.map((k) => [k, k === 'acct_code' ? q.data?.acct_code ?? '' : k === 'note' ? q.data?.note ?? '' : (m as unknown as R)[k] == null ? '' : String((m as unknown as R)[k])])));
+    setF(Object.fromEntries(RES_FIELDS.map((k) => [k, k === 'acct_code' ? q.data?.acct_code ?? '' : k === 'note' ? q.data?.note ?? '' : k === 'warn_pct' ? (q.data?.warn_pct == null ? '' : String(Number(q.data.warn_pct)))
+      : (m as unknown as R)[k] == null ? '' : String((m as unknown as R)[k])])));
   }, [q.data]);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
   async function save() {
@@ -651,7 +657,7 @@ export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
               {mode === 'new' && <label className={label}>{t('ps.mould.code')} <span className="text-crit-fg">*</span><input id="res-code" className={`${inputCls} font-mono uppercase`} value={newCode} onChange={(e) => setNewCode(e.target.value)} /></label>}
               {fld('name', t('erp.col.name'))}
-              <label className={label}>{t('ps.mould.kind')}<select id="res-kind" disabled={!canWrite} className={inputCls} value={f.kind ?? 'mould'} onChange={(e) => { set('kind', e.target.value); if (e.target.value === 'mould') set('unit', 'shot'); }}>{(['mould', 'machine', 'labour', 'other'] as const).map((k) => <option key={k} value={k}>{t(`ps.res.kind.${k}`)}</option>)}</select></label>
+              <label className={label}>{t('ps.mould.kind')}<select id="res-kind" disabled={!canWrite} className={inputCls} value={f.kind ?? 'mould'} onChange={(e) => { set('kind', e.target.value); if (e.target.value === 'mould') { set('unit', 'shot'); if (mode === 'new') setF((x) => ({ ...x, kind: 'mould', unit: 'shot', ...MOULD_DEFAULTS })); } else if (mode === 'new') setF((x) => ({ ...x, kind: e.target.value, maint_every_shots: '', rated_life_shots: '', warn_pct: '' })); }}>{(['mould', 'machine', 'labour', 'other'] as const).map((k) => <option key={k} value={k}>{t(`ps.res.kind.${k}`)}</option>)}</select></label>
               <label className={label}>{t('ps.mould.unit')}<select id="res-unit" disabled={!canWrite} className={inputCls} value={f.unit ?? 'hour'} onChange={(e) => set('unit', e.target.value)}>{(['shot', 'hour', 'unit'] as const).map((k) => <option key={k} value={k}>{t(`ps.unit.${k}`)}</option>)}</select></label>
               {fld('unit_cost', t('ps.mould.unitCost'), { num: true })}
               <label className={label}>{t('ps.mould.acct')}<select id="res-acct" disabled={!canWrite} className={inputCls} value={f.acct_code ?? ''} onChange={(e) => set('acct_code', e.target.value)}><option value="">—</option>{(setup.data?.accounts ?? []).map((a) => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}</select>
@@ -659,9 +665,11 @@ export function MouldPage({ mode }: { mode: 'new' | 'view' }) {
               {f.kind === 'mould' && <>{fld('cavities', t('ps.mould.cavities'), { num: true })}{fld('rated_life_shots', t('ps.mould.ratedLife'), { num: true })}{fld('shots_done', t('ps.mould.shots'), { num: true })}</>}
               {fld('location', t('ps.mould.location'))}{fld('asset_no', t('ps.mould.asset'))}
               {f.kind === 'mould' && fld('maint_every_shots', t('ps.mould.everyShots'), { num: true })}
+              {f.kind === 'mould' && fld('warn_pct', t('ps.mould.warnPct'), { num: true })}
               {fld('maint_every_days', t('ps.mould.everyDays'), { num: true })}
               {fld('note', t('erp.col.remarks'))}
             </div>
+            {f.kind === 'mould' && <p className="border-t border-line px-5 py-3 text-xs text-muted" data-testid="mould-defaults-note">{t('ps.mould.defaultsNote')}</p>}
             <div className="flex flex-wrap gap-2 border-t border-line p-5">
               <Button variant="primary" id="res-save" disabled={busy || !canWrite} disabledReason={!canWrite ? readOnlyReason : undefined} onClick={save}>{busy ? t('so.saving') : t('ps.save')}</Button>
             </div>

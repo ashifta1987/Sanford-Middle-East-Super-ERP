@@ -9,6 +9,7 @@ import { ApiError, errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, StatusTag, fmtDay, fmtMoney, fmtQty } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -241,6 +242,7 @@ export function StockDocNewPage({ kind }: { kind: StockDocKind }) {
   const [acct, setAcct] = useState('');
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [lines, setLines] = useState<GLine[]>([newGLine()]);
   const [why, setWhy] = useState('');
   const [ev, setEv] = useState<InvEval | null>(null);
@@ -267,7 +269,7 @@ export function StockDocNewPage({ kind }: { kind: StockDocKind }) {
     if (checks.length && !why.trim()) { setErr(t('inv.reasonNeeded')); return; }
     setBusy(true);
     try {
-      const res = await invCreate(company, obj, header, payload, checks.length ? why.trim() : null);
+      const res = await invCreate(company, obj, header, payload, checks.length ? why.trim() : null, series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       nav(`/docs/${kind}/${company}/${res.doc_entry}`, { state: { flash: t(res.state === 'approved' ? 'inv.flash.posted' : 'inv.flash.waiting', { no: res.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -304,6 +306,7 @@ export function StockDocNewPage({ kind }: { kind: StockDocKind }) {
               </label>
               <label className={label}>{t('inv.reference')}<input id="inv-ref" className={inputCls} value={ref} onChange={(e) => setRef(e.target.value)} /></label>
               <label className={label}>{t('erp.col.remarks')}<input id="inv-comments" dir="auto" className={inputCls} value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+              <SeriesPicker company={company} obj={obj} value={series} onChange={setSeries} date={date} whs={whs} />
             </div>
             {errs.filter((e) => e.line === null && payload.length).map((e, i) => <p key={i} role="alert" dir="auto" className="px-5 pb-3 text-[13px] text-crit-fg" data-testid="inv-header-error">{e.message}</p>)}
           </SectionCard>
@@ -409,6 +412,7 @@ export function TransferNewPage({ kind }: { kind: TransferKind }) {
   const [to, setTo] = useState('WH02');
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [lines, setLines] = useState<TLine[]>([newTLine()]);
   const [ev, setEv] = useState<InvEval | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -440,7 +444,7 @@ export function TransferNewPage({ kind }: { kind: TransferKind }) {
     setErr(null);
     setBusy(true);
     try {
-      const res = isReq ? await trRequestCreate(company, header, payload) : await trCreate(company, header, payload);
+      const res = isReq ? await trRequestCreate(company, header, payload, series) : await trCreate(company, header, payload, series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       nav(`/docs/${kind}/${company}/${res.doc_entry}`, { state: { flash: t(isReq ? 'inv.flash.request' : 'inv.flash.transfer', { no: res.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -470,6 +474,7 @@ export function TransferNewPage({ kind }: { kind: TransferKind }) {
               </label>
               <label className={label}>{t('inv.reference')}<input id="tr-ref" className={inputCls} value={ref} onChange={(e) => setRef(e.target.value)} /></label>
               <label className={label}>{t('erp.col.remarks')}<input id="tr-comments" dir="auto" className={inputCls} value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+              <SeriesPicker company={company} obj={obj} value={series} onChange={setSeries} date={date} />
             </div>
           </SectionCard>
           <SectionCard title={t('inv.lines')}>
@@ -755,12 +760,13 @@ export function CountNewPage() {
   const [grp, setGrp] = useState('');
   const [date, setDate] = useState(today());
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function go() {
     setErr(null); setBusy(true);
     try {
-      const r = await countCreate(company, { whs_code: whs, item_group: grp || null, count_date: date, comments });
+      const r = await countCreate(company, { whs_code: whs, item_group: grp || null, count_date: date, comments }, series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       nav(`/inventory/counts/${company}/${r.count_id}`, { state: { flash: t('inv.flash.countStarted', { no: r.doc_no, n: r.lines }) } });
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -779,6 +785,7 @@ export function CountNewPage() {
               <option value="">{t('inv.count.allItems')}</option>{(setup.data?.item_groups ?? []).map((g) => <option key={g.code} value={g.code}>{g.name}</option>)}</select></label>
           <label className={label}>{t('inv.count.date')} <span className="text-crit-fg">*</span><input id="count-date" type="date" className={`${inputCls} num`} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className={label}>{t('erp.col.remarks')}<input id="count-comments" dir="auto" className={inputCls} value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+          <SeriesPicker company={company} obj={1470000065} value={series} onChange={setSeries} date={date} whs={whs} />
         </div>
         <div className="flex flex-wrap gap-2 border-t border-line p-5">
           <Button variant="primary" id="count-create" disabled={busy || !canWrite} disabledReason={!canWrite ? readOnlyReason : undefined} onClick={go}>{busy ? t('so.saving') : t('inv.count.start')}</Button>

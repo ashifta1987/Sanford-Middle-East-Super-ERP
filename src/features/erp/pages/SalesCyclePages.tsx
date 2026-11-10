@@ -15,6 +15,7 @@ import { Fields, LiveBadge, PageTitle, SectionCard, StatusTag, fmtDay, fmtMoney,
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { DocFlow } from '../components/DocFlow';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { AskAiDocCard } from '../components/AskAi';
 import { DOC_KINDS, moduleByKey, type DocKind } from '../modules';
 import { searchCustomers, useSoSetup, type CustomerHit } from '../salesOrder';
@@ -157,6 +158,7 @@ export function DeliveryNewPage() {
   const [rows, setRows] = useState<PickRow[]>([]);
   const [date, setDate] = useState(today());
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (q.data) setRows(pickRows(q.data.lines, () => true)); }, [q.data]);
@@ -174,7 +176,7 @@ export function DeliveryNewPage() {
     setBusy(true);
     try {
       const res = await deliveryCreate(company, { doc_date: date, comments },
-        sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty, whs_code: r.whs || null })));
+        sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty, whs_code: r.whs || null })), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       qc.invalidateQueries({ queryKey: ['sales-flow'] });
       qc.removeQueries({ queryKey: ['doc', 'sales_order', company, String(order)] });
@@ -208,6 +210,7 @@ export function DeliveryNewPage() {
           <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}
             <input id="sc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} />
           </label>
+          <SeriesPicker company={company} obj={15} value={series} onChange={setSeries} date={date} />
         </div>
       </SectionCard>
       <SectionCard title={t('sc.linesToDeliver')}>
@@ -219,7 +222,7 @@ export function DeliveryNewPage() {
 }
 
 // ---------- New A/R invoice (from deliveries, or service lines) ----------
-interface SvcLine { key: string; item_code: string; text: string; qty: string; price: string; tax_code: string; listPrice: number | null }
+interface SvcLine { key: string; item_code: string; text: string; qty: string; price: string; disc: string; tax_code: string; listPrice: number | null }
 let svcSeq = 0;
 
 export function InvoiceNewPage() {
@@ -243,6 +246,8 @@ export function InvoiceNewPage() {
   const [due, setDue] = useState('');
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
+  const [why, setWhy] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open.data) setRows(pickRows(open.data.lines, (l) => (delivery ? l.base_doc_entry === delivery : false))); }, [open.data, delivery]);
@@ -255,11 +260,12 @@ export function InvoiceNewPage() {
   const svcTot = svc.reduce((acc, l) => {
     if (!l.item_code) return acc;
     const p = l.price !== '' ? Number(l.price) : Number(l.listPrice ?? 0);
-    const n = r2((Number(l.qty) || 0) * p);
-    return { before: acc.before + n, net: acc.net + n, vat: acc.vat + r2((n * rate(l.tax_code)) / 100) };
+    const b = r2((Number(l.qty) || 0) * p);
+    const n = r2(b * (1 - (Number(l.disc) || 0) / 100));
+    return { before: acc.before + b, net: acc.net + n, vat: acc.vat + r2((n * rate(l.tax_code)) / 100) };
   }, { before: 0, net: 0, vat: 0 });
   const pt = pickTotals(rows);
-  const tot = { before: r2(pt.before + svcTot.before), discount: pt.discount, vat: r2(pt.vat + svcTot.vat), total: r2(pt.total + svcTot.net + svcTot.vat) };
+  const tot = { before: r2(pt.before + svcTot.before), discount: r2(pt.discount + svcTot.before - svcTot.net), vat: r2(pt.vat + svcTot.vat), total: r2(pt.total + svcTot.net + svcTot.vat) };
   const sel = rows.filter((r) => r.sel);
   const svcFilled = svc.filter((l) => l.item_code);
 
@@ -275,13 +281,14 @@ export function InvoiceNewPage() {
     if (!sel.length && !svcFilled.length) { setErr(t('sc.chooseLines')); return; }
     setBusy(true);
     try {
-      const res = await invoiceCreate(company, { card_code: card, doc_date: date, due_date: due || null, customer_ref: ref, comments }, [
+      const res = await invoiceCreate(company, { card_code: card, doc_date: date, due_date: due || null, customer_ref: ref, comments, approval_reason: why || null }, [
         ...sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })),
-        ...svcFilled.map((l) => ({ item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, tax_code: l.tax_code || null })),
-      ]);
+        ...svcFilled.map((l) => ({ item_code: l.item_code, qty: l.qty, price: l.price === '' ? null : l.price, discount_pct: l.disc === '' ? null : l.disc, tax_code: l.tax_code || null })),
+      ], series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       qc.invalidateQueries({ queryKey: ['sales-flow'] });
-      nav(`/docs/ar_invoice/${company}/${res.doc_entry}`, { state: { flash: t('sc.flash.invoice', { no: res.doc_no }) } });
+      if (res.state === 'pending_approval') nav(`/sales/requests/${company}/${res.request_id}`, { state: { flash: t('sreq.flash.sent', { no: res.doc_no }) } });
+      else nav(`/docs/ar_invoice/${company}/${res.doc_entry}`, { state: { flash: t('sc.flash.invoice', { no: res.doc_no }) } });
     } catch (e) {
       setErr(errorMessage(e));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -331,6 +338,10 @@ export function InvoiceNewPage() {
           <label className="block text-xs font-medium text-muted sm:col-span-2">{t('erp.col.remarks')}
             <input id="sc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} />
           </label>
+          <SeriesPicker company={company} obj={13} value={series} onChange={setSeries} date={date} />
+          <label className="block text-xs font-medium text-muted sm:col-span-2 xl:col-span-3">{t('sreq.reasonField')}
+            <input id="sc-approval-reason" className="input mt-1 text-[15px] text-ink" dir="auto" value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sreq.reasonPhInvoice')} />
+          </label>
         </div>
       </SectionCard>
       <SectionCard title={t('sc.deliveredLines')} right={<span className="text-sm text-muted">{t('sc.openDeliveries')}</span>}>
@@ -342,7 +353,7 @@ export function InvoiceNewPage() {
         <ul className="divide-y divide-line">
           {svc.map((l, i) => (
             <li key={l.key} className="px-4 py-3" data-testid="svc-line">
-              <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-[minmax(0,1fr)_96px_128px_120px_44px]">
+              <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-[minmax(0,1fr)_88px_120px_88px_120px_44px]">
                 <div className="col-span-2 min-w-0 md:col-span-1">
                   <Combobox id={`svc-${l.key}-item`} label={t('so.itemN', { n: i + 1 })} text={l.text}
                     onText={(s) => setSvc((ls) => ls.map((x) => (x.key === l.key ? { ...x, text: s, item_code: '' } : x)))}
@@ -356,6 +367,10 @@ export function InvoiceNewPage() {
                 <label className="block text-xs font-medium text-muted">{t('so.unitPrice')}
                   <input id={`svc-${l.key}-price`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" value={l.price}
                     placeholder={l.listPrice != null ? fmtMoney(l.listPrice) : ''} onChange={(e) => setSvc((ls) => ls.map((x) => (x.key === l.key ? { ...x, price: e.target.value } : x)))} />
+                </label>
+                <label className="block text-xs font-medium text-muted">{t('so.disc')}
+                  <input id={`svc-${l.key}-disc`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" value={l.disc} placeholder="0"
+                    onChange={(e) => setSvc((ls) => ls.map((x) => (x.key === l.key ? { ...x, disc: e.target.value } : x)))} />
                 </label>
                 <label className="block text-xs font-medium text-muted">{t('erp.col.taxCode')}
                   <select className="input mt-1 px-2 text-[15px] text-ink" value={l.tax_code} onChange={(e) => setSvc((ls) => ls.map((x) => (x.key === l.key ? { ...x, tax_code: e.target.value } : x)))}>
@@ -372,7 +387,7 @@ export function InvoiceNewPage() {
         </ul>
         <div className="flex flex-col gap-3 border-t border-line sm:flex-row sm:items-start sm:justify-between">
           <div className="p-4">
-            <Button variant="secondary" id="svc-add" onClick={() => setSvc((ls) => [...ls, { key: `s${++svcSeq}`, item_code: '', text: '', qty: '1', price: '', tax_code: defTax, listPrice: null }])}>
+            <Button variant="secondary" id="svc-add" onClick={() => setSvc((ls) => [...ls, { key: `s${++svcSeq}`, item_code: '', text: '', qty: '1', price: '', disc: '', tax_code: defTax, listPrice: null }])}>
               <Plus className="h-4 w-4" aria-hidden /> {t('sc.addService')}
             </Button>
           </div>
@@ -399,6 +414,8 @@ export function CreditMemoNewPage() {
   const [ret, setRet] = useState(true);
   const [whs, setWhs] = useState('');
   const [comments, setComments] = useState('');
+  const [why, setWhy] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (q.data) { setRows(pickRows(q.data.lines, () => true)); setWhs(q.data.lines.find((l) => l.whs_code)?.whs_code ?? ''); } }, [q.data]);
@@ -416,11 +433,12 @@ export function CreditMemoNewPage() {
     if (!sel.length) { setErr(t('sc.chooseLines')); return; }
     setBusy(true);
     try {
-      const res = await creditMemoCreate(company, { doc_date: date, return_stock: ret && anyStock, whs_code: ret ? whs || null : null, comments },
-        sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })));
+      const res = await creditMemoCreate(company, { doc_date: date, return_stock: ret && anyStock, whs_code: ret ? whs || null : null, comments, approval_reason: why || null },
+        sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       qc.invalidateQueries({ queryKey: ['sales-flow'] });
-      nav(`/docs/ar_credit_note/${company}/${res.doc_entry}`, { state: { flash: t('sc.flash.creditMemo', { no: res.doc_no }) } });
+      if (res.state === 'pending_approval') nav(`/sales/requests/${company}/${res.request_id}`, { state: { flash: t('sreq.flash.sent', { no: res.doc_no }) } });
+      else nav(`/docs/ar_credit_note/${company}/${res.doc_entry}`, { state: { flash: t('sc.flash.creditMemo', { no: res.doc_no }) } });
     } catch (e) {
       setErr(errorMessage(e));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -461,6 +479,10 @@ export function CreditMemoNewPage() {
               </select>
             </label>
           )}
+          <SeriesPicker company={company} obj={14} value={series} onChange={setSeries} date={date} />
+          <label className="block text-xs font-medium text-muted sm:col-span-2">{t('sreq.reasonField')}
+            <input id="sc-approval-reason" className="input mt-1 text-[15px] text-ink" dir="auto" value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sreq.reasonPhCredit')} />
+          </label>
         </div>
       </SectionCard>
       <SectionCard title={t('sc.linesToCredit')}>

@@ -50,9 +50,9 @@ export interface InvEval {
 }
 export const invChecks = (company: string, obj: number, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
   rpc<InvEval>('inventory_doc_checks', { p_company: company, p_obj: obj, p_header: header, p_lines: lines });
-export const invCreate = (company: string, obj: number, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, reason: string | null) =>
+export const invCreate = (company: string, obj: number, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, reason: string | null, series: number | null = null) =>
   rpc<{ doc_entry: number; doc_no: string; state: WorkflowState; status: string; value: number; trans_id: number | null }>('inventory_doc_create', {
-    p_company: company, p_obj: obj, p_header: header, p_lines: lines, p_reason: reason,
+    p_company: company, p_obj: obj, p_header: header, p_lines: lines, p_reason: reason, p_series: series,
   });
 export const invDecide = (company: string, obj: number, entry: number, decision: 'approved' | 'rejected', note: string | null) =>
   rpc<{ state: WorkflowState; trans_id: number | null }>('inventory_doc_decide', { p_company: company, p_obj: obj, p_doc_entry: entry, p_decision: decision, p_note: note });
@@ -61,12 +61,12 @@ export const invCancel = (company: string, obj: number, entry: number, note: str
 
 export const trChecks = (company: string, obj: number, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
   rpc<InvEval>('transfer_checks', { p_company: company, p_obj: obj, p_header: header, p_lines: lines });
-export const trRequestCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string }>('transfer_request_create', { p_company: company, p_header: header, p_lines: lines });
+export const trRequestCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string }>('transfer_request_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
 export const trRequestCancel = (company: string, entry: number, note: string) =>
   rpc<{ status: string }>('transfer_request_cancel', { p_company: company, p_doc_entry: entry, p_note: note });
-export const trCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; qty: number; value: number; trans_id: number | null }>('transfer_create', { p_company: company, p_header: header, p_lines: lines });
+export const trCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; qty: number; value: number; trans_id: number | null }>('transfer_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
 export interface TrSource {
   header: { doc_entry: number; doc_no: string; doc_date: string; due_date: string | null; from_whs: string | null; to_whs: string | null; status: string; source: string; comments: string | null } | null;
   lines: Array<{ base_doc_entry: number; base_line: number; item_code: string; description: string | null; uom: string | null; quantity: number; open_qty: number;
@@ -117,8 +117,8 @@ export interface CountInfo {
 export function useCountInfo(company: string, id: number) {
   return useQuery({ queryKey: ['inv-count', company, id], queryFn: () => rpc<CountInfo | null>('inv_count_info', { p_company: company, p_count_id: id }) });
 }
-export const countCreate = (company: string, header: Record<string, unknown>) =>
-  rpc<{ count_id: number; doc_no: string; lines: number }>('inv_count_create', { p_company: company, p_header: header });
+export const countCreate = (company: string, header: Record<string, unknown>, series: number | null = null) =>
+  rpc<{ count_id: number; doc_no: string; lines: number }>('inv_count_create', { p_company: company, p_header: header, p_series: series });
 export const countSave = (company: string, id: number, lines: Array<Record<string, unknown>>) =>
   rpc<{ n_lines: number; n_counted: number; saved: number; added: number; state: CountState }>('inv_count_save', { p_company: company, p_count_id: id, p_lines: lines });
 export const countSubmit = (company: string, id: number, reason: string | null) =>

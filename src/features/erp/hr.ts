@@ -73,7 +73,7 @@ export interface EmployeeInfo {
 export function useEmployeeInfo(company: string, id: number) {
   return useQuery({ queryKey: ['hr-emp', company, id], enabled: Boolean(company && id), queryFn: () => rpc<EmployeeInfo>('hr_employee_info', { p_company: company, p_emp_id: id }) });
 }
-export const employeeSave = (company: string, emp: Any) => rpc<{ emp_id: number; hr_code: string }>('hr_employee_save', { p_company: company, p_emp: emp });
+export const employeeSave = (company: string, emp: Any, series: number | null = null) => rpc<{ emp_id: number; hr_code: string }>('hr_employee_save', { p_company: company, p_emp: emp, p_series: series });
 export const employeeExtraSave = (company: string, id: number, extra: Any) => rpc<{ saved: boolean }>('hr_employee_extra_save', { p_company: company, p_emp_id: id, p_extra: extra });
 export const paySet = (company: string, id: number, wage: string, amount: number, from: string, note: string | null) =>
   rpc('hr_pay_set', { p_company: company, p_emp_id: id, p_wage_code: wage, p_amount: amount, p_valid_from: from, p_note: note });

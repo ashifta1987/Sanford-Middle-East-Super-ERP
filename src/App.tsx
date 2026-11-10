@@ -64,7 +64,11 @@ const { CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, Lot
 const P_AdminPages = from(() => import('@/features/erp/pages/AdminPages'));
 const { AuthorizationsPage, UserFormPage, UsersPage } = P_AdminPages('AuthorizationsPage', 'UserFormPage', 'UsersPage');
 const P_AdminSetupPages = from(() => import('@/features/erp/pages/AdminSetupPages'));
-const { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage, NumberingPage } = P_AdminSetupPages('AiAssistantPage', 'ApprovalTemplatesPage', 'CompanyDetailsPage', 'ExchangeRatesPage', 'NumberingPage');
+const { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage } = P_AdminSetupPages('AiAssistantPage', 'ApprovalTemplatesPage', 'CompanyDetailsPage', 'ExchangeRatesPage');
+const P_NumberingPages = from(() => import('@/features/erp/pages/NumberingPages'));
+const { CompaniesPage, CompanyFormPage, DocNumberingPage } = P_NumberingPages('CompaniesPage', 'CompanyFormPage', 'DocNumberingPage');
+const P_SalesRequestPages = from(() => import('@/features/erp/pages/SalesRequestPages'));
+const { SalesRequestPage } = P_SalesRequestPages('SalesRequestPage');
 const P_ReportPages = from(() => import('@/features/erp/pages/ReportPages'));
 const { ReportPage, ReportPrintPage, ReportsLibraryPage } = P_ReportPages('ReportPage', 'ReportPrintPage', 'ReportsLibraryPage');
 const P_ProductionPages = from(() => import('@/features/erp/pages/ProductionPages'));
@@ -148,6 +152,8 @@ export default function App() {
         <Route path="docs/ar_credit_note/:company/:entry" element={<SalesDocPage key="ar_credit_note" kind="ar_credit_note" />} />
         <Route path="sales/atp" element={<AtpCheckPage />} />
         <Route path="sales/atp-rules" element={<AtpRulesPage />} />
+        {/* B1 · credit memos and direct service invoices waiting for approval */}
+        <Route path="sales/requests/:company/:id" element={<SalesRequestPage />} />
         {/* A6 · purchasing, China flow */}
         {(['purchase_request', 'purchase_quotation', 'purchase_order'] as const).map((k) => [
           <Route key={`${k}-new`} path={`docs/${k}/new`} element={<PurchaseDocNewPage key={`${k}-new`} kind={k} />} />,
@@ -222,7 +228,11 @@ export default function App() {
         <Route path="admin/users/:id" element={<UserFormPage key="u-edit" mode="edit" />} />
         <Route path="admin/authorizations" element={<AuthorizationsPage />} />
         <Route path="admin/approval-templates" element={<ApprovalTemplatesPage />} />
-        <Route path="admin/numbering" element={<NumberingPage />} />
+        {/* B1 · Document Numbering (several series per type, user defaults) and Choose/Create Company */}
+        <Route path="admin/numbering" element={<DocNumberingPage />} />
+        <Route path="admin/companies" element={<CompaniesPage />} />
+        <Route path="admin/companies/new" element={<CompanyFormPage key="cmp-new" mode="new" />} />
+        <Route path="admin/companies/:code" element={<CompanyFormPage key="cmp-edit" mode="edit" />} />
         <Route path="admin/company" element={<CompanyDetailsPage />} />
         <Route path="admin/exchange-rates" element={<ExchangeRatesPage />} />
         <Route path="admin/ai-assistant" element={<AiAssistantPage />} />

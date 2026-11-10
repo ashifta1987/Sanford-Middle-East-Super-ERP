@@ -11,7 +11,7 @@ export type SalesKind = 'sales_order' | 'sales_quotation';
 export const SALES_OBJ: Record<SalesKind, number> = { sales_order: 17, sales_quotation: 23 };
 export type WorkflowState = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
 export type RuleCode = 'discount_pct' | 'credit_limit' | 'below_cost' | 'journal_amount' | 'payment_amount' | 'bank_change' | 'po_amount' | 'po_price_increase'
-  | 'stock_doc_amount' | 'count_variance_pct' | 'count_variance_value' | 'bp_credit_limit' | 'bp_bank_detail' | 'leave_manager' | 'leave_hr' | 'leave_long' | 'company_details';
+  | 'stock_doc_amount' | 'count_variance_pct' | 'count_variance_value' | 'bp_credit_limit' | 'bp_bank_detail' | 'leave_manager' | 'leave_hr' | 'leave_long' | 'company_details' | 'credit_memo_amount';
 
 export interface Code<T = string> { code: T; name: string }
 export interface SoSetup {
@@ -57,7 +57,7 @@ export interface SoInfo {
   obj_type?: number; status?: string; can_copy?: boolean; copy_block?: 'not_approved' | 'closed' | 'read_only' | null;
 }
 export interface InboxRow {
-  approval_id: number; company_code: string; kind: 'sales_order' | 'sales_quotation' | 'journal' | 'payment' | 'purchase_order' | 'goods_receipt' | 'goods_issue' | 'inventory_count' | 'bp_change' | 'leave' | 'company_details'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
+  approval_id: number; company_code: string; kind: 'sales_order' | 'sales_quotation' | 'journal' | 'payment' | 'purchase_order' | 'goods_receipt' | 'goods_issue' | 'inventory_count' | 'bp_change' | 'leave' | 'company_details' | 'sales_doc_request'; doc_entry: number; doc_no: string; rule_code: RuleCode; step: number;
   card_code: string | null; card_name: string | null; total: number; currency: string; requested_by_name: string | null; requested_at: string;
   reason: string | null; decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null;
   state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;
@@ -106,9 +106,9 @@ export function useInbox() {
   return useQuery({ queryKey: ['approval-inbox'], queryFn: () => rpc<Inbox>('approval_inbox', {}), refetchInterval: 30_000 });
 }
 
-export const soSave = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[], obj = 17) =>
+export const soSave = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[], obj = 17, series: number | null = null) =>
   rpc<{ doc_entry: number; doc_no: string; state: WorkflowState; totals: SoTotals; checks: SoCheck[] }>('sales_doc_save', {
-    p_company: company, p_obj: obj, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines),
+    p_company: company, p_obj: obj, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines), p_series: series,
   });
 export const soChecks = (company: string, entry: number | null, header: SoHeaderInput, lines: SoLineInput[], obj = 17) =>
   rpc<SoEval>('sales_doc_checks', { p_company: company, p_obj: obj, p_doc_entry: entry, p_header: toHeaderPayload(header), p_lines: toLinesPayload(lines) });

@@ -9,6 +9,7 @@ import { ApiError, errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, StatusTag, fmtDay, fmtMoney, fmtQty } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -247,6 +248,7 @@ function PurchaseDocForm({ kind, company, initial }: {
   const [supText, setSupText] = useState(initial?.supplierText ?? '');
   const [lines, setLines] = useState<FormLine[]>(initial?.lines ?? []);
   const [entry, setEntry] = useState<number | null>(initial?.entry ?? null);
+  const [series, setSeries] = useState<number | null>(null);
   const [preview, setPreview] = useState<PuEval | null>(null);
   const [reason, setReason] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -298,7 +300,7 @@ function PurchaseDocForm({ kind, company, initial }: {
     setErr(null); setAttempted(true);
     setBusy(true);
     try {
-      const res = await puSave(company, obj, entry, h, filled);
+      const res = await puSave(company, obj, entry, h, filled, entry ? null : series);
       setEntry(res.doc_entry);
       setDirty(false);
       if (thenSubmit) {
@@ -366,6 +368,7 @@ function PurchaseDocForm({ kind, company, initial }: {
               <label className={clsx('block text-xs font-medium text-muted', isReq ? 'sm:col-span-2' : 'xl:col-span-3 sm:col-span-2')}>{t('erp.col.remarks')}
                 <input id="pu-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={h.comments} onChange={(e) => set({ comments: e.target.value })} />
               </label>
+              {!entry && <SeriesPicker company={company} obj={obj} value={series} onChange={setSeries} date={h.doc_date} whs={h.whs_code} />}
             </div>
           </SectionCard>
 
@@ -738,13 +741,14 @@ function ChinaSteps({ company, po, poNo, info, doc, lines, onDone }: { company: 
   const [pi, setPi] = useState({ vendor_pi_no: '', pi_date: today(), amount: '', eta: '', status: '', note: '' });
   const [piEdit, setPiEdit] = useState<number | null>(null);
   const [dep, setDep] = useState({ doc_date: today(), mode: 'pct', pct: '30', amount: '', pi_id: '' });
+  const [depSeries, setDepSeries] = useState<number | null>(null);
   const [qcF, setQcF] = useState({ inspected_on: today(), inspector: '', result: 'pass', note: '', photo: '' });
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [sh, setSh] = useState({ container_no: '', shipping_mark: '', shipment_mode: 'sea', etd: '', eta: '', note: '' });
   const [shQty, setShQty] = useState<Record<number, string>>({});
   const open = (f: typeof form) => { setForm(f); setErr(null); };
   const lastQc = (info.qcs ?? []).slice(-1)[0];
-  const qcBlock = info.require_qc_pass && info.last_qc !== 'pass';
+  const qcBlock = info.last_qc !== 'pass';   // B1: QC must always pass before goods ship
 
   async function run(fn: () => Promise<unknown>, msg: string) {
     setErr(null); setBusy(true);
@@ -803,6 +807,7 @@ function ChinaSteps({ company, po, poNo, info, doc, lines, onDone }: { company: 
           {form === 'deposit' && (
             <div className="grid grid-cols-1 gap-4 border-y border-line p-5 sm:grid-cols-2" data-testid="pu-deposit-form">
               <label className={field}>{t('erp.col.postingDate')}<input id="pu-dep-date" type="date" className={`${input} num`} value={dep.doc_date} onChange={(e) => setDep({ ...dep, doc_date: e.target.value })} /></label>
+              <SeriesPicker company={company} obj={204} value={depSeries} onChange={setDepSeries} date={dep.doc_date} id="pu-dep-series" />
               <label className={field}>{t('pu.deposit.how')}
                 <select id="pu-dep-mode" className={input} value={dep.mode} onChange={(e) => setDep({ ...dep, mode: e.target.value })}>
                   <option value="pct">{t('pu.deposit.pct')}</option><option value="amount">{t('pu.deposit.amount', { cur })}</option>
@@ -819,7 +824,7 @@ function ChinaSteps({ company, po, poNo, info, doc, lines, onDone }: { company: 
               </label>
               <p className="text-sm text-muted sm:col-span-2">{t('pu.deposit.what')}</p>
               <Actions submitId="pu-dep-save" label={t('pu.deposit.save')}
-                onSubmit={() => run(() => depositCreate(company, po, { doc_date: dep.doc_date, pct: dep.mode === 'pct' ? dep.pct : null, amount: dep.mode === 'amount' ? dep.amount : null, pi_id: dep.pi_id || null }), t('pu.flash.deposit'))} />
+                onSubmit={() => run(() => depositCreate(company, po, { doc_date: dep.doc_date, pct: dep.mode === 'pct' ? dep.pct : null, amount: dep.mode === 'amount' ? dep.amount : null, pi_id: dep.pi_id || null }, depSeries), t('pu.flash.deposit'))} />
             </div>
           )}
           {(info.deposits ?? []).length === 0 ? <p className="px-5 pb-4 text-sm text-muted">{t('pu.deposit.none')}</p> : (
@@ -1136,6 +1141,7 @@ export function GrpoNewPage() {
   const [date, setDate] = useState(today());
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (src.data) setRows(toPicks(src.data.lines)); }, [src.data]);
@@ -1150,7 +1156,7 @@ export function GrpoNewPage() {
     if (!sel.length) { setErr(t('sc.chooseLines')); return; }
     setBusy(true);
     try {
-      const res = await grpoCreate(company, { doc_date: date, customer_ref: ref, comments }, sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty, whs_code: r.whs || null })));
+      const res = await grpoCreate(company, { doc_date: date, customer_ref: ref, comments }, sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty, whs_code: r.whs || null })), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['pu-flow'] }); qc.invalidateQueries({ queryKey: ['pu-info'] });
       nav(`/docs/goods_receipt_po/${company}/${res.doc_entry}`, { state: { flash: t('pu.flash.grpo', { no: res.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -1172,6 +1178,7 @@ export function GrpoNewPage() {
           <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span><input id="pu-doc_date" type="date" className="input num mt-1 text-[15px] text-ink" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className="block text-xs font-medium text-muted">{t('pu.deliveryNote')}<input id="pu-ref" className="input mt-1 text-[15px] text-ink" value={ref} onChange={(e) => setRef(e.target.value)} /></label>
           <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="pu-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+          <SeriesPicker company={company} obj={20} value={series} onChange={setSeries} date={date} />
         </div>
       </SectionCard>
       <SectionCard title={t('pu.linesToReceive')}>
@@ -1214,6 +1221,7 @@ export function ApInvoiceNewPage() {
   const [due, setDue] = useState('');
   const [ref, setRef] = useState('');
   const [comments, setComments] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (src.data) setRows(toPicks(src.data.lines)); }, [src.data]);
@@ -1240,7 +1248,7 @@ export function ApInvoiceNewPage() {
     try {
       const res = await apInvoiceCreate(company, { doc_date: date, due_date: due || null, customer_ref: ref, comments,
         down_payments: Object.entries(draw).filter(([, v]) => num(v) > 0).map(([k, v]) => ({ doc_entry: Number(k), amount: v })) },
-      sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })));
+      sel.map((r) => ({ base_doc_entry: r.line.base_doc_entry, base_line: r.line.base_line, qty: r.qty })), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['pu-flow'] });
       nav(`/docs/ap_invoice/${company}/${res.doc_entry}`, { state: { flash: t('pu.flash.ap', { no: res.doc_no, n: fmtMoney(res.total, h.currency) }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -1263,6 +1271,7 @@ export function ApInvoiceNewPage() {
           <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span><input id="pu-doc_date" type="date" className="input num mt-1 text-[15px] text-ink" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className="block text-xs font-medium text-muted">{t('erp.col.dueDate')}<input id="pu-due_date" type="date" className="input num mt-1 text-[15px] text-ink" value={due} onChange={(e) => setDue(e.target.value)} /><span className="mt-1 block">{t('sc.dueFromTerms')}</span></label>
           <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="pu-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={comments} onChange={(e) => setComments(e.target.value)} /></label>
+          <SeriesPicker company={company} obj={18} value={series} onChange={setSeries} date={date} />
         </div>
       </SectionCard>
       <SectionCard title={t('pu.linesToInvoice')}><PickLines rows={rows} setRows={setRows} /></SectionCard>
@@ -1450,6 +1459,7 @@ export function LandedCostNewPage() {
   const [pick, setPick] = useState('');
   const [charges, setCharges] = useState<Array<{ key: string; code: string; amount: string }>>([]);
   const [h, setH] = useState({ doc_date: today(), reference: '', comments: '' });
+  const [series, setSeries] = useState<number | null>(null);
   const [preview, setPreview] = useState<LcEval | null>(null);
   const [pErr, setPErr] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1484,7 +1494,7 @@ export function LandedCostNewPage() {
     setErr(null); setBusy(true);
     try {
       const p = payload();
-      const res = await lcCreate(company, p.header, p.lines, p.charges);
+      const res = await lcCreate(company, p.header, p.lines, p.charges, series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['pu-flow'] }); qc.invalidateQueries({ queryKey: ['pu-view'] });
       nav(`/purchasing/landed-costs/${company}/${res.doc_entry}`, { state: { flash: t('pu.flash.lc', { no: res.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -1502,6 +1512,7 @@ export function LandedCostNewPage() {
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span><input id="lc-date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.doc_date} onChange={(e) => setH({ ...h, doc_date: e.target.value })} /></label>
               <label className="block text-xs font-medium text-muted">{t('pu.lc.reference')}<input id="lc-ref" className="input mt-1 text-[15px] text-ink" value={h.reference} onChange={(e) => setH({ ...h, reference: e.target.value })} /></label>
               <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="lc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={h.comments} onChange={(e) => setH({ ...h, comments: e.target.value })} /></label>
+              <SeriesPicker company={company} obj={69} value={series} onChange={setSeries} date={h.doc_date} />
             </div>
           </SectionCard>
           <SectionCard title={t('pu.lc.lines')} right={
@@ -1714,8 +1725,9 @@ export function PurchasingSetupPage() {
                 </select>
               </label>
               <label className="flex min-h-[44px] items-center gap-3 text-[15px] sm:col-span-2">
-                <input type="checkbox" id="ps-qc" className="h-5 w-5 accent-[rgb(var(--c-primary))]" checked={st.require_qc_pass} disabled={!canWrite} onChange={(e) => setSt({ ...st, require_qc_pass: e.target.checked })} />{t('pu.setup.qcPass')}
+                <input type="checkbox" id="ps-qc" className="h-5 w-5 accent-[rgb(var(--c-primary))]" checked readOnly disabled aria-describedby="ps-qc-note" />{t('pu.setup.qcPass')}
               </label>
+              <p id="ps-qc-note" className="-mt-2 text-[13px] text-muted sm:col-span-2">{t('pu.setup.qcAlways')}</p>
               <div className="sm:col-span-2"><Button variant="primary" id="ps-save" disabled={!canWrite} disabledReason={readOnlyReason} onClick={() => run(() => puSettingSet(company, st), t('pu.setup.saved'))}>{t('pu.setup.save')}</Button></div>
             </div>
           </SectionCard>

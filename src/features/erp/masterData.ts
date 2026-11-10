@@ -31,9 +31,9 @@ export interface Contact { name: string; role?: string | null; phone?: string | 
 export interface Address { address_name: string; kind: 'B' | 'S'; street?: string | null; block?: string | null; building?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string | null }
 
 export const bpChecks = (company: string, bp: Record<string, unknown>) => rpc<BpEval>('bp_checks', { p_company: company, p_bp: bp });
-export const bpSave = (company: string, bp: Record<string, unknown>, dupReason: string | null, reason: string | null) =>
+export const bpSave = (company: string, bp: Record<string, unknown>, dupReason: string | null, reason: string | null, series: number | null = null) =>
   rpc<{ card_code: string; created: boolean; changed: Record<string, unknown>; credit_request: { request_id: number; state: string; approvers: MdRule[] } | null }>(
-    'bp_save', { p_company: company, p_bp: bp, p_dup_reason: dupReason, p_reason: reason });
+    'bp_save', { p_company: company, p_bp: bp, p_dup_reason: dupReason, p_reason: reason, p_series: series });
 export const bpChangeDecide = (company: string, id: number, decision: 'approved' | 'rejected', note: string | null) =>
   rpc<{ state: string }>('bp_change_decide', { p_company: company, p_request: id, p_decision: decision, p_note: note });
 export const bpChangeCancel = (company: string, id: number, note: string | null) =>
@@ -68,8 +68,8 @@ export function useBpInfo(company: string, code: string) {
 
 export interface ItemEval { is_new: boolean; errors: FieldError[]; duplicates: Array<{ item_code: string; name: string; match: string; preferred_supplier: string | null }>; values: Record<string, unknown> }
 export const itemChecks = (company: string, item: Record<string, unknown>) => rpc<ItemEval>('item_checks', { p_company: company, p_item: item });
-export const itemSave = (company: string, item: Record<string, unknown>, dupReason: string | null) =>
-  rpc<{ item_code: string; created: boolean; changed: Record<string, unknown> }>('item_save', { p_company: company, p_item: item, p_dup_reason: dupReason });
+export const itemSave = (company: string, item: Record<string, unknown>, dupReason: string | null, series: number | null = null) =>
+  rpc<{ item_code: string; created: boolean; changed: Record<string, unknown> }>('item_save', { p_company: company, p_item: item, p_dup_reason: dupReason, p_series: series });
 export interface ItemInfo {
   item: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   can_edit: boolean; edit_reason: string | null; history: HistoryRow[];

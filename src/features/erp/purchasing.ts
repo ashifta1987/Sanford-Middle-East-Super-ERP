@@ -76,9 +76,9 @@ const linesPayload = (ls: PuLineInput[]) => ls.map((l) => ({
 }));
 export const puChecks = (company: string, obj: number, entry: number | null, h: PuHeaderInput, ls: PuLineInput[]) =>
   rpc<PuEval>('purchase_doc_checks', { p_company: company, p_obj: obj, p_doc_entry: entry, p_header: headerPayload(h), p_lines: linesPayload(ls) });
-export const puSave = (company: string, obj: number, entry: number | null, h: PuHeaderInput, ls: PuLineInput[]) =>
+export const puSave = (company: string, obj: number, entry: number | null, h: PuHeaderInput, ls: PuLineInput[], series: number | null = null) =>
   rpc<{ doc_entry: number; doc_no: string; checks: PuCheck[]; totals: PuEval['totals'] }>('purchase_doc_save', {
-    p_company: company, p_obj: obj, p_doc_entry: entry, p_header: headerPayload(h), p_lines: linesPayload(ls),
+    p_company: company, p_obj: obj, p_doc_entry: entry, p_header: headerPayload(h), p_lines: linesPayload(ls), p_series: series,
   });
 export const puSubmit = (company: string, obj: number, entry: number, reason: string | null) =>
   rpc<{ state: WorkflowState; status: string; checks: PuCheck[] }>('purchase_doc_submit', { p_company: company, p_obj: obj, p_doc_entry: entry, p_reason: reason });
@@ -170,15 +170,15 @@ export function usePuView(company: string, obj: number, entry: number) {
 
 export const piSave = (company: string, id: number | null, data: Record<string, unknown>) =>
   rpc<{ pi_id: number; status: string }>('purchase_pi_save', { p_company: company, p_pi_id: id, p_data: data });
-export const depositCreate = (company: string, po: number, header: Record<string, unknown>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number; card_code: string }>('purchase_deposit_create', { p_company: company, p_po: po, p_header: header });
+export const depositCreate = (company: string, po: number, header: Record<string, unknown>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number; card_code: string }>('purchase_deposit_create', { p_company: company, p_po: po, p_header: header, p_series: series });
 export const qcSave = (company: string, data: Record<string, unknown>) => rpc<{ qc_id: number; result: string }>('purchase_qc_save', { p_company: company, p_data: data });
 export const shipmentSave = (company: string, id: number | null, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
   rpc<{ shipment_id: number; eta: string }>('purchase_shipment_save', { p_company: company, p_shipment_id: id, p_header: header, p_lines: lines });
-export const grpoCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null }>('purchase_grpo_create', { p_company: company, p_header: header, p_lines: lines });
-export const apInvoiceCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; gross: number; drawn: number; total: number; trans_id: number }>('purchase_invoice_create', { p_company: company, p_header: header, p_lines: lines });
+export const grpoCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null }>('purchase_grpo_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
+export const apInvoiceCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; gross: number; drawn: number; total: number; trans_id: number }>('purchase_invoice_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
 
 export interface LcLine {
   line_num: number; grpo_entry: number; grpo_line: number; grpo_no: string; item_code: string; description: string | null; whs_code: string; qty: number; value: number;
@@ -192,8 +192,8 @@ export interface LcEval {
 }
 export const lcPreview = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, charges: Array<Record<string, unknown>>) =>
   rpc<LcEval>('landed_cost_preview', { p_company: company, p_header: header, p_lines: lines, p_charges: charges });
-export const lcCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, charges: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; to_inventory: number; to_cogs: number; trans_id: number }>('landed_cost_create', { p_company: company, p_header: header, p_lines: lines, p_charges: charges });
+export const lcCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, charges: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; total: number; to_inventory: number; to_cogs: number; trans_id: number }>('landed_cost_create', { p_company: company, p_header: header, p_lines: lines, p_charges: charges, p_series: series });
 export interface LcInfo {
   doc_entry: number; doc_no: string; doc_date: string; card_code: string | null; card_name: string | null; reference: string | null; comments: string | null;
   total: number; to_inventory: number; to_cogs: number; currency: string; trans_id: number | null; can_read_journal: boolean; created_by_name: string | null; created_at: string;

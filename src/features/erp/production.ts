@@ -57,7 +57,7 @@ export function useOrderInfo(company: string, id: number) {
   return useQuery({ queryKey: ['prod-order', company, id], enabled: Boolean(company && id),
     queryFn: () => rpc<OrderInfo>('prod_order_info', { p_company: company, p_order: id }) });
 }
-export const orderCreate = (company: string, h: Record<string, unknown>) => rpc<{ order_id: number; doc_no: string }>('prod_order_create', { p_company: company, p_header: h });
+export const orderCreate = (company: string, h: Record<string, unknown>, series: number | null = null) => rpc<{ order_id: number; doc_no: string }>('prod_order_create', { p_company: company, p_header: h, p_series: series });
 export const orderRelease = (company: string, id: number) => rpc<unknown>('prod_order_release', { p_company: company, p_order: id });
 export const orderIssue = (company: string, id: number, h: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
   rpc<{ doc_entry: number; doc_no: string; value: number }>('prod_order_issue', { p_company: company, p_order: id, p_header: h, p_lines: lines });
@@ -83,12 +83,13 @@ export function useMould(company: string, code: string) {
     const [{ data, error }, m, r] = await Promise.all([
       erp().from('mould_schedule').select('*').eq('company_code', company).eq('res_code', code).maybeSingle(),
       erp().from('mould_maintenance').select('maint_id,done_on,kind,shots_at,note,created_at').eq('company_code', company).eq('res_code', code).order('done_on', { ascending: false }),
-      erp().from('prod_resource').select('acct_code,note').eq('company_code', company).eq('res_code', code).maybeSingle(),
+      erp().from('prod_resource').select('acct_code,note,warn_pct').eq('company_code', company).eq('res_code', code).maybeSingle(),
     ]);
     if (error) throw new ApiError(error);
     if (m.error) throw new ApiError(m.error);
     return { mould: data as MouldRow | null, log: (m.data ?? []) as Array<{ maint_id: number; done_on: string; kind: string; shots_at: number; note: string | null }>,
-      acct_code: (r.data as { acct_code: string | null } | null)?.acct_code ?? null, note: (r.data as { note: string | null } | null)?.note ?? null };
+      acct_code: (r.data as { acct_code: string | null } | null)?.acct_code ?? null, note: (r.data as { note: string | null } | null)?.note ?? null,
+      warn_pct: (r.data as { warn_pct: number | null } | null)?.warn_pct ?? null };
   } });
 }
 

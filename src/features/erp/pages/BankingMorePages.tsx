@@ -10,6 +10,7 @@ import { ApiError, errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Fields, Kpi, LiveBadge, PageTitle, SectionCard, fmtDay, fmtMoney } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -93,6 +94,7 @@ export function DepositNewPage() {
   const [bank, setBank] = useState('');
   const [cash, setCash] = useState('');
   const [memo, setMemo] = useState('');
+  const [series, setSeries] = useState<number | null>(null);
   const [sel, setSel] = useState<Record<number, boolean>>({});
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,7 +106,7 @@ export function DepositNewPage() {
   async function go() {
     setErr(null); setBusy(true);
     try {
-      const r = await depositCreate(company, { deposit_date: date, bank_code: bankCode, cash_amount: cash, memo }, chosen.map((c) => c.cheque_id));
+      const r = await depositCreate(company, { deposit_date: date, bank_code: bankCode, cash_amount: cash, memo }, chosen.map((c) => c.cheque_id), series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['dep-setup'] });
       nav('/banking/deposits', { state: { flash: t('bk.flash.deposited', { no: r.doc_no, amount: fmtMoney(r.total, cur) }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -132,6 +134,7 @@ export function DepositNewPage() {
                   <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}
                     <input id="dep-memo" dir="auto" className="input mt-1 text-[15px] text-ink" value={memo} onChange={(e) => setMemo(e.target.value)} />
                   </label>
+                  <SeriesPicker company={company} obj={25} value={series} onChange={setSeries} date={date} />
                 </div>
               </SectionCard>
               <SectionCard title={t('bk.chequesOnHand')}>

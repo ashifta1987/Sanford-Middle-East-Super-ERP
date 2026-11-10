@@ -60,12 +60,34 @@ export function useDocView(company: string, obj: number, entry: number) {
   });
 }
 
-export const deliveryCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null }>('sales_delivery_create', { p_company: company, p_header: header, p_lines: lines });
-export const invoiceCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null; due_date: string }>('sales_invoice_create', { p_company: company, p_header: header, p_lines: lines });
-export const creditMemoCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null }>('sales_credit_memo_create', { p_company: company, p_header: header, p_lines: lines });
+export const deliveryCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<{ doc_entry: number; doc_no: string; total: number; trans_id: number | null }>('sales_delivery_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
+/** B1: an invoice with a service-line discount above the user's limit, or a credit memo above the credit-memo limit, comes back as a request. */
+export interface PendingRequest { state: 'pending_approval'; request_id: number; doc_no: string; obj_type: number; checks: Array<{ message: string; approver_name: string }>; total: number }
+type Created = { doc_entry: number; doc_no: string; total: number; trans_id: number | null; state?: undefined };
+export const invoiceCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<(Created & { due_date: string }) | PendingRequest>('sales_invoice_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
+export const creditMemoCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, series: number | null = null) =>
+  rpc<Created | PendingRequest>('sales_credit_memo_create', { p_company: company, p_header: header, p_lines: lines, p_series: series });
+
+export interface SalesRequestInfo {
+  request: {
+    request_id: number; company_code: string; obj_type: 13 | 14; card_code: string | null; card_name: string | null; total: number | null; currency: string | null;
+    header: Record<string, unknown>; lines: Array<Record<string, unknown>>; checks: Array<{ rule_code: string; message: string; approver_name: string; step: number }>;
+    state: 'pending_approval' | 'approved' | 'rejected' | 'cancelled'; reason: string | null; requested_by: string; requested_at: string; decided_at: string | null;
+    doc_entry: number | null; doc_no: string | null; note: string | null; doc_no_req: string; requested_by_name: string | null; series: string | null;
+  };
+  approvals: Array<{ step: number; approver_name: string; decision: string | null; decided_at: string | null; decided_by_name: string | null; note: string | null; superseded: boolean }>;
+  is_requester: boolean; can_decide: boolean;
+}
+export const useSalesRequest = (company: string, id: number) => useQuery({
+  queryKey: ['sales-request', company, id], enabled: Boolean(company && id),
+  queryFn: () => rpc<SalesRequestInfo>('sales_doc_request_info', { p_company: company, p_request_id: id }),
+});
+export const salesRequestDecide = (company: string, id: number, decision: 'approved' | 'rejected', note: string) =>
+  rpc<{ state: string; doc_entry: number | null; doc_no: string | null; obj_type: number }>('sales_doc_request_decide', { p_company: company, p_request_id: id, p_decision: decision, p_note: note || null });
+export const salesRequestCancel = (company: string, id: number, note: string) =>
+  rpc<{ state: string }>('sales_doc_request_cancel', { p_company: company, p_request_id: id, p_note: note || null });
 
 export interface PrintData {
   company: { code: string; legal_name: string; short_name: string; tax_id: string | null; licence_authority: string | null; country: string; currency: string };

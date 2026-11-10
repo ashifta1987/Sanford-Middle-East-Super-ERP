@@ -9,6 +9,7 @@ import i18n from '@/lib/i18n';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, LiveBadge, PageTitle, SectionCard, fmtDay, fmtMoney } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -205,6 +206,7 @@ export function BpFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const info = useBpInfo(mode === 'edit' ? company : '', code);
   const S = setup.data;
   const [f, setF] = useState<BpForm | null>(null);
+  const [series, setSeries] = useState<number | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [reason, setReason] = useState('');
@@ -262,7 +264,7 @@ export function BpFormPage({ mode }: { mode: 'new' | 'edit' }) {
       setEv(fresh);
       if (fresh.errors.length) { setFormErr(t('md.fixFirst')); return; }
       if (fresh.duplicates.length && !dupReason) { setDupOpen(true); return; }
-      const res = await bpSave(company, payload, dupReason, nn(reason) as string | null);
+      const res = await bpSave(company, payload, dupReason, nn(reason) as string | null, mode === 'new' ? series : null);
       setDirty(false); setDupOpen(false);
       qc.invalidateQueries({ queryKey: ['bp-info', company] });
       qc.invalidateQueries({ queryKey: ['bp', company] });
@@ -311,6 +313,7 @@ export function BpFormPage({ mode }: { mode: 'new' | 'edit' }) {
                   </div>
                   <FieldMsg id="bp-kind" message={errOf(errs, 'kind')} />
                 </fieldset>
+                {mode === 'new' && <SeriesPicker key={f.kind} company={company} obj={f.kind === 'supplier' ? 2002 : f.kind === 'lead' ? 2003 : 2001} value={series} onChange={setSeries} className="max-w-sm" />}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <TextField id="bp-name" label={t('md.f.name')} required value={f.name} onChange={(v) => set('name', v)} error={errOf(errs, 'name')} />
                   <TextField id="bp-foreign_name" label={t('md.f.foreign_name')} dir="rtl" required={req('foreign_name')} value={f.foreign_name} onChange={(v) => set('foreign_name', v)} error={errOf(errs, 'foreign_name')} />
@@ -716,6 +719,7 @@ export function ItemFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const info = useItemInfo(mode === 'edit' ? company : '', code);
   const S = setup.data;
   const [f, setF] = useState<ItemForm | null>(null);
+  const [itemSeries, setItemSeries] = useState<number | null>(null);
   const [supText, setSupText] = useState('');
   const [ev, setEv] = useState<ItemEval | null>(null);
   const [tried, setTried] = useState(false);
@@ -757,7 +761,9 @@ export function ItemFormPage({ mode }: { mode: 'new' | 'edit' }) {
   }, [payload, company]);
 
   const set = <K extends keyof ItemForm>(k: K, v: ItemForm[K]) => { setF((x) => (x ? { ...x, [k]: v } : x)); setDirty(true); };
-  const errs = tried ? ev?.errors ?? [] : [];
+  // B1: with an item code series, a new item may leave the code empty and take the next code.
+  const autoCode = mode === 'new' && itemSeries !== null && !f?.item_code;
+  const errs = (tried ? ev?.errors ?? [] : []).filter((e) => !(autoCode && e.field === 'item_code'));
   const req = (k: string) => Boolean(S?.item_required.includes(k));
   const back = mode === 'edit' ? `/items/${company}/${encodeURIComponent(code)}` : '/items';
 
@@ -767,9 +773,9 @@ export function ItemFormPage({ mode }: { mode: 'new' | 'edit' }) {
     try {
       const fresh = await itemChecks(company, payload);
       setEv(fresh);
-      if (fresh.errors.length) { setFormErr(t('md.fixFirst')); return; }
+      if (fresh.errors.filter((e) => !(autoCode && e.field === 'item_code')).length) { setFormErr(t('md.fixFirst')); return; }
       if (fresh.duplicates.length && !dupReason) { setDupOpen(true); return; }
-      const res = await itemSave(company, payload, dupReason);
+      const res = await itemSave(company, payload, dupReason, autoCode ? itemSeries : null);
       setDirty(false); setDupOpen(false);
       qc.invalidateQueries({ queryKey: ['item-info', company] });
       qc.invalidateQueries({ queryKey: ['item', company] });
@@ -797,8 +803,9 @@ export function ItemFormPage({ mode }: { mode: 'new' | 'edit' }) {
           <div className="min-w-0 space-y-5">
             <SectionCard title={t('erp.section.general')}>
               <div className="grid gap-4 p-5 sm:grid-cols-2">
+                {mode === 'new' && <SeriesPicker company={company} obj={4} value={itemSeries} onChange={setItemSeries} hideWhenNone label={t('num.pick.itemLabel')} id="it-series" />}
                 {mode === 'new'
-                  ? <TextField id="it-item_code" label={t('md.f.item_code')} required value={f.item_code} onChange={(v) => set('item_code', v.toUpperCase())} error={errOf(errs, 'item_code')} help={t('md.help.itemCode')} />
+                  ? <TextField id="it-item_code" label={t('md.f.item_code')} required={!autoCode} value={f.item_code} onChange={(v) => set('item_code', v.toUpperCase())} error={errOf(errs, 'item_code')} help={itemSeries !== null ? t('num.pick.itemHelp') : t('md.help.itemCode')} />
                   : <div className={labelCls}>{t('md.f.item_code')}<p className="mt-2 font-mono text-[15px] text-ink">{f.item_code}</p></div>}
                 <TextField id="it-name" label={t('md.f.item_name')} required value={f.name} onChange={(v) => set('name', v)} error={errOf(errs, 'name')} />
                 <TextField id="it-foreign_name" label={t('md.f.foreign_name')} dir="rtl" required={req('foreign_name')} value={f.foreign_name} onChange={(v) => set('foreign_name', v)} error={errOf(errs, 'foreign_name')} />

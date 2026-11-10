@@ -327,7 +327,8 @@ DECLARE
   v_date date;
 BEGIN
   BEGIN
-    v_date := nullif(btrim(coalesce(p_header->>'doc_date', p_header->>'post_date', p_header->>'opened_on', '')), '')::date;
+    v_date := nullif(btrim(coalesce(p_header->>'doc_date', p_header->>'post_date', p_header->>'deposit_date', p_header->>'count_date',
+                                    p_header->>'opened_on', '')), '')::date;
   EXCEPTION WHEN others THEN
     v_date := NULL;      -- the document's own check names the bad date
   END;

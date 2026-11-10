@@ -11,6 +11,7 @@ import i18n from '@/lib/i18n';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, PageTitle, SectionCard, fmtDay, fmtMoney } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
@@ -207,6 +208,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [series, setSeries] = useState<number | null>(null);
   const docs = useOpenDocs(company, dir, h.card_code);
   const cur = setup.data?.currency ?? '';
   const banks = setup.data?.banks ?? [];
@@ -260,7 +262,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
     if (needsApproval && !reason.trim()) { setReasonErr(t('bk.reasonNeeded')); document.getElementById('bk-reason')?.focus(); return; }
     setBusy(true);
     try {
-      const r = await paySubmit(company, dir, header, lines, needsApproval ? reason.trim() : null);
+      const r = await paySubmit(company, dir, header, lines, needsApproval ? reason.trim() : null, series);
       setDirty(false);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       qc.invalidateQueries({ queryKey: ['approval-inbox'] });
@@ -327,6 +329,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span>
                 <input id="bk-date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.doc_date} onChange={(e) => set({ doc_date: e.target.value })} />
               </label>
+              <SeriesPicker company={company} obj={incoming ? 24 : 46} value={series} onChange={setSeries} date={h.doc_date} />
               <label className="block text-xs font-medium text-muted sm:col-span-2 xl:col-span-3">{t('erp.col.remarks')}
                 <input id="bk-memo" dir="auto" className="input mt-1 text-[15px] text-ink" value={h.memo} onChange={(e) => set({ memo: e.target.value })} />
               </label>

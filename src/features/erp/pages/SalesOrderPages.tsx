@@ -14,6 +14,7 @@ import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Crumbs, Fields, LiveBadge, SectionCard, StatusTag, fmtDay, fmtMoney, fmtQty } from '../components/ui';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { Dialog } from '../components/Dialog';
 import { moduleByKey } from '../modules';
 import { DocFlow } from '../components/DocFlow';
@@ -246,6 +247,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
   const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'save' | 'submit' | null>(null);
   const [preview, setPreview] = useState<SoEval | null>(null);
+  const [series, setSeries] = useState<number | null>(null);
 
   // Defaults from the company settings (only where the user has not chosen).
   useEffect(() => {
@@ -336,7 +338,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
     setBusy(submit ? 'submit' : 'save');
     let saved = entry;
     try {
-      const res = await soSave(company, entry, header, filled, obj);
+      const res = await soSave(company, entry, header, filled, obj, entry ? null : series);
       saved = res.doc_entry;
       setEntry(res.doc_entry); setDocNo(res.doc_no);
       let state = res.state;
@@ -442,6 +444,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
               <label className="block text-xs font-medium text-muted sm:col-span-2">{t('erp.col.remarks')}
                 <input id="so-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={header.comments} onChange={(e) => setH({ comments: e.target.value })} />
               </label>
+              {!entry && <SeriesPicker company={company} obj={obj} value={series} onChange={setSeries} date={header.doc_date} whs={header.whs_code} />}
             </div>
           </SectionCard>
 

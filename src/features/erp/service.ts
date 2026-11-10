@@ -7,7 +7,10 @@ export type CallStatus = 'open' | 'in_progress' | 'resolved' | 'closed' | 'cance
 export type WarrantyStatus = 'in_warranty' | 'out_of_warranty' | 'contract' | 'no_rule' | 'unknown' | 'none';
 export interface SvcSetup {
   currency: string;
-  setting: { parts_reason_code: string | null; note: string | null };
+  setting: { parts_reason_code: string | null; note: string | null; manager_position: string | null; parts_positions: string[]; parts_users: string[] };
+  positions: Array<{ position_code: string; name: string }>;
+  users: Array<{ user_id: string; name: string; position_code: string }>;
+  can_issue_parts: boolean;
   reasons: Array<{ code: string; name: string; acct_code: string | null }>;
   warranty_rules: Array<{ rule_id: number; item_code: string | null; group_code: number | null; months: number; note: string | null; source: string; name: string | null }>;
   item_groups: Array<{ code: number; name: string }>;
@@ -47,8 +50,8 @@ export function useCallInfo(company: string, id: number) {
   return useQuery({ queryKey: ['svc-call', company, id], enabled: Boolean(company && id),
     queryFn: () => rpc<CallInfo>('service_call_info', { p_company: company, p_call: id }) });
 }
-export const callSave = (company: string, c: Record<string, unknown>) =>
-  rpc<{ call_id: number; doc_no: string; warranty: Warranty }>('service_call_save', { p_company: company, p_call: c });
+export const callSave = (company: string, c: Record<string, unknown>, series: number | null = null) =>
+  rpc<{ call_id: number; doc_no: string; warranty: Warranty }>('service_call_save', { p_company: company, p_call: c, p_series: series });
 export const callStatus = (company: string, id: number, status: CallStatus, text: string | null) =>
   rpc<unknown>('service_call_status', { p_company: company, p_call: id, p_status: status, p_text: text });
 export const callParts = (company: string, id: number, h: Record<string, unknown>, lines: Array<Record<string, unknown>>, reason: string | null) =>
@@ -80,8 +83,8 @@ export function useContractInfo(company: string, id: number) {
   return useQuery({ queryKey: ['svc-contract', company, id], enabled: Boolean(company && id),
     queryFn: () => rpc<ContractInfo>('service_contract_info', { p_company: company, p_contract: id }) });
 }
-export const contractSave = (company: string, c: Record<string, unknown>) =>
-  rpc<{ contract_id: number; doc_no: string }>('service_contract_save', { p_company: company, p_c: c });
+export const contractSave = (company: string, c: Record<string, unknown>, series: number | null = null) =>
+  rpc<{ contract_id: number; doc_no: string }>('service_contract_save', { p_company: company, p_c: c, p_series: series });
 export const contractStatus = (company: string, id: number, action: 'activate' | 'end' | 'cancel', note: string | null) =>
   rpc<unknown>('service_contract_status', { p_company: company, p_contract: id, p_action: action, p_note: note });
 export const svcSettingSet = (company: string, s: Record<string, unknown>) => rpc<unknown>('service_setting_set', { p_company: company, p_setting: s });

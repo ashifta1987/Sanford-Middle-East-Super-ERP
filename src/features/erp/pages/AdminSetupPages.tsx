@@ -12,15 +12,15 @@ import { Fields, SectionCard, fmtDay, fmtMoney } from '../components/ui';
 import { Dialog } from '../components/Dialog';
 import { todayIso } from '../journal';
 import {
-  adminSettingSave, aiSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave, seriesSave,
-  uploadLogo, useAiSetup, useCompanyInfo, useFxSetup, useSeries, useTemplates,
-  type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec, type Series,
+  adminSettingSave, aiSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave,
+  uploadLogo, useAiSetup, useCompanyInfo, useFxSetup, useTemplates,
+  type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec,
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
 
 const OBJ_LABEL: Record<number, string> = {
   17: 'Sales Order', 22: 'Purchase Order', 46: 'Outgoing Payment', 30: 'Journal Entry', 59: 'Goods Receipt', 60: 'Goods Issue',
-  1470000065: 'Inventory Counting', 2: 'Business Partner',
+  1470000065: 'Inventory Counting', 2: 'Business Partner', 14: 'A/R Credit Memo',
 };
 
 // ---------- Approval templates ----------
@@ -169,88 +169,6 @@ export function ApprovalTemplatesPage() {
         footer={<><Button variant="secondary" onClick={() => setDelFor(null)}>{t('je.keep')}</Button><Button variant="danger" id="adm-r-delete-confirm" disabled={busy} onClick={del}>{t('adm.delete')}</Button></>}>
         <p className="text-sm text-ink-2">{t('adm.tpl.deleteBody')}</p>
       </Dialog>
-    </AdminFrame>
-  );
-}
-
-// ---------- Document numbering ----------
-export function NumberingPage() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const sc = useAdminCompany();
-  const { company } = sc;
-  const q = useSeries(company);
-  const [edit, setEdit] = useState<{ obj: number; prefix: string; next: string; pad: string; active: boolean } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const canWrite = Boolean(q.data?.can_write);
-  const start = (s: Series) => { setErr(null); setEdit({ obj: s.obj_type, prefix: s.prefix ?? '', next: String(s.next_num ?? 1), pad: String(s.pad ?? 5), active: s.active ?? true }); };
-  async function save(s: Series) {
-    if (!edit) return;
-    setErr(null); setFlash(null); setBusy(true);
-    try {
-      const r = await seriesSave(company, edit.obj, edit.prefix, Number(edit.next), Number(edit.pad), edit.active);
-      setFlash(t('adm.num.saved', { doc: s.label, ex: r.example }));
-      setEdit(null);
-      await qc.invalidateQueries({ queryKey: ['adm-series', company] });
-    } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
-  }
-  return (
-    <AdminFrame title={t('adm.num.title')} desc={t('adm.num.desc')} actions={<CompanyPicker {...sc} />}>
-      <Flash text={flash} />
-      <ErrorBox text={err} />
-      <ReadOnlyNote show={Boolean(q.data && !canWrite)} />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <SectionCard title={t('adm.num.series')}>
-          {q.isLoading ? <SkeletonRows rows={8} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[14px]" data-testid="adm-series">
-                <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                  <th scope="col" className="px-4 py-2.5 text-start">{t('adm.num.doc')}</th>
-                  <th scope="col" className="px-4 py-2.5 text-start">{t('adm.num.prefix')}</th>
-                  <th scope="col" className="px-4 py-2.5 text-end">{t('adm.num.next')}</th>
-                  <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{t('adm.num.pad')}</th>
-                  <th scope="col" className="px-4 py-2.5 text-start max-md:hidden">{t('adm.num.example')}</th>
-                  <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.status')}</th>
-                  {canWrite && <th scope="col" className="px-4 py-2.5"><span className="sr-only">{t('fs.per.actions')}</span></th>}
-                </tr></thead>
-                <tbody>
-                  {(q.data?.series ?? []).map((s) => edit?.obj === s.obj_type ? (
-                    <tr key={s.obj_type} className="border-t border-line bg-surface-2" data-testid="adm-series-edit">
-                      <td className="px-4 py-2" dir="ltr">{s.label}</td>
-                      <td className="px-2 py-2"><input id="adm-n-prefix" aria-label={t('adm.num.prefix')} dir="ltr" className="input min-h-[40px] w-28 font-mono text-sm" value={edit.prefix} onChange={(e) => setEdit({ ...edit, prefix: e.target.value })} /></td>
-                      <td className="px-2 py-2 text-end"><input id="adm-n-next" aria-label={t('adm.num.next')} inputMode="numeric" className="input num min-h-[40px] w-24 text-end text-sm" value={edit.next} onChange={(e) => setEdit({ ...edit, next: e.target.value })} /></td>
-                      <td className="px-2 py-2 text-end max-sm:hidden"><input id="adm-n-pad" aria-label={t('adm.num.pad')} inputMode="numeric" className="input num min-h-[40px] w-16 text-end text-sm" value={edit.pad} onChange={(e) => setEdit({ ...edit, pad: e.target.value })} /></td>
-                      <td className="px-4 py-2 font-mono text-[13px] max-md:hidden">{edit.prefix}{(edit.next || '').padStart(Number(edit.pad) || 0, '0')}</td>
-                      <td className="px-4 py-2"><label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} />{t('adm.users.active')}</label></td>
-                      <td className="px-4 py-2"><div className="flex justify-end gap-1">
-                        <Button variant="primary" className="min-h-[40px] px-3 text-sm" id="adm-n-save" disabled={busy} onClick={() => save(s)} icon={<Check className="h-4 w-4" aria-hidden />}>{t('adm.save')}</Button>
-                        <Button variant="ghost" className="min-h-[40px] px-2" aria-label={t('fs.cancel')} onClick={() => setEdit(null)} icon={<X className="h-4 w-4" aria-hidden />} />
-                      </div></td>
-                    </tr>
-                  ) : (
-                    <tr key={s.obj_type} className="border-t border-line" data-testid="adm-series-row" data-obj={s.obj_type}>
-                      <td className="px-4 py-2" dir="ltr">{s.label}</td>
-                      <td className="px-4 py-2 font-mono text-[13px]">{s.prefix ?? '—'}</td>
-                      <td className="num px-4 py-2 text-end">{s.next_num ?? '—'}</td>
-                      <td className="num px-4 py-2 text-end max-sm:hidden">{s.pad ?? '—'}</td>
-                      <td className="px-4 py-2 font-mono text-[13px] max-md:hidden">{s.example ?? '—'}</td>
-                      <td className="px-4 py-2">{s.prefix === null ? <span className="pill pill-warning">{t('adm.num.notSet')}</span>
-                        : <span className={clsx('pill', s.active ? 'pill-ok' : 'pill-neutral')}>{s.active ? t('adm.users.active') : t('adm.users.inactive')}</span>}</td>
-                      {canWrite && <td className="px-4 py-2 text-end"><Button variant="ghost" className="min-h-[40px] px-3 text-sm" disabled={busy || Boolean(edit)} onClick={() => start(s)} icon={<Pencil className="h-4 w-4" aria-hidden />}>{s.prefix === null ? t('adm.num.setUp') : t('adm.edit')}</Button></td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-        <aside className="space-y-5">
-          <SectionCard title={t('adm.num.rulesTitle')}><ul className="list-disc space-y-2 p-5 ps-9 text-sm text-ink-2"><li>{t('adm.num.rule1')}</li><li>{t('adm.num.rule2')}</li><li>{t('adm.num.rule3')}</li><li>{t('adm.num.rule4')}</li></ul></SectionCard>
-          <AuditCard objects={['number_series']} />
-        </aside>
-      </div>
     </AdminFrame>
   );
 }

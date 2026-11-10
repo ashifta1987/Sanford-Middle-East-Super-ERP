@@ -107,9 +107,9 @@ export const useCashPosition = (company: string | null) => useQuery({
 const header = (h: PayHeaderInput) => ({ ...h, cheques: h.cheques.filter((c) => c.cheque_no.trim() || c.amount.trim() || c.due_date) });
 export const payChecks = (company: string, dir: Dir, h: PayHeaderInput, lines: PayLineInput[]) =>
   rpc<PayEval>('payment_checks', { p_company: company, p_dir: dir, p_header: header(h), p_lines: lines });
-export const paySubmit = (company: string, dir: Dir, h: PayHeaderInput, lines: PayLineInput[], reason: string | null) =>
+export const paySubmit = (company: string, dir: Dir, h: PayHeaderInput, lines: PayLineInput[], reason: string | null, series: number | null = null) =>
   rpc<{ state: 'posted' | 'pending_approval'; doc_entry?: number; doc_no?: string; draft_id?: number; trans_id?: number }>('payment_submit', {
-    p_company: company, p_dir: dir, p_header: header(h), p_lines: lines, p_reason: reason,
+    p_company: company, p_dir: dir, p_header: header(h), p_lines: lines, p_reason: reason, p_series: series,
   });
 export const payDecide = (company: string, id: number, decision: 'approved' | 'rejected', note: string | null) =>
   rpc<{ state: DraftState; doc_entry: number | null; doc_no: string | null; direction: Dir }>('payment_decide', { p_company: company, p_draft_id: id, p_decision: decision, p_note: note });
@@ -117,8 +117,8 @@ export const payDraftCancel = (company: string, id: number, note: string) =>
   rpc<{ state: DraftState }>('payment_draft_cancel', { p_company: company, p_draft_id: id, p_note: note });
 export const payCancel = (company: string, dir: Dir, entry: number, date: string, reason: string) =>
   rpc<{ trans_id: number }>('payment_cancel', { p_company: company, p_dir: dir, p_doc_entry: entry, p_date: date, p_reason: reason });
-export const depositCreate = (company: string, h: { deposit_date: string; bank_code: string; cash_amount: string; memo: string }, cheques: number[]) =>
-  rpc<{ deposit_id: number; doc_no: string; total: number; trans_id: number }>('deposit_create', { p_company: company, p_header: h, p_cheques: cheques });
+export const depositCreate = (company: string, h: { deposit_date: string; bank_code: string; cash_amount: string; memo: string }, cheques: number[], series: number | null = null) =>
+  rpc<{ deposit_id: number; doc_no: string; total: number; trans_id: number }>('deposit_create', { p_company: company, p_header: h, p_cheques: cheques, p_series: series });
 export const statementImport = (company: string, bank: string, file: string, rows: StatementRow[]) =>
   rpc<{ statement_id: number | null; imported: number; skipped: number }>('bank_statement_import', { p_company: company, p_bank_code: bank, p_file_name: file, p_rows: rows });
 export const autoMatch = (company: string, id: number) => rpc<{ matched: number; unmatched: number }>('bank_statement_auto_match', { p_company: company, p_statement_id: id });

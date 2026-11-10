@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { ErrorState, PageLoading } from '@/components/States';
 import { Fields, SectionCard, fmtDay, fmtMoney } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule, useModuleLevel } from '../components/Guard';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
 import type { Row } from '../api';
@@ -312,6 +313,7 @@ export function EmployeeFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const { canWrite } = useModuleLevel('hr');
   const [f, setF] = useState<Record<string, string>>({ first_name: '', middle_name: '', last_name: '', job_title: '', division: '', branch_id: '', manager_emp_id: '',
     mobile: '', email: '', gender: '', birth_date: '', nationality: '', passport_no: '', passport_expires: '', gov_id: '', joined_on: '', left_on: '', status: 'active' });
+  const [series, setSeries] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -325,7 +327,7 @@ export function EmployeeFormPage({ mode }: { mode: 'new' | 'edit' }) {
     try {
       const body: Record<string, unknown> = { ...f };
       if (mode === 'edit') body.emp_id = id;
-      const r = await employeeSave(company, body);
+      const r = await employeeSave(company, body, mode === 'new' ? series : null);
       qc.invalidateQueries({ queryKey: ['hr-emp'] });
       nav(`/hr/employees/${company}/${r.emp_id}`, { state: { flash: mode === 'new' ? t('hr.emp.created', { code: r.hr_code }) : t('hr.saved') } });
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -348,6 +350,7 @@ export function EmployeeFormPage({ mode }: { mode: 'new' | 'edit' }) {
             <datalist id="hr-depts">{(st?.departments ?? []).map((d) => <option key={d} value={d} />)}</datalist>
           </label>
           <Sel label={t('hr.f.branch')} value={f.branch_id} onChange={set('branch_id')} empty="—" options={(st?.branches ?? []).map((b) => [String(b.id), b.name])} />
+          {mode === 'new' && <SeriesPicker company={company} obj={171} value={series} onChange={setSeries} label={t('num.pick.empLabel')} />}
           <Sel id="hr-f-manager" label={t('hr.f.manager')} value={f.manager_emp_id} onChange={set('manager_emp_id')} empty="—"
             options={(st?.employees ?? []).filter((x) => x.emp_id !== id).map((x) => [String(x.emp_id), `${x.hr_code} · ${x.name}`])} />
           <Txt label={t('hr.f.mobile')} dir="ltr" value={f.mobile} onChange={set('mobile')} />

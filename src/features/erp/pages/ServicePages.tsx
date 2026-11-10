@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/format';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading } from '@/components/States';
 import { Fields, SectionCard, YesNo, fmtDay, fmtMoney, fmtQty } from '../components/ui';
+import { SeriesPicker } from '../components/SeriesPicker';
 import { RequireModule } from '../components/Guard';
 import { Combobox } from '../components/Combobox';
 import { ListScreen, type ListConfig } from '../components/ListScreen';
@@ -97,6 +98,7 @@ export function ServiceCallFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const setup = useSvcSetup(company || null);
   const info = useCallInfo(company, cid);
   const [f, setF] = useState<Record<string, string>>({ priority: 'medium' });
+  const [series, setSeries] = useState<number | null>(null);
   const [custText, setCustText] = useState('');
   const [itemText, setItemText] = useState('');
   const [serialItem, setSerialItem] = useState(false);
@@ -122,7 +124,7 @@ export function ServiceCallFormPage({ mode }: { mode: 'new' | 'edit' }) {
   async function save() {
     setErr(null); setBusy(true);
     try {
-      const r = await callSave(company, { ...f, call_id: cid || null, invoice_entry: f.invoice_entry || null, technician: f.technician || null });
+      const r = await callSave(company, { ...f, call_id: cid || null, invoice_entry: f.invoice_entry || null, technician: f.technician || null }, cid ? null : series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['svc-call'] });
       nav(`/service/calls/${company}/${r.call_id}`, { state: { flash: t(r.warranty.flagged ? 'ps.call.savedFlagged' : 'ps.call.saved', { no: r.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -156,6 +158,7 @@ export function ServiceCallFormPage({ mode }: { mode: 'new' | 'edit' }) {
           <SectionCard title={t('ps.call.problem')}>
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               <label className={`${label} sm:col-span-2`}>{t('ps.call.subject')} <span className="text-crit-fg">*</span><input id="call-subject" dir="auto" className={inputCls} value={f.subject ?? ''} onChange={(e) => set('subject', e.target.value)} /></label>
+              {!cid && <SeriesPicker company={company} obj={191} value={series} onChange={setSeries} />}
               <label className={`${label} sm:col-span-2`}>{t('ps.call.details')}<textarea id="call-problem" rows={3} dir="auto" className="input mt-1 py-2 text-[15px] text-ink" value={f.problem ?? ''} onChange={(e) => set('problem', e.target.value)} /></label>
               <label className={label}>{t('ps.call.priority')}<select id="call-priority" className={inputCls} value={f.priority} onChange={(e) => set('priority', e.target.value)}>{(['high', 'medium', 'low'] as const).map((p) => <option key={p} value={p}>{t(`ps.call.prio.${p}`)}</option>)}</select></label>
               <label className={label}>{t('ps.call.technician')}<select id="call-tech" className={inputCls} value={f.technician ?? ''} onChange={(e) => set('technician', e.target.value)}><option value="">{t('ps.call.unassigned')}</option>{(S?.technicians ?? []).map((u) => <option key={u.user_id} value={u.user_id}>{u.name}</option>)}</select></label>
@@ -265,6 +268,7 @@ export function ServiceCallPage() {
                 <label className={`${label} sm:col-span-2`}>{t('ps.call.partsReason')}<input id="parts-why" dir="auto" className={inputCls} value={pWhy} onChange={(e) => setPWhy(e.target.value)} /></label>
                 <div className="flex items-end sm:col-span-2 xl:col-span-4"><Button variant="primary" id="parts-issue" disabled={busy || !pItem} onClick={parts}>{t('ps.call.issueParts')}</Button></div>
                 <p className="text-[13px] text-muted sm:col-span-2 xl:col-span-4">{t('ps.call.partsHelp', { reason: setup.data?.setting.parts_reason_code ?? t('ps.notSet') })}</p>
+                {setup.data && !setup.data.can_issue_parts && <p className="rounded-btn border border-warn-fg/30 bg-warn-bg px-3 py-2 text-[13px] text-warn-fg sm:col-span-2 xl:col-span-4" data-testid="parts-not-allowed">{t('ps.issuers.notAllowed')}</p>}
               </div>
             ) : <p className="border-t border-line px-5 py-3 text-[13px] text-muted" data-testid="parts-no-inventory">{t('ps.call.partsNeedInventory')}</p>)}
           </SectionCard>
@@ -450,6 +454,7 @@ export function ContractFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const info = useContractInfo(company, id);
   const [f, setF] = useState<Record<string, string>>({ starts_on: today() });
   const [flags, setFlags] = useState({ covers_parts: true, covers_labour: true, covers_travel: false, all_items: false });
+  const [series, setSeries] = useState<number | null>(null);
   const [custText, setCustText] = useState('');
   const [lines, setLines] = useState<CLine[]>([{ key: `c${++cseq}`, item_code: '', text: '', serial_no: '' }]);
   const [err, setErr] = useState<string | null>(null);
@@ -468,7 +473,7 @@ export function ContractFormPage({ mode }: { mode: 'new' | 'edit' }) {
     setErr(null); setBusy(true);
     try {
       const r = await contractSave(company, { ...f, ...flags, contract_id: id || null, response_hours: f.response_hours || null,
-        lines: flags.all_items ? [] : lines.filter((l) => l.item_code).map((l) => ({ item_code: l.item_code, serial_no: l.serial_no || null })) });
+        lines: flags.all_items ? [] : lines.filter((l) => l.item_code).map((l) => ({ item_code: l.item_code, serial_no: l.serial_no || null })) }, id ? null : series);
       qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['svc-contract'] });
       nav(`/service/contracts/${company}/${r.contract_id}`, { state: { flash: t('ps.ct.saved', { no: r.doc_no }) } });
     } catch (e) { setErr(errorMessage(e)); window.scrollTo({ top: 0, behavior: 'smooth' }); } finally { setBusy(false); }
@@ -486,6 +491,7 @@ export function ContractFormPage({ mode }: { mode: 'new' | 'edit' }) {
             <label className={label}>{t('ps.ct.starts')} <span className="text-crit-fg">*</span><input id="ct-from" type="date" className={`${inputCls} num`} value={f.starts_on ?? ''} onChange={(e) => set('starts_on', e.target.value)} /></label>
             <label className={label}>{t('ps.ct.ends')} <span className="text-crit-fg">*</span><input id="ct-to" type="date" className={`${inputCls} num`} value={f.ends_on ?? ''} onChange={(e) => set('ends_on', e.target.value)} /></label>
             <label className={label}>{t('ps.ct.responseHours')}<input id="ct-resp" inputMode="decimal" className={`${inputCls} num`} value={f.response_hours ?? ''} onChange={(e) => set('response_hours', e.target.value)} /></label>
+            {!id && <SeriesPicker company={company} obj={190} value={series} onChange={setSeries} />}
             <fieldset className="sm:col-span-2 xl:col-span-4"><legend className={label}>{t('ps.ct.coverage')}</legend>
               <div className="mt-2 flex flex-wrap gap-4">{(['covers_parts', 'covers_labour', 'covers_travel', 'all_items'] as const).map((k) => (
                 <label key={k} className="inline-flex min-h-[40px] items-center gap-2 text-[15px]"><input id={`ct-${k}`} type="checkbox" className="h-4 w-4" checked={flags[k]} onChange={(e) => setFlags((x) => ({ ...x, [k]: e.target.checked }))} />{t(`ps.ct.${k}`)}</label>))}</div></fieldset>
@@ -577,7 +583,15 @@ export function ServiceSetupPage() {
   const [reason, setReason] = useState('');
   const [rTarget, setRTarget] = useState<'group' | 'item'>('group');
   const [rGroup, setRGroup] = useState(''); const [rItem, setRItem] = useState(''); const [rItemText, setRItemText] = useState(''); const [rMonths, setRMonths] = useState('');
-  useEffect(() => { if (S) setReason(S.setting.parts_reason_code ?? ''); }, [S]);
+  const [mgr, setMgr] = useState('');
+  const [pPos, setPPos] = useState<string[]>([]);
+  const [pUsers, setPUsers] = useState<string[]>([]);
+  useEffect(() => {
+    if (!S) return;
+    setReason(S.setting.parts_reason_code ?? '');
+    setMgr(S.setting.manager_position ?? ''); setPPos(S.setting.parts_positions ?? []); setPUsers(S.setting.parts_users ?? []);
+  }, [S]);
+  const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const refresh = () => qc.invalidateQueries({ queryKey: ['svc-setup'] });
   async function run(f: () => Promise<unknown>, msg: string) { setErr(null); try { await f(); setFlash(msg); refresh(); } catch (e) { setErr(errorMessage(e)); } }
   if (setup.isLoading) return <RequireModule module="service"><PageLoading /></RequireModule>;
@@ -594,6 +608,42 @@ export function ServiceSetupPage() {
             <p className="text-[13px] text-muted">{t('ps.ssetup.reasonHelp')}</p>
             <Button variant="primary" id="ss-save" disabled={!can} disabledReason={!can ? t('erp.readOnly', { module: 'Service' }) : undefined} onClick={() => run(() => svcSettingSet(company, { parts_reason_code: reason }), t('ps.setupSaved'))}>{t('ps.save')}</Button>
             <p className="text-sm">{t('ps.ssetup.numbering')}: <span className="font-mono">{S?.numbering.call ?? t('ps.notSet')}</span> · <span className="font-mono">{S?.numbering.contract ?? t('ps.notSet')}</span></p>
+          </div>
+        </SectionCard>
+        <SectionCard title={t('ps.issuers.title')}>
+          <div className="space-y-4 p-5" data-testid="ss-issuers">
+            <p className="text-[13px] text-muted">{t('ps.issuers.help')}</p>
+            <label className={label}>{t('ps.issuers.manager')}
+              <select id="ss-manager" disabled={!can} className={inputCls} value={mgr} onChange={(e) => setMgr(e.target.value)}>
+                <option value="">{t('ps.notSet')}</option>
+                {(S?.positions ?? []).map((p) => <option key={p.position_code} value={p.position_code}>{p.name}</option>)}
+              </select>
+            </label>
+            <fieldset>
+              <legend className="text-xs font-medium text-muted">{t('ps.issuers.positions')}</legend>
+              <div className="mt-1 grid max-h-48 gap-1 overflow-y-auto rounded-btn border border-line p-2 sm:grid-cols-2">
+                {(S?.positions ?? []).map((p) => (
+                  <label key={p.position_code} className="inline-flex min-h-[40px] items-center gap-2 text-sm">
+                    <input type="checkbox" className="h-4 w-4" disabled={!can} checked={pPos.includes(p.position_code)} onChange={() => setPPos(toggle(pPos, p.position_code))} data-testid="ss-pos" data-code={p.position_code} />
+                    <span dir="auto">{p.name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-xs font-medium text-muted">{t('ps.issuers.users')}</legend>
+              <div className="mt-1 grid max-h-48 gap-1 overflow-y-auto rounded-btn border border-line p-2 sm:grid-cols-2">
+                {(S?.users ?? []).map((u) => (
+                  <label key={u.user_id} className="inline-flex min-h-[40px] items-center gap-2 text-sm">
+                    <input type="checkbox" className="h-4 w-4" disabled={!can} checked={pUsers.includes(u.user_id)} onChange={() => setPUsers(toggle(pUsers, u.user_id))} />
+                    <span dir="auto">{u.name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p className="text-[13px] text-ink-2" data-testid="ss-issuers-rule">{pPos.length || pUsers.length ? t('ps.issuers.ruleList', { n: pPos.length + pUsers.length }) : mgr ? t('ps.issuers.ruleManager', { pos: S?.positions.find((p) => p.position_code === mgr)?.name ?? mgr }) : t('ps.issuers.ruleNobody')}</p>
+            <Button variant="primary" id="ss-issuers-save" disabled={!can} disabledReason={!can ? t('erp.readOnly', { module: 'Service' }) : undefined}
+              onClick={() => run(() => svcSettingSet(company, { manager_position: mgr || null, parts_positions: pPos, parts_users: pUsers }), t('ps.setupSaved'))}>{t('ps.save')}</Button>
           </div>
         </SectionCard>
         <SectionCard title={t('ps.ssetup.warranty')}>

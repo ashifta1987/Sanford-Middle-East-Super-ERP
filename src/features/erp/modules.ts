@@ -159,6 +159,14 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Human Resources Reports': '/hr/expiry', 'Roles and Duties': '/hr/setup', 'Attendance and Check-in': '/hr/attendance', Leave: '/hr/leave',
     Payroll: '/hr/payroll', 'Staff Portal': '/portal',
   },
+  // A13 · Production and Service
+  production: {
+    'Bill of Materials': '/production/boms', 'Production Order': '/production/orders', 'Receipt from Production': '/production/orders?f_state=released',
+    'Issue for Production': '/production/orders?f_state=released', 'Bill of Materials Management': '/production/boms',
+  },
+  service: {
+    'Service Call': '/service/calls', 'Equipment Card': '/service/equipment', 'Service Contract': '/service/contracts',
+  },
   // A11 · Reports: report library (read-only SQL functions with the user's own rights), Ask AI for a Report
   reports: {
     Financials: '/reports?cat=financials', 'Sales and Purchasing': '/reports?cat=sales_purchasing', 'Business Partners': '/reports?cat=bp',
@@ -224,6 +232,18 @@ const LIVE_ITEMS: Record<string, string> = {
   'Customer receivables ageing': '/reports/ar-aging', 'Supplier liabilities ageing': '/reports/ap-aging', 'Aging ›': '/reports/ar-aging',
   'Customer Receivables by Customer Cross-Section': '/reports/ar-aging', 'Inventory in warehouse': '/reports/inventory-in-warehouse',
   'Inventory valuation': '/reports/inventory-valuation', 'Ask in plain words': '/reports?ask=1',
+  // A13 · production and service
+  'Find a BOM': '/production/boms', 'New BOM': '/production/boms/new', 'BOM types': '/production/boms', 'Mould or tool used': '/production/moulds',
+  'New production order': '/production/orders/new', 'Open orders': '/production/orders?f_state=released', 'Release to the floor': '/production/orders?f_state=planned',
+  'Close order': '/production/orders?f_state=released', 'Receive output': '/production/orders?f_state=released', 'Issue components': '/production/orders?f_state=released',
+  'Extra issue': '/production/orders?f_state=released', 'Find where used': '/production/boms', 'Bill of Materials Report': '/production/boms',
+  'Production ›': '/production/setup', 'Route stages and production settings, mould records': '/production/moulds',
+  'New service call': '/service/calls/new', 'Open calls': '/service/calls?f_status=open', 'Assign technician': '/service/calls?f_status=open',
+  'Parts and labour': '/service/calls?f_status=in_progress', 'Close with solution': '/service/calls?f_status=resolved',
+  'Find by serial number': '/service/equipment', 'Warranty status': '/service/equipment', 'Service history': '/service/equipment',
+  'New contract': '/service/contracts/new', Coverage: '/service/contracts', 'Response time': '/service/contracts', 'Renewals due': '/service/contracts?f_state=active',
+  'Service Calls': '/service/calls', 'Service Contracts': '/service/contracts', 'Equipment Card Report': '/service/equipment',
+  'My Service Calls': '/service/calls', 'Service ›': '/service/setup',
 };
 
 /** module › SAP function name → create screen (documents that can be raised in Super ERP; the database checks every write) */
@@ -239,6 +259,8 @@ const CREATE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   bp: { 'Business Partner Master Data': '/bp/new' },
   hr: { 'Employee Master Data': '/hr/employees/new', Leave: '/portal' },
   administration: { License: '/admin/users/invite' },
+  production: { 'Bill of Materials': '/production/boms/new', 'Production Order': '/production/orders/new' },
+  service: { 'Service Call': '/service/calls/new', 'Service Contract': '/service/contracts/new', 'Equipment Card': '/service/equipment/new' },
 };
 
 export const liveRouteForFunction = (m: ModuleKey, fn: string) => LIVE_FUNCTIONS[m]?.[fn];

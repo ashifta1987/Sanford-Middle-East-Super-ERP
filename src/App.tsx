@@ -41,6 +41,12 @@ import {
 import { AuthorizationsPage, UserFormPage, UsersPage } from '@/features/erp/pages/AdminPages';
 import { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage, NumberingPage } from '@/features/erp/pages/AdminSetupPages';
 import { ReportPage, ReportPrintPage, ReportsLibraryPage } from '@/features/erp/pages/ReportPages';
+import {
+  BomFormPage, BomPage, BomsPage, MouldPage, MouldsPage, ProdOrderNewPage, ProdOrderPage, ProdOrdersPage, ProductionSetupPage,
+} from '@/features/erp/pages/ProductionPages';
+import {
+  ContractFormPage, ContractPage, ContractsPage, EquipmentCardPage, EquipmentPage, ServiceCallFormPage, ServiceCallPage, ServiceCallsPage, ServiceSetupPage,
+} from '@/features/erp/pages/ServicePages';
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -197,6 +203,30 @@ export default function App() {
         {/* A11 · Reports */}
         <Route path="reports" element={<ReportsLibraryPage />} />
         <Route path="reports/:code" element={<ReportPage />} />
+        {/* A13 · Production and Service */}
+        <Route path="production/boms" element={<BomsPage />} />
+        <Route path="production/boms/new" element={<BomFormPage key="bom-new" mode="new" />} />
+        <Route path="production/boms/:company/:item" element={<BomPage />} />
+        <Route path="production/boms/:company/:item/edit" element={<BomFormPage key="bom-edit" mode="edit" />} />
+        <Route path="production/orders" element={<ProdOrdersPage />} />
+        <Route path="production/orders/new" element={<ProdOrderNewPage />} />
+        <Route path="production/orders/:company/:id" element={<ProdOrderPage />} />
+        <Route path="production/moulds" element={<MouldsPage />} />
+        <Route path="production/moulds/new" element={<MouldPage key="mould-new" mode="new" />} />
+        <Route path="production/moulds/:company/:code" element={<MouldPage key="mould-view" mode="view" />} />
+        <Route path="production/setup" element={<ProductionSetupPage />} />
+        <Route path="service/calls" element={<ServiceCallsPage />} />
+        <Route path="service/calls/new" element={<ServiceCallFormPage key="call-new" mode="new" />} />
+        <Route path="service/calls/:company/:id" element={<ServiceCallPage />} />
+        <Route path="service/calls/:company/:id/edit" element={<ServiceCallFormPage key="call-edit" mode="edit" />} />
+        <Route path="service/equipment" element={<EquipmentPage />} />
+        <Route path="service/equipment/new" element={<EquipmentCardPage key="eq-new" mode="new" />} />
+        <Route path="service/equipment/:company/:id" element={<EquipmentCardPage key="eq-view" mode="view" />} />
+        <Route path="service/contracts" element={<ContractsPage />} />
+        <Route path="service/contracts/new" element={<ContractFormPage key="ct-new" mode="new" />} />
+        <Route path="service/contracts/:company/:id" element={<ContractPage />} />
+        <Route path="service/contracts/:company/:id/edit" element={<ContractFormPage key="ct-edit" mode="edit" />} />
+        <Route path="service/setup" element={<ServiceSetupPage />} />
 
         {legacy.map(([from, to]) => <Route key={from} path={from} element={<Navigate to={to} replace />} />)}
         <Route path="approvals" element={<ApprovalsPage />} />

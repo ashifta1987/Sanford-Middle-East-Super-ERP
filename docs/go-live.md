@@ -70,7 +70,7 @@ The list is also in `scripts/local-stack/sql-order-supabase.txt`.
 ### 3.3 Tests on the branch
 1. On the branch only, load the fictional data: `15_sample_company.sql`, then `scripts/local-stack/test-users.sql`.
 2. Run each suite, `supabase/tests/a1_module_access.sql` to `a14_go_live.sql`, then `b1_numbering_company.sql` (after `scripts/local-stack/test-users-b1.sql`). Each one prints PASS/FAIL rows and a TOTAL row, and rolls back.
-3. Expected result, the same as local and CI: **15 suites, 1,796 checks passed, 0 failed.**
+3. Expected result, the same as local and CI: **15 suites, 1,797 checks passed, 0 failed.**
 4. Throw the branch away afterwards, or remove ZZ99 if it is a long-lived test project.
 
 The `a14_go_live.sql` suite runs the same checks as the advisors (RLS on every table, `search_path` on every definer function, nothing callable by anon).

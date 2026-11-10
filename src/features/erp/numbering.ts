@@ -51,3 +51,4 @@ export function seriesProblem(o: SeriesOption, date?: string | null, whs?: strin
   if (whs && o.whs_code && o.whs_code !== whs) return 'whs';
   return null;
 }
+

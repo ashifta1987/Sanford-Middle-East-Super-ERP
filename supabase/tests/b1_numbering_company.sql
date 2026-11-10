@@ -332,6 +332,12 @@ BEGIN
          '{"card_code":"C0011","doc_date":"2026-11-10","due_date":"2026-12-31","whs_code":"WH01"}', '[{"item_code":"SMP-1010","qty":2,"tax_code":"SR"}]'));
   q2 := (r->>'doc_entry')::integer;
   PERFORM pg_temp.call(sales, format('SELECT erp.sales_doc_submit(%L, 23, %s, NULL)', 'ZZ99', q2));
+  r := pg_temp.call(sales, format('SELECT erp.sales_doc_save(%L, 23, NULL, %L::jsonb, %L::jsonb)', 'ZZ99',
+         '{"card_code":"C0011","doc_date":"2026-11-10","whs_code":"WH01"}', '[{"item_code":"SMP-1010","qty":1,"tax_code":"SR"}]'));
+  PERFORM pg_temp.call(sales, format('SELECT erp.sales_doc_submit(%L, 23, %s, NULL)', 'ZZ99', (r->>'doc_entry')::int));
+  r2 := pg_temp.call(sales, $q$SELECT erp.sales_copy_source('ZZ99', 23, NULL, 'C0011')$q$);
+  PERFORM pg_temp.check((r2->'lines') @> format('[{"base_doc_entry":%s}]', q2)::jsonb AND (r2->'lines') @> format('[{"base_doc_entry":%s}]', r->>'doc_entry')::jsonb,
+                        'copy to: valid quotations and quotations without a valid-until date are offered', left(r2::text, 200));
   r := pg_temp.so(sales, hs, format('[{"item_code":"SMP-1010","qty":1,"tax_code":"SR","base_obj_type":23,"base_doc_entry":%s,"base_line":0}]', q2)::jsonb, so_primary);
   PERFORM pg_temp.check(r->>'error' IS NULL AND r->>'doc_no' LIKE 'SO-26-%', 'order from a valid quotation still works', r::text);
 

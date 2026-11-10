@@ -1676,7 +1676,7 @@ BEGIN
         LEFT JOIN erp.item i ON i.company_code = l.company_code AND i.item_code = l.item_code
        WHERE l.company_code = p_company AND l.obj_type = p_obj AND ld.source = 'erp' AND ld.status = 'open'
          AND coalesce(l.line_status, 'O') = 'O' AND l.open_qty > 0
-         AND NOT (p_obj = 23 AND ld.due_date < current_date)
+         AND NOT (p_obj = 23 AND coalesce(ld.due_date < current_date, false))   -- expired quotations are not offered (no valid-until = never expires)
          AND (CASE WHEN p_doc_entry IS NOT NULL THEN l.doc_entry = p_doc_entry ELSE ld.card_code = p_card_code END)), '[]'::jsonb));
 END $$;
 

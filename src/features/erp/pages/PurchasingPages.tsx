@@ -642,7 +642,7 @@ function ApprovalPanel({ company, id, info, kind, docNo, onDone }: { company: st
     try {
       const r = await puDecide(company, id, decision, decision === 'rejected' ? note.trim() : null);
       setRejOpen(false);
-      onDone(decision === 'rejected' ? t('so.flash.rejected') : r.state === 'approved' ? t('pu.flash.approved', { no: docNo }) : t('so.flash.stepApproved'));
+      onDone(decision === 'rejected' ? (r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t('so.flash.rejected')) : r.state === 'approved' ? t('pu.flash.approved', { no: docNo }) : t('so.flash.stepApproved'));
     } catch (e) {
       const m = errorMessage(e);
       if (decision === 'rejected') setNoteErr(m); else setErr(m);
@@ -1710,6 +1710,8 @@ export function PurchasingSetupPage() {
         <h1 className="flex flex-wrap items-center gap-3 text-[26px] font-semibold sm:text-[28px]">{t('pu.setup.title')} <LiveBadge live /></h1>
         <p className="mt-1 max-w-3xl text-[15px] text-muted">{t('pu.setup.desc', { company })}</p>
       </header>
+      {/* B3 · setup windows */}
+      <nav aria-label={t('stp.setupWindows')} className="mb-5 flex flex-wrap gap-2" data-testid="stp-links"><Link id="pu-lc-types" to="/purchasing/landed-cost-types" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.lc.title')}</Link></nav>
       <FormError message={err} />
       <Flash text={msg} />
       {lists.isLoading ? <PageLoading /> : lists.error ? <div className="card"><ErrorState error={lists.error} onRetry={() => lists.refetch()} /></div> : (

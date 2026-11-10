@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -19,8 +19,8 @@ import { moduleByKey } from '../modules';
 import type { Row } from '../api';
 import { searchAccounts, type AccountHit } from '../journal';
 import {
-  autoMatch, bankAccountSave, bankingSettingSet, bpBankSave, candidates, depositCreate, dirPath, matchLine, parseCsv, searchPartners, statementImport,
-  toAmount, toIsoDate, unmatchLine, useCashPosition, useDepositSetup, useStatementInfo,
+  autoMatch, bankAccountSave, bankingSettingSet, bpBankSave, candidates, depositCreate, dirPath, matchLine, parseCsv, searchPartners, statementFormatSave, statementImport,
+  toAmount, toIsoDate, unmatchLine, useCashPosition, useDepositSetup, useStatementActivity, useStatementFormats, useStatementInfo,
   type BpHit, type Candidate, type DateFormat, type JlSource, type StatementLine, type StatementRow,
 } from '../banking';
 import { BkHeader, Flash, FormError, todayIso, useDefaultCompany, useFlash } from './BankingPages';
@@ -242,10 +242,25 @@ function ImportCard() {
   const [map, setMap] = useState({ date: '', description: '', reference: '', amount: '', debit: '', credit: '' });
   const [mode, setMode] = useState<'amount' | 'split'>('amount');
   const [fmt, setFmt] = useState<DateFormat>('DD/MM/YYYY');
+  const [dec, setDec] = useState<'.' | ','>('.');
+  const [remember, setRemember] = useState(true);
+  const [usedSaved, setUsedSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const bankCode = bank || (banks.data?.length === 1 ? banks.data[0].bank_code : '');
+  const formats = useStatementFormats(company);
+  const saved = bankCode ? formats.data?.[bankCode] : undefined;
+  // B3: a bank's saved column mapping is used when its columns are in the file.
+  function applySaved(hs: string[]) {
+    if (!saved) return false;
+    const cols = [saved.date, saved.mode === 'amount' ? saved.amount : saved.debit, saved.mode === 'amount' ? null : saved.credit, saved.reference, saved.description].filter(Boolean) as string[];
+    if (!cols.every((c) => hs.includes(c))) return false;
+    setMap({ date: saved.date, description: saved.description ?? '', reference: saved.reference ?? '', amount: saved.amount ?? '', debit: saved.debit ?? '', credit: saved.credit ?? '' });
+    setMode(saved.mode); setFmt(saved.date_format); setDec(saved.decimal_sep);
+    return true;
+  }
+  useEffect(() => { if (file) setUsedSaved(applySaved(file.headers)); }, [saved, file?.name]); // eslint-disable-line react-hooks/exhaustive-deps
   const col = (h: string) => (file ? file.headers.indexOf(h) : -1);
   const guess = (hs: string[], ...words: string[]) => hs.find((h) => words.some((w) => h.toLowerCase().includes(w))) ?? '';
 
@@ -263,13 +278,14 @@ function ImportCard() {
     setMode(!guess(hs, 'amount', 'مبلغ') && debit && credit ? 'split' : 'amount');
     const sample = parsed.rows[0]?.[hs.indexOf(guess(hs, 'date', 'تاريخ'))] ?? '';
     if (/^\d{4}-/.test(sample)) setFmt('YYYY-MM-DD');
+    setUsedSaved(applySaved(hs));
   }
   const rows: StatementRow[] = (file?.rows ?? []).map((r) => {
     const cell = (h: string) => (h && col(h) >= 0 ? r[col(h)] ?? '' : '');
-    let amount = toAmount(cell(map.amount));
+    let amount = toAmount(cell(map.amount), dec);
     if (mode === 'split') {
-      const c = Number(toAmount(cell(map.credit)) || 0);
-      const d = Number(toAmount(cell(map.debit)) || 0);
+      const c = Number(toAmount(cell(map.credit), dec) || 0);
+      const d = Number(toAmount(cell(map.debit), dec) || 0);
       amount = String(r2(c - Math.abs(d)));
     }
     return { date: toIsoDate(cell(map.date), fmt), description: cell(map.description).trim(), reference: cell(map.reference).trim(), amount };
@@ -279,6 +295,12 @@ function ImportCard() {
     try {
       const r = await statementImport(company, bankCode, file!.name, rows);
       qc.invalidateQueries({ queryKey: ['erp-list'] });
+      if (remember) {
+        try {
+          await statementFormatSave(company, bankCode, { mode, date: map.date, amount: map.amount, debit: map.debit, credit: map.credit, reference: map.reference, description: map.description, date_format: fmt, decimal_sep: dec });
+          qc.invalidateQueries({ queryKey: ['stmt-formats', company] });
+        } catch { /* the import itself worked; the format is only a convenience */ }
+      }
       if (r.statement_id) nav(`/banking/statements/${company}/${r.statement_id}`, { state: { flash: t('bk.flash.imported', { n: r.imported, skipped: r.skipped }) } });
       else setResult(t('bk.flash.nothingNew', { skipped: r.skipped }));
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -312,11 +334,17 @@ function ImportCard() {
         </div>
         {file && (
           <>
+            {usedSaved && <p className="rounded-btn bg-info-bg px-4 py-2 text-sm text-info-fg" data-testid="imp-saved">{t('bk.usingSaved', { bank: bankCode })}</p>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {sel('imp-date', t('bk.mapDate'), map.date, (v) => setMap((m) => ({ ...m, date: v })))}
               <label className="block text-xs font-medium text-muted">{t('bk.dateFormat')}
                 <select id="imp-format" className="input mt-1 text-[15px] text-ink" value={fmt} onChange={(e) => setFmt(e.target.value as DateFormat)}>
                   {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-muted">{t('bk.decimalSep')}
+                <select id="imp-decimal" className="input mt-1 text-[15px] text-ink" value={dec} onChange={(e) => setDec(e.target.value as '.' | ',')}>
+                  <option value=".">{t('bk.decimalDot')}</option><option value=",">{t('bk.decimalComma')}</option>
                 </select>
               </label>
               {sel('imp-desc', t('bk.mapDescription'), map.description, (v) => setMap((m) => ({ ...m, description: v })), true)}
@@ -349,6 +377,10 @@ function ImportCard() {
             </div>
           </>
         )}
+        {file && canWrite && (
+          <label className="inline-flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" id="imp-remember" className="h-5 w-5" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            {t('bk.rememberFormat', { bank: bankCode || '—' })}</label>
+        )}
         <Button variant="primary" id="imp-submit" disabled={Boolean(why) || busy} disabledReason={why} onClick={go} icon={<Upload className="h-4 w-4" aria-hidden />}>{busy ? t('bk.importing') : t('bk.import')}</Button>
       </div>
     </SectionCard>
@@ -378,7 +410,7 @@ export function StatementPage() {
   }
   const s = q.data;
   const matched = s.lines.filter((l) => l.match).length;
-  const refresh = (msg?: string) => { if (msg) setFlash(msg); qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['cash-position'] }); q.refetch(); };
+  const refresh = (msg?: string) => { if (msg) setFlash(msg); qc.invalidateQueries({ queryKey: ['erp-list'] }); qc.invalidateQueries({ queryKey: ['cash-position'] }); qc.invalidateQueries({ queryKey: ['stmt-activity'] }); q.refetch(); };
   async function runAuto() {
     setErr(null); setBusy(true);
     try { const r = await autoMatch(company, s.statement_id); refresh(t('bk.flash.autoMatched', { n: r.matched, left: r.unmatched })); } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -398,7 +430,7 @@ export function StatementPage() {
       <FormError message={err} />
       <SectionCard title={t('bk.lines')} right={
         <label className="inline-flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" id="stmt-only" checked={only} onChange={(e) => setOnly(e.target.checked)} className="h-4 w-4" /> {t('bk.onlyUnmatched')}</label>}>
-        <p className="border-b border-line px-5 py-2 text-xs text-muted">{t('bk.matchRule', { n: s.match_days ?? 0 })}</p>
+        <p className="border-b border-line px-5 py-2 text-xs text-muted" data-testid="stmt-rule">{t('bk.matchRuleRef', { n: s.match_days ?? 3 })}</p>
         {lines.length === 0 ? <EmptyState title={t('bk.allMatched')} body={t('bk.allMatchedBody')} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-[14px] sm:min-w-[720px]" data-testid="stmt-lines">
@@ -438,8 +470,30 @@ export function StatementPage() {
           </div>
         )}
       </SectionCard>
+      <StatementActivityCard company={company} id={s.statement_id} />
       {pick && <MatchDialog company={company} line={pick} currency={s.currency} onClose={() => setPick(null)} onDone={() => { setPick(null); refresh(t('bk.flash.matched')); }} />}
     </RequireModule>
+  );
+}
+
+/** B3 · who matched, unmatched or auto-matched what (audit log). */
+function StatementActivityCard({ company, id }: { company: string; id: number }) {
+  const { t } = useTranslation();
+  const a = useStatementActivity(company, id);
+  if (!a.data?.length) return null;
+  return (
+    <SectionCard className="mt-5" title={t('bk.stmtActivity')}>
+      <ul className="divide-y divide-line" data-testid="stmt-activity">
+        {a.data.slice(0, 20).map((x, i) => (
+          <li key={i} className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-2.5 text-sm">
+            <span><span className="font-medium">{t(`bk.act.${x.action}`, { defaultValue: x.action })}</span> · {x.actor_name}
+              {x.detail && 'matched' in x.detail ? <span className="text-muted"> · {t('bk.act.counts', { n: x.detail.matched as number, left: x.detail.unmatched as number })}</span> : null}
+              {x.detail && 'match_no' in x.detail ? <span className="text-muted"> · {t('bk.matchNo', { n: x.detail.match_no as number })}</span> : null}</span>
+            <time className="num text-xs text-muted" dateTime={x.at}>{new Date(x.at).toLocaleString()}</time>
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
   );
 }
 

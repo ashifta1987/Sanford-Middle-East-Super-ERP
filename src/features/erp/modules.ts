@@ -53,6 +53,8 @@ const FIN_SETUP = (no: number): MenuFunction => ({
   items: [
     { name: 'G/L Account Determination', desc: 'The account each kind of posting uses: receivables, revenue, VAT, inventory…' },
     { name: 'Posting Periods', desc: 'Open, close or lock months. Nothing posts on dates in a closed or locked period.' },
+    // B3 · item group and warehouse accounts are set on the same screen (and on the item group / warehouse Accounting tabs)
+    { name: 'Item group and warehouse accounts', desc: 'Accounts that override the company default for one item group or one warehouse.' },
   ],
 });
 const menu = (k: string) => D.MENU[k] ?? { desc: '' };
@@ -121,6 +123,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Data Import/Export': '/backoffice/migration',
     // B1 · companies are created from the front end
     'Choose/Create Company': '/admin/companies',
+    // B3 · Administration › Setup › Financials › G/L Account Determination (the other Setup items open their own windows)
+    Setup: '/financials/gl-determination',
   },
   financials: {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
@@ -151,7 +155,7 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   inventory: {
     'Item Master Data': '/items', 'Price Lists': '/inventory/prices',
     // A7 · inventory transactions
-    'Bin Locations': '/inventory/setup', 'Inventory Transactions': '/docs/inventory_transfer',
+    'Bin Locations': '/inventory/warehouses', 'Inventory Transactions': '/docs/inventory_transfer',
     // A11 · reports
     'Inventory Reports': '/reports?cat=inventory',
   },
@@ -209,12 +213,12 @@ const LIVE_ITEMS: Record<string, string> = {
   'Copy to goods receipt': '/docs/purchase_order?f_status=open', 'Receive against PO': '/docs/purchase_order?f_status=open',
   'Record deposit invoice': '/docs/purchase_order?f_status=open', 'Open deposits': '/docs/ap_down_payment?f_status=open',
   'New A/P invoice': '/docs/goods_receipt_po?f_status=open', 'New landed cost': '/purchasing/landed-costs/new', 'Cost lines': '/purchasing/landed-costs',
-  'Allocation method': '/purchasing/setup', 'Update item costs': '/purchasing/landed-costs', 'Purchasing ›': '/purchasing/setup',
+  'Allocation method': '/purchasing/landed-cost-types', 'Update item costs': '/purchasing/landed-costs', 'Purchasing ›': '/purchasing/setup',
   'New PI entry': '/docs/purchase_order?f_status=open', 'Deposit status': '/docs/ap_down_payment',
   // A7 · inventory: counting, batches / serials, bins, item history
   'Inventory Counting Transactions ›': '/inventory/counts', 'Item Serial Numbers ›': '/inventory/serials', 'Batches ›': '/inventory/batches',
   'Batches and serials': '/inventory/serials', 'Bin Location Master Data': '/inventory/setup', 'Bin Location Management': '/inventory/setup',
-  'Item history': '/items', 'Inventory ›': '/inventory/setup', 'Bin Locations': '/inventory/setup',
+  'Item history': '/items', 'Inventory ›': '/inventory/setup', 'Bin Locations': '/inventory/warehouses',
   // A8 · master data
   'New business partner': '/bp/new', Customers: '/bp?f_kind=customer', 'Suppliers and factories': '/bp?f_kind=supplier', Leads: '/bp?f_kind=lead',
   'Credit limits and payment terms': '/bp/changes', '360° view': '/bp', 'Trademark registrations': '/bp/trademarks', 'Brand list': '/bp/trademarks',
@@ -244,6 +248,8 @@ const LIVE_ITEMS: Record<string, string> = {
   'Close order': '/production/orders?f_state=released', 'Receive output': '/production/orders?f_state=released', 'Issue components': '/production/orders?f_state=released',
   'Extra issue': '/production/orders?f_state=released', 'Find where used': '/production/boms', 'Bill of Materials Report': '/production/boms',
   'Production ›': '/production/setup', 'Route stages and production settings, mould records': '/production/moulds',
+  // B3 · setup windows (Administration › Setup ›): G/L Account Determination, resources, landed cost types
+  'Financials ›': '/financials/gl-determination', 'Resources ›': '/production/resources', 'Item group and warehouse accounts': '/financials/gl-determination?tab=inventory',
   'New service call': '/service/calls/new', 'Open calls': '/service/calls?f_status=open', 'Assign technician': '/service/calls?f_status=open',
   'Parts and labour': '/service/calls?f_status=in_progress', 'Close with solution': '/service/calls?f_status=resolved',
   'Find by serial number': '/service/equipment', 'Warranty status': '/service/equipment', 'Service history': '/service/equipment',

@@ -800,7 +800,7 @@ function ApprovalPanel({ company, id, info, docNo, onDone, kind }: { company: st
     try {
       const r = await soDecide(company, id, decision, decision === 'rejected' ? note.trim() : null, n, SALES_OBJ[kind]);
       setRejOpen(false);
-      onDone(decision === 'rejected' ? t('so.flash.rejected') : r.state === 'approved' ? t(tk(kind, 'flash.approved')) : t(tk(kind, 'flash.stepApproved')));
+      onDone(decision === 'rejected' ? (r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t('so.flash.rejected')) : r.state === 'approved' ? t(tk(kind, 'flash.approved')) : t(tk(kind, 'flash.stepApproved')));
     } catch (e) {
       const m = errorMessage(e);
       if (decision === 'rejected') setNoteErr(m); else setErr(m);

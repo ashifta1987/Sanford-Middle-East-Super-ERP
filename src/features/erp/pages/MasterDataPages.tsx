@@ -552,7 +552,7 @@ function RequestsCard({ info, company, code, onFlash }: { info: BpInfo; company:
       qc.invalidateQueries({ queryKey: ['bp', company, code] });
       qc.invalidateQueries({ queryKey: ['inbox'] });
       qc.invalidateQueries({ queryKey: ['approval-inbox'] });
-      onFlash(t(`md.req.flash.${res.state}`, { what: requestText(r, cur) }));
+      onFlash(rej && res.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t(`md.req.flash.${res.state}`, { what: requestText(r, cur) }));
       setRej(null);
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(null); }
   }

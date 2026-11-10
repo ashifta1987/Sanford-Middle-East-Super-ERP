@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { AlertCircle, CircleCheck, Lock, LockOpen, Pencil, Plus, X } from 'lucide-react';
+import { AlertCircle, CircleCheck, Lock, LockOpen, Plus } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { useCompany } from '@/layout/CompanyContext';
 import { erp } from '@/lib/supabase';
@@ -11,10 +11,9 @@ import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { LiveBadge, PageTitle, SectionCard, fmtDay } from '../components/ui';
 import { RequireModule, useModuleLevel } from '../components/Guard';
-import { Combobox, type ComboOption } from '../components/Combobox';
 import { Dialog } from '../components/Dialog';
 import { moduleByKey } from '../modules';
-import { glSet, periodAddYear, periodSetStatus, searchAccounts, type AccountHit, type PeriodStatus } from '../journal';
+import { periodAddYear, periodSetStatus, type PeriodStatus } from '../journal';
 
 /** The company a setup screen works on: the top-bar company, or the user's home company when "all companies" is selected. */
 function useSetupCompany() {
@@ -56,108 +55,7 @@ function ErrorBox({ text }: { text: string | null }) {
   return <div role="alert" className="mb-4 flex items-start gap-2 rounded-card border border-crit-fg/30 bg-crit-bg p-4 font-semibold text-crit-fg"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /><span dir="auto" data-testid="fs-error">{text}</span></div>;
 }
 
-// ---------- G/L Account Determination ----------
-interface GlKey { area: string; posting_key: string; label: string; sort: number }
-interface GlRow { area: string; posting_key: string; acct_code: string; source: string; updated_at: string; account: { name: string } | null }
-const AREAS = ['sales', 'purchasing', 'general', 'inventory', 'resources'] as const;
-
-export function GlDeterminationPage() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const sc = useSetupCompany();
-  const { company } = sc;
-  const { canWrite, readOnlyReason } = useModuleLevel('financials');
-  const [editing, setEditing] = useState<string | null>(null);
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
-  const q = useQuery({
-    queryKey: ['gl-det', company], enabled: Boolean(company),
-    queryFn: async () => {
-      const [k, g] = await Promise.all([
-        erp().from('gl_posting_key').select('area,posting_key,label,sort').order('sort'),
-        erp().from('gl_determination').select('area,posting_key,acct_code,source,updated_at,account(name)').eq('company_code', company),
-      ]);
-      if (k.error) throw new ApiError(k.error);
-      if (g.error) throw new ApiError(g.error);
-      return { keys: (k.data ?? []) as GlKey[], rows: (g.data ?? []) as unknown as GlRow[] };
-    },
-  });
-  const byKey = useMemo(() => new Map((q.data?.rows ?? []).map((r) => [`${r.area}/${r.posting_key}`, r])), [q.data]);
-  const missing = (q.data?.keys ?? []).filter((k) => !byKey.has(`${k.area}/${k.posting_key}`)).length;
-
-  async function save(k: GlKey, acct: string | null) {
-    setErr(null); setFlash(null); setBusy(true);
-    try {
-      await glSet(company, k.area, k.posting_key, acct);
-      setEditing(null);
-      setFlash(acct ? t('fs.gl.saved', { label: k.label, acct }) : t('fs.gl.cleared', { label: k.label }));
-      await qc.invalidateQueries({ queryKey: ['gl-det', company] });
-    } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
-  }
-  const opts = async (s: string): Promise<Array<ComboOption<AccountHit>>> => (await searchAccounts(company, s)).filter((a) => !a.frozen).map((a) => ({
-    value: a.acct_code, label: `${a.format_code || a.acct_code} · ${a.name}`, data: a, meta: a.acct_code,
-  }));
-
-  return (
-    <SetupFrame title={t('fs.gl.title')} desc={t('fs.gl.desc')} {...sc}>
-      <Flash text={flash} />
-      <ErrorBox text={err} />
-      {!canWrite && readOnlyReason && <p className="mb-4 text-sm text-muted">{readOnlyReason}. {t('fs.readOnlyBody')}</p>}
-      {q.data && missing > 0 && <p className="mb-4 rounded-btn border border-warn-fg/30 bg-warn-bg px-4 py-3 text-sm text-warn-fg" data-testid="gl-missing">{t('fs.gl.missing', { count: missing, company })}</p>}
-      {q.isLoading ? <div className="card"><SkeletonRows rows={6} /></div> : q.error ? <div className="card"><ErrorState error={q.error} onRetry={() => q.refetch()} /></div> : (
-        <div className="space-y-5">
-          {AREAS.map((area) => {
-            const keys = (q.data?.keys ?? []).filter((k) => k.area === area);
-            if (!keys.length) return null;
-            return (
-              <SectionCard key={area} title={t(`fs.gl.area.${area}`)}>
-                <ul className="divide-y divide-line">
-                  {keys.map((k) => {
-                    const id = `${k.area}/${k.posting_key}`;
-                    const r = byKey.get(id);
-                    const sap = r?.source === 'sap';
-                    return (
-                      <li key={id} data-testid="gl-row" data-key={k.posting_key} className="grid gap-3 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-center">
-                        <div className="min-w-0">
-                          <div className="font-medium">{k.label}</div>
-                          <div className="text-xs text-muted">{r ? (r.source === 'sap' ? 'SAP Business One' : r.source === 'sample' ? t('erp.sampleData') : 'Super ERP') : ''}</div>
-                        </div>
-                        {editing === id ? (
-                          <Combobox<AccountHit> id={`gl-${k.posting_key}`} label={t('erp.col.account')} text={text} onText={setText} search={opts}
-                            placeholder={t('je.accountPh')} noMatch={t('je.noAccount')} onSelect={(o) => save(k, o.value)} />
-                        ) : (
-                          <div className="min-w-0">
-                            {r ? <><span className="font-mono text-[14px]">{r.acct_code}</span> <span dir="auto" className="text-ink-2">· {r.account?.name ?? ''}</span></>
-                              : <span className="pill pill-warning">{t('fs.gl.notSet')}</span>}
-                          </div>
-                        )}
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {canWrite && !sap && editing !== id && (
-                            <Button variant="secondary" id={`gl-edit-${k.posting_key}`} disabled={busy} onClick={() => { setEditing(id); setText(''); setErr(null); }} icon={<Pencil className="h-4 w-4" aria-hidden />}>
-                              {r ? t('fs.gl.change') : t('fs.gl.set')}
-                            </Button>
-                          )}
-                          {canWrite && !sap && editing !== id && r && (
-                            <Button variant="ghost" id={`gl-clear-${k.posting_key}`} disabled={busy} onClick={() => save(k, null)}>{t('fs.gl.clear')}</Button>
-                          )}
-                          {editing === id && <Button variant="ghost" onClick={() => setEditing(null)} icon={<X className="h-4 w-4" aria-hidden />}>{t('fs.cancel')}</Button>}
-                          {sap && <span className="text-xs text-muted">{t('fs.gl.sapReadOnly')}</span>}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </SectionCard>
-            );
-          })}
-          <p className="text-sm text-muted">{t('fs.gl.note')}</p>
-        </div>
-      )}
-    </SetupFrame>
-  );
-}
+// B3 · G/L Account Determination moved to SetupPages.tsx (tabs, item group and warehouse accounts).
 
 // ---------- Posting Periods ----------
 interface Period { period_code: string; from_date: string; to_date: string; status: PeriodStatus; updated_at: string }

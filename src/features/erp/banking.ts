@@ -125,6 +125,23 @@ export const autoMatch = (company: string, id: number) => rpc<{ matched: number;
 export const candidates = (company: string, line: number) => rpc<Candidate[]>('bank_statement_candidates', { p_company: company, p_line_id: line });
 export const matchLine = (company: string, line: number, trans: number, jl: number) =>
   rpc<{ match_no: number }>('bank_statement_match', { p_company: company, p_line_id: line, p_trans_id: trans, p_jl_line_id: jl });
+// B3 · statement format saved per bank account, and the statement's match / unmatch history
+export interface StatementFormat { mode: 'amount' | 'split'; date: string; amount: string | null; debit: string | null; credit: string | null; reference: string | null; description: string | null; date_format: DateFormat; decimal_sep: '.' | ',' }
+export const useStatementFormats = (company: string) => useQuery({
+  queryKey: ['stmt-formats', company], enabled: Boolean(company),
+  queryFn: async () => {
+    const { data, error } = await erp().from('bank_statement_format').select('bank_code,mapping').eq('company_code', company);
+    if (error) throw new ApiError(error);
+    return Object.fromEntries((data ?? []).map((r: { bank_code: string; mapping: StatementFormat }) => [r.bank_code, r.mapping])) as Record<string, StatementFormat>;
+  },
+});
+export const statementFormatSave = (company: string, bank: string, m: Record<string, unknown>) =>
+  rpc<StatementFormat>('bank_statement_format_save', { p_company: company, p_bank_code: bank, p_mapping: m });
+export interface StatementActivity { at: string; action: string; actor_name: string; detail: Record<string, unknown> | null }
+export const useStatementActivity = (company: string, id: number) => useQuery({
+  queryKey: ['stmt-activity', company, id], enabled: Boolean(company && id),
+  queryFn: () => rpc<StatementActivity[]>('bank_statement_activity', { p_company: company, p_statement_id: id }),
+});
 export const unmatchLine = (company: string, line: number) => rpc<{ unmatched: boolean }>('bank_statement_unmatch', { p_company: company, p_line_id: line });
 export const bankAccountSave = (company: string, a: Record<string, unknown>) => rpc<Record<string, unknown>>('bank_account_save', { p_company: company, p_acct: a });
 export const bankingSettingSet = (company: string, s: Record<string, unknown>) => rpc<Record<string, unknown>>('banking_setting_set', { p_company: company, p_setting: s });
@@ -184,9 +201,11 @@ export function toIsoDate(s: string, f: DateFormat): string {
   return f === 'MM/DD/YYYY' ? `${c}-${pad(a)}-${pad(b)}` : `${c}-${pad(b)}-${pad(a)}`;
 }
 /** "1,234.50", "(12.00)", "12.00-" → a plain number string. */
-export function toAmount(s: string | undefined): string {
+/** B3: decimal separator '.' (1,234.56) or ',' (1.234,56) as saved in the bank's statement format. */
+export function toAmount(s: string | undefined, decimal: '.' | ',' = '.'): string {
   if (s === undefined) return '';
-  let v = s.trim().replace(/[\s,]/g, '').replace(/[A-Z]{3}$/i, '');
+  let v = s.trim().replace(/\s/g, '').replace(/[A-Z]{3}$/i, '');
+  v = decimal === ',' ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '');
   let neg = false;
   if (/^\(.*\)$/.test(v)) { neg = true; v = v.slice(1, -1); }
   if (v.endsWith('-')) { neg = true; v = v.slice(0, -1); }

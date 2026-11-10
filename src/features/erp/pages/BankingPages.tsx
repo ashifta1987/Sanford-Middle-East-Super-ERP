@@ -760,7 +760,7 @@ function DraftApprovalPanel({ d, onDone }: { d: DraftInfo; onDone: (msg: string)
     try {
       const r = await payDecide(d.company_code, d.draft_id, decision, decision === 'rejected' ? note.trim() : null);
       setRejOpen(false);
-      onDone(decision === 'rejected' ? t('bk.flash.rejected') : r.state === 'posted' ? t('bk.flash.approvedPosted', { no: r.doc_no }) : t('bk.flash.stepApproved'));
+      onDone(decision === 'rejected' ? (r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t('bk.flash.rejected')) : r.state === 'posted' ? t('bk.flash.approvedPosted', { no: r.doc_no }) : t('bk.flash.stepApproved'));
     } catch (e) {
       const m = errorMessage(e);
       if (decision === 'rejected') setNoteErr(m); else setErr(m);

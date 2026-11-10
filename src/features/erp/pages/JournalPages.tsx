@@ -483,7 +483,7 @@ function JeApprovalPanel({ info, onDone }: { info: JeDraftInfo; onDone: (msg: st
     try {
       const r = await jeDecide(info.company_code, info.draft_id, decision, decision === 'rejected' ? note.trim() : null);
       setRejOpen(false);
-      onDone(decision === 'rejected' ? t('je.flash.rejected') : r.state === 'posted' ? t('je.flash.approvedPosted', { n: r.trans_id }) : t('je.flash.stepApproved'));
+      onDone(decision === 'rejected' ? (r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t('je.flash.rejected')) : r.state === 'posted' ? t('je.flash.approvedPosted', { n: r.trans_id }) : t('je.flash.stepApproved'));
     } catch (e) {
       const m = errorMessage(e);
       if (decision === 'rejected') setNoteErr(m); else setErr(m);

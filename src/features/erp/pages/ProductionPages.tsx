@@ -725,6 +725,8 @@ export function ProductionSetupPage() {
   if (setup.isLoading) return <RequireModule module="production"><PageLoading /></RequireModule>;
   return (
     <PsListFrame module="production" title={t('ps.setup.title')} desc={t('ps.setup.desc')}>
+      {/* B3 · setup windows */}
+      <nav aria-label={t('stp.setupWindows')} className="mb-5 flex flex-wrap gap-2" data-testid="stp-links"><Link id="prd-res-link" to="/production/resources" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.res.title')}</Link><Link id="prd-gl-link" to="/financials/gl-determination?tab=production" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.gl.productionAccounts')}</Link></nav>
       <Flash text={flash} />
       <FormError message={err} />
       {setup.error && <div className="card mb-5"><ErrorState error={setup.error} onRetry={() => setup.refetch()} /></div>}

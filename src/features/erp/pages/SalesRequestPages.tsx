@@ -40,7 +40,7 @@ export function SalesRequestPage() {
     try {
       const res = await salesRequestDecide(company, r.request_id, decision, note);
       setRejectOpen(false);
-      setFlash(res.state === 'approved' ? t('sreq.flash.approved', { no: res.doc_no }) : res.state === 'rejected' ? t('sreq.flash.rejected') : t('sreq.flash.nextStep'));
+      setFlash(res.state === 'approved' ? t('sreq.flash.approved', { no: res.doc_no }) : res.state === 'rejected' ? t('sreq.flash.rejected') : decision === 'rejected' ? t('apr.flash.rejectionRecorded') : t('sreq.flash.nextStep'));
       qc.invalidateQueries({ queryKey: ['erp-list'] });
       await refresh();
     } catch (e) { setErr(errorMessage(e)); setRejectOpen(false); } finally { setBusy(false); }

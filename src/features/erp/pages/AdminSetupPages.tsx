@@ -205,7 +205,8 @@ export function CompanyDetailsPage() {
 
   async function run(fn: () => Promise<unknown>, msg: string) {
     setErr(null); setFlash(null); setBusy(true);
-    try { await fn(); setFlash(msg); await qc.invalidateQueries({ queryKey: ['adm-company', company] }); return true; } catch (e) { setErr(errorMessage(e)); return false; } finally { setBusy(false); }
+    // B3: a rejection that the stage still needs more of leaves the request waiting
+    try { const r = await fn() as { state?: string } | null; setFlash(msg === t('adm.co.rejected') && r?.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : msg); await qc.invalidateQueries({ queryKey: ['adm-company', company] }); return true; } catch (e) { setErr(errorMessage(e)); return false; } finally { setBusy(false); }
   }
   async function submit() {
     const changes: Record<string, string> = {};

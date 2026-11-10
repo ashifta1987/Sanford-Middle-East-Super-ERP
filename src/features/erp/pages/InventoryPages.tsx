@@ -590,7 +590,7 @@ export function InvDocPage({ kind }: { kind: InvKind }) {
   const transfer = kind === 'inventory_transfer' || kind === 'transfer_request';
   async function decide(d: 'approved' | 'rejected', note: string | null) {
     setErr(null);
-    try { const r = await invDecide(company, obj, id, d, note); setFlash(t(d === 'approved' ? 'inv.flash.approved' : 'inv.flash.rejected', { no: I!.doc_no, trans: r.trans_id ?? '' })); refresh(); }
+    try { const r = await invDecide(company, obj, id, d, note); setFlash(d === 'rejected' && r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t(d === 'approved' ? 'inv.flash.approved' : 'inv.flash.rejected', { no: I!.doc_no, trans: r.trans_id ?? '' })); refresh(); }
     catch (e) { setErr(errorMessage(e)); }
   }
   async function cancel(note: string) {
@@ -857,7 +857,7 @@ export function CountPage() {
   }
   async function decide(d: 'approved' | 'rejected', note: string | null) {
     setErr(null);
-    try { await countDecide(company, cid, d, note); setFlash(t(d === 'approved' ? 'inv.flash.countApproved' : 'inv.flash.rejected', { no: C!.doc_no })); refresh(); }
+    try { const r = await countDecide(company, cid, d, note); setFlash(d === 'rejected' && r.state === 'pending_approval' ? t('apr.flash.rejectionRecorded') : t(d === 'approved' ? 'inv.flash.countApproved' : 'inv.flash.rejected', { no: C!.doc_no })); refresh(); }
     catch (e) { setErr(errorMessage(e)); }
   }
   if (q.isLoading) return <RequireModule module="inventory"><PageLoading /></RequireModule>;
@@ -1068,6 +1068,8 @@ export function InventorySetupPage() {
         <h1 className="flex flex-wrap items-center gap-3 text-[26px] font-semibold sm:text-[28px]">{t('inv.setup.title')} <LiveBadge live /></h1>
         <p className="mt-1 text-[15px] text-muted">{t('inv.setup.desc')}</p>
       </header>
+      {/* B3 · setup windows */}
+      <nav aria-label={t('stp.setupWindows')} className="mb-5 flex flex-wrap gap-2" data-testid="stp-links"><Link id="inv-whs-link" to="/inventory/warehouses" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.whs.title')}</Link><Link id="inv-ig-link" to="/inventory/item-groups" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.ig.title')}</Link><Link id="inv-rs-link" to="/inventory/reasons" className="inline-flex min-h-[40px] items-center rounded-btn border border-line bg-surface px-3 text-sm font-medium hover:bg-page">{t('stp.rs.title')}</Link></nav>
       <Flash text={flash} />
       <FormError message={err ?? (setup.error ? errorMessage(setup.error) : null)} />
       <div className="space-y-5">

@@ -46,7 +46,9 @@ const { AtpCheckPage, AtpRulesPage, CreditMemoNewPage, DeliveryNewPage, InvoiceN
 const P_JournalPages = from(() => import('@/features/erp/pages/JournalPages'));
 const { JournalDraftPage, JournalDraftsPage, JournalNewPage } = P_JournalPages('JournalDraftPage', 'JournalDraftsPage', 'JournalNewPage');
 const P_FinanceSetupPages = from(() => import('@/features/erp/pages/FinanceSetupPages'));
-const { GlDeterminationPage, PostingPeriodsPage } = P_FinanceSetupPages('GlDeterminationPage', 'PostingPeriodsPage');
+const { PostingPeriodsPage } = P_FinanceSetupPages('PostingPeriodsPage');
+const P_SetupPages = from(() => import('@/features/erp/pages/SetupPages'));
+const { GlAccountDeterminationPage, ItemGroupPage, ItemGroupsPage, LandedCostTypesPage, ReasonsPage, ResourcesPage, WarehousePage, WarehousesPage } = P_SetupPages('GlAccountDeterminationPage', 'ItemGroupPage', 'ItemGroupsPage', 'LandedCostTypesPage', 'ReasonsPage', 'ResourcesPage', 'WarehousePage', 'WarehousesPage');
 const P_BankingPages = from(() => import('@/features/erp/pages/BankingPages'));
 const { PaymentDetailPage, PaymentDraftPage, PaymentDraftsPage, PaymentNewPage } = P_BankingPages('PaymentDetailPage', 'PaymentDraftPage', 'PaymentDraftsPage', 'PaymentNewPage');
 const P_BankingMorePages = from(() => import('@/features/erp/pages/BankingMorePages'));
@@ -191,6 +193,14 @@ export default function App() {
         <Route path="inventory/serials" element={<LotsPage key="S" kind="S" />} />
         <Route path="inventory/lots/:company/:id" element={<LotPage />} />
         <Route path="inventory/setup" element={<InventorySetupPage />} />
+        {/* B3 · setup windows: warehouses, item groups, goods receipt / issue reasons, landed cost types, resources */}
+        <Route path="inventory/warehouses" element={<WarehousesPage />} />
+        <Route path="inventory/warehouses/:company/:code" element={<WarehousePage key="whs" />} />
+        <Route path="inventory/item-groups" element={<ItemGroupsPage />} />
+        <Route path="inventory/item-groups/:company/:code" element={<ItemGroupPage key="ig" />} />
+        <Route path="inventory/reasons" element={<ReasonsPage />} />
+        <Route path="purchasing/landed-cost-types" element={<LandedCostTypesPage />} />
+        <Route path="production/resources" element={<ResourcesPage />} />
         <Route path="docs/:kind" element={<DocumentsPage />} />
         <Route path="docs/:kind/:company/:entry" element={<DocumentDetail />} />
         <Route path="financials/accounts" element={<AccountsPage />} />
@@ -199,7 +209,8 @@ export default function App() {
         <Route path="financials/journals/new" element={<JournalNewPage />} />
         <Route path="financials/journals/drafts" element={<JournalDraftsPage />} />
         <Route path="financials/journals/drafts/:company/:id" element={<JournalDraftPage />} />
-        <Route path="financials/gl-determination" element={<GlDeterminationPage />} />
+        {/* B3 · G/L Account Determination by tab, with item group and warehouse accounts */}
+        <Route path="financials/gl-determination" element={<GlAccountDeterminationPage />} />
         <Route path="financials/periods" element={<PostingPeriodsPage />} />
         <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
         <Route path="banking/payments/:dir" element={<PaymentsPage />} />

@@ -67,7 +67,10 @@ $$;
 -- The document currency and rate for a form. Never raises: returns {currency, rate, local, overridden, error, field}.
 --   p_bp_cur  the partner's currency (NULL or '##' = any currency)    p_head / p_head_rate  what the form sent (may be empty)
 --   p_noun    'Customer' / 'Supplier'                                 p_date  posting date (NULL: no rate yet)
-CREATE OR REPLACE FUNCTION erp._cur_pick(p_company varchar, p_card text, p_bp_cur text, p_head text, p_head_rate text, p_date date, p_noun text)
+--   p_kept    the rate already stored on the document / draft being re-checked (submit, approval): accepted as it is.
+DROP FUNCTION IF EXISTS erp._cur_pick(varchar, text, text, text, text, date, text);
+CREATE OR REPLACE FUNCTION erp._cur_pick(p_company varchar, p_card text, p_bp_cur text, p_head text, p_head_rate text, p_date date, p_noun text,
+                                         p_kept numeric DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
 DECLARE
   v_lc    text := (SELECT currency FROM erp.company WHERE company_code = p_company);
@@ -98,7 +101,7 @@ BEGIN
   IF v_typed IS NOT NULL AND v_typed IS DISTINCT FROM v_rate THEN
     IF v_typed <= 0 THEN
       RETURN v_res || jsonb_build_object('field', 'fx_rate', 'error', 'The exchange rate must be more than 0.');
-    ELSIF NOT erp.can_write('finance') THEN
+    ELSIF NOT erp.can_write('finance') AND v_typed IS DISTINCT FROM p_kept THEN
       RETURN v_res || jsonb_build_object('rate', v_rate, 'field', 'fx_rate', 'error',
         CASE WHEN v_rate IS NULL THEN erp._cur_no_rate(v_cur, p_date)
              ELSE format('Only Financials can change the exchange rate. The rate for %s on %s is %s.', v_cur, erp._day(p_date), trim_scale(v_rate)) END);

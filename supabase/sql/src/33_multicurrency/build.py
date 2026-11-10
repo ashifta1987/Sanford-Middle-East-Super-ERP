@@ -185,7 +185,8 @@ t = patch(t, """    ELSIF bp.currency IS NOT NULL AND bp.currency NOT IN (v_cur,
 t = patch(t, """  -- Price list, payment terms, salesperson: the header value, else the customer's own""",
           """  -- B4: document currency and rate (v_cur becomes the document currency; v_lcur is the company currency)
   v_lcur := v_cur;
-  fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Customer');
+  fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Customer',
+                      (SELECT fx_rate FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry AND source = 'erp'));
   IF fx->>'error' IS NOT NULL THEN
     v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
   END IF;
@@ -251,6 +252,17 @@ t = patch(t, """                                             base_obj_type int, 
   INSERT INTO erp.audit_log""", label='sds retotal')
 add('sales_doc_save', '19_sales_cycle.sql', ln, t + "\n-- B4: header currency + rate; totals from the lines (LC, and DC for foreign-currency documents).")
 
+# ---- stored documents re-checked at submit / approval carry their currency and rate
+t, ln = extract('19_sales_cycle.sql', 'erp._sd_stored(')
+t = patch(t, """                                 'customer_ref', d.customer_ref, 'comments', d.comments),""",
+          """                                 'customer_ref', d.customer_ref, 'comments', d.comments, 'currency', d.currency, 'fx_rate', d.fx_rate),""", label='sd stored')
+add('_sd_stored', '19_sales_cycle.sql', ln, t + "\n-- B4: + currency and rate (a re-check keeps them).")
+t, ln = extract('21_purchasing.sql', 'erp._pd_stored(')
+t = patch(t, """'whs_code', w.whs_code, 'china_office', w.china_office, 'customer_ref', d.customer_ref, 'comments', d.comments),""",
+          """'whs_code', w.whs_code, 'china_office', w.china_office, 'customer_ref', d.customer_ref, 'comments', d.comments,
+                                 'currency', d.currency, 'fx_rate', d.fx_rate),""", label='pd stored')
+add('_pd_stored', '21_purchasing.sql', ln, t + "\n-- B4: + currency and rate.")
+
 # ---- purchasing evaluator
 t, ln = extract('31_approvals.sql', 'erp._pd_eval(')
 t = patch(t, """  r        record;
@@ -273,7 +285,8 @@ t = patch(t, """  v_terms := coalesce(erp._num(h->>'payment_terms')::integer, CA
           """  -- B4: document currency and rate (a purchase request has no supplier: company currency)
   v_lcur := v_cur;
   IF NOT v_req THEN
-    fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Supplier');
+    fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Supplier',
+                        (SELECT fx_rate FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry AND source = 'erp'));
     IF fx->>'error' IS NOT NULL THEN
       v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
     END IF;
@@ -529,7 +542,8 @@ t = patch(t, """    ELSIF bp.currency IS NOT NULL AND bp.currency NOT IN (v_cur,
 t = patch(t, """  -- Means of payment
   v_cash :=""", """  -- B4: payment currency (the partner's, or the header's) and the payment date's rate. v_cur becomes the payment currency.
   v_lc := v_cur;
-  fx := erp._cur_pick(p_company, v_card, bp.currency, h->>'currency', h->>'fx_rate', v_date, v_partyc);
+  fx := erp._cur_pick(p_company, v_card, bp.currency, h->>'currency', h->>'fx_rate', v_date, v_partyc,
+                      CASE WHEN p_draft_id IS NOT NULL THEN erp._num(h->>'fx_rate') END);   -- a waiting draft keeps the rate it was checked with
   IF fx->>'error' IS NOT NULL THEN
     v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
   END IF;

@@ -67,7 +67,10 @@ $$;
 -- The document currency and rate for a form. Never raises: returns {currency, rate, local, overridden, error, field}.
 --   p_bp_cur  the partner's currency (NULL or '##' = any currency)    p_head / p_head_rate  what the form sent (may be empty)
 --   p_noun    'Customer' / 'Supplier'                                 p_date  posting date (NULL: no rate yet)
-CREATE OR REPLACE FUNCTION erp._cur_pick(p_company varchar, p_card text, p_bp_cur text, p_head text, p_head_rate text, p_date date, p_noun text)
+--   p_kept    the rate already stored on the document / draft being re-checked (submit, approval): accepted as it is.
+DROP FUNCTION IF EXISTS erp._cur_pick(varchar, text, text, text, text, date, text);
+CREATE OR REPLACE FUNCTION erp._cur_pick(p_company varchar, p_card text, p_bp_cur text, p_head text, p_head_rate text, p_date date, p_noun text,
+                                         p_kept numeric DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
 DECLARE
   v_lc    text := (SELECT currency FROM erp.company WHERE company_code = p_company);
@@ -98,7 +101,7 @@ BEGIN
   IF v_typed IS NOT NULL AND v_typed IS DISTINCT FROM v_rate THEN
     IF v_typed <= 0 THEN
       RETURN v_res || jsonb_build_object('field', 'fx_rate', 'error', 'The exchange rate must be more than 0.');
-    ELSIF NOT erp.can_write('finance') THEN
+    ELSIF NOT erp.can_write('finance') AND v_typed IS DISTINCT FROM p_kept THEN
       RETURN v_res || jsonb_build_object('rate', v_rate, 'field', 'fx_rate', 'error',
         CASE WHEN v_rate IS NULL THEN erp._cur_no_rate(v_cur, p_date)
              ELSE format('Only Financials can change the exchange rate. The rate for %s on %s is %s.', v_cur, erp._day(p_date), trim_scale(v_rate)) END);
@@ -1057,7 +1060,8 @@ BEGIN
 
   -- B4: document currency and rate (v_cur becomes the document currency; v_lcur is the company currency)
   v_lcur := v_cur;
-  fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Customer');
+  fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Customer',
+                      (SELECT fx_rate FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry AND source = 'erp'));
   IF fx->>'error' IS NOT NULL THEN
     v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
   END IF;
@@ -1421,6 +1425,43 @@ BEGIN
 END $$;
 -- B4: header currency + rate; totals from the lines (LC, and DC for foreign-currency documents).
 
+-- ---- _sd_stored: copied from 19_sales_cycle.sql:586.
+CREATE OR REPLACE FUNCTION erp._sd_stored(p_company varchar, p_obj integer, p_doc_entry integer) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+  SELECT jsonb_build_object(
+    'header', jsonb_build_object('card_code', d.card_code, 'doc_date', d.doc_date, 'due_date', d.due_date, 'price_list', w.price_list,
+                                 'payment_terms', w.payment_terms, 'slp_code', d.slp_code, 'whs_code', w.whs_code,
+                                 'customer_ref', d.customer_ref, 'comments', d.comments, 'currency', d.currency, 'fx_rate', d.fx_rate),
+    'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('item_code', l.item_code, 'qty', l.quantity, 'price', l.price,
+                                                          'discount_pct', l.discount_pct, 'tax_code', l.tax_code, 'whs_code', l.whs_code,
+                                                          'base_obj_type', l.base_obj_type, 'base_doc_entry', l.base_doc_entry, 'base_line', l.base_line)
+                                        ORDER BY l.line_num)
+                         FROM erp.document_line l
+                        WHERE l.company_code = d.company_code AND l.obj_type = d.obj_type AND l.doc_entry = d.doc_entry), '[]'::jsonb))
+    FROM erp.document d
+    JOIN erp.doc_workflow w ON w.company_code = d.company_code AND w.obj_type = d.obj_type AND w.doc_entry = d.doc_entry
+   WHERE d.company_code = p_company AND d.obj_type = p_obj AND d.doc_entry = p_doc_entry
+$$;
+-- B4: + currency and rate (a re-check keeps them).
+
+-- ---- _pd_stored: copied from 21_purchasing.sql:692.
+CREATE OR REPLACE FUNCTION erp._pd_stored(p_company varchar, p_obj integer, p_doc_entry integer) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
+  SELECT jsonb_build_object(
+    'header', jsonb_build_object('card_code', d.card_code, 'doc_date', d.doc_date, 'due_date', d.due_date, 'payment_terms', w.payment_terms,
+                                 'whs_code', w.whs_code, 'china_office', w.china_office, 'customer_ref', d.customer_ref, 'comments', d.comments,
+                                 'currency', d.currency, 'fx_rate', d.fx_rate),
+    'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('item_code', l.item_code, 'qty', l.quantity, 'price', l.price, 'tax_code', l.tax_code,
+                                                          'whs_code', l.whs_code, 'cbm', l.cbm, 'base_obj_type', l.base_obj_type,
+                                                          'base_doc_entry', l.base_doc_entry, 'base_line', l.base_line) ORDER BY l.line_num)
+                         FROM erp.document_line l
+                        WHERE l.company_code = d.company_code AND l.obj_type = d.obj_type AND l.doc_entry = d.doc_entry), '[]'::jsonb))
+    FROM erp.document d
+    JOIN erp.doc_workflow w ON w.company_code = d.company_code AND w.obj_type = d.obj_type AND w.doc_entry = d.doc_entry
+   WHERE d.company_code = p_company AND d.obj_type = p_obj AND d.doc_entry = p_doc_entry
+$$;
+-- B4: + currency and rate.
+
 -- ---- _pd_eval: copied from 31_approvals.sql:1203.
 CREATE OR REPLACE FUNCTION erp._pd_eval(p_company varchar, p_obj integer, p_header jsonb, p_lines jsonb, p_position text, p_doc_entry integer)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
@@ -1522,7 +1563,8 @@ BEGIN
   -- B4: document currency and rate (a purchase request has no supplier: company currency)
   v_lcur := v_cur;
   IF NOT v_req THEN
-    fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Supplier');
+    fx := erp._cur_pick(p_company, v_card, CASE WHEN v_bp_ok THEN bp.currency END, h->>'currency', h->>'fx_rate', v_doc_date, 'Supplier',
+                        (SELECT fx_rate FROM erp.document WHERE company_code = p_company AND obj_type = p_obj AND doc_entry = p_doc_entry AND source = 'erp'));
     IF fx->>'error' IS NOT NULL THEN
       v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
     END IF;
@@ -2684,7 +2726,8 @@ BEGIN
 
   -- B4: payment currency (the partner's, or the header's) and the payment date's rate. v_cur becomes the payment currency.
   v_lc := v_cur;
-  fx := erp._cur_pick(p_company, v_card, bp.currency, h->>'currency', h->>'fx_rate', v_date, v_partyc);
+  fx := erp._cur_pick(p_company, v_card, bp.currency, h->>'currency', h->>'fx_rate', v_date, v_partyc,
+                      CASE WHEN p_draft_id IS NOT NULL THEN erp._num(h->>'fx_rate') END);   -- a waiting draft keeps the rate it was checked with
   IF fx->>'error' IS NOT NULL THEN
     v_err := v_err || jsonb_build_object('line', NULL, 'field', fx->>'field', 'message', fx->>'error');
   END IF;
@@ -3257,7 +3300,7 @@ END $$;
 -- ============ 12. Grants ============
 REVOKE ALL ON FUNCTION
   erp._cur_rate(varchar, text, date), erp._cur_no_rate(text, date), erp._cur_list(varchar), erp._cur_conv(varchar, numeric, text, text, date),
-  erp._cur_pick(varchar, text, text, text, text, date, text), erp._cur_ctx_set(text, numeric), erp._cur_ctx_take(varchar), erp._cur_noun(integer),
+  erp._cur_pick(varchar, text, text, text, text, date, text, numeric), erp._cur_ctx_set(text, numeric), erp._cur_ctx_take(varchar), erp._cur_noun(integer),
   erp._cur_ctx_base(varchar, integer, jsonb, date, jsonb), erp._cur_ctx_card(varchar, text, date, jsonb, text), erp._cur_line_fc(),
   erp._bk_doc_open_fc(varchar, integer, integer), erp._cur_clear_lc(varchar, integer, integer, numeric), erp._cur_last_dc(jsonb, text, numeric),
   erp._stock_soft_switch(), erp._stock_move_keep()

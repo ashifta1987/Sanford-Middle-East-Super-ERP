@@ -126,7 +126,7 @@ END $$;
 -- ============ 12. Grants ============
 REVOKE ALL ON FUNCTION
   erp._cur_rate(varchar, text, date), erp._cur_no_rate(text, date), erp._cur_list(varchar), erp._cur_conv(varchar, numeric, text, text, date),
-  erp._cur_pick(varchar, text, text, text, text, date, text), erp._cur_ctx_set(text, numeric), erp._cur_ctx_take(varchar), erp._cur_noun(integer),
+  erp._cur_pick(varchar, text, text, text, text, date, text, numeric), erp._cur_ctx_set(text, numeric), erp._cur_ctx_take(varchar), erp._cur_noun(integer),
   erp._cur_ctx_base(varchar, integer, jsonb, date, jsonb), erp._cur_ctx_card(varchar, text, date, jsonb, text), erp._cur_line_fc(),
   erp._bk_doc_open_fc(varchar, integer, integer), erp._cur_clear_lc(varchar, integer, integer, numeric), erp._cur_last_dc(jsonb, text, numeric),
   erp._stock_soft_switch(), erp._stock_move_keep()

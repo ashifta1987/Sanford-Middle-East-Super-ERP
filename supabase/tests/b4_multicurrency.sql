@@ -213,6 +213,14 @@ BEGIN
   r := pg_temp.ssave(sales, 17, '{"card_code":"C0012","doc_date":"2026-11-10","whs_code":"WH01","currency":"USD"}', '[{"item_code":"SMP-1010","qty":1}]');
   PERFORM pg_temp.check(r->'totals'->>'currency' = 'USD' AND (r->'lines'->0->>'price')::numeric = round(133.16 / 3.6725, 6),
     'all-currencies customer picks USD; the AED price list price is converted (133.16 / 3.6725)', left(r::text, 300));
+  r := pg_temp.ssubmit(sales, 17, (r->>'doc_entry')::integer);
+  PERFORM pg_temp.check(r->>'status' = 'open' AND (SELECT currency = 'USD' AND fx_rate = 3.6725 FROM erp.document WHERE company_code = 'ZZ99' AND obj_type = 17
+                          AND doc_entry = (SELECT max(doc_entry) FROM erp.document WHERE company_code = 'ZZ99' AND obj_type = 17 AND card_code = 'C0012')),
+    'submit re-checks the stored order in its own currency (USD kept)', r::text);
+  r := pg_temp.call(admin, format('SELECT erp.sales_doc_save(%L, 17, NULL, %L::jsonb, %L::jsonb)', 'ZZ99', '{"card_code":"C0013","doc_date":"2026-11-10","whs_code":"WH01","fx_rate":3.7}', '[{"item_code":"SMP-1010","qty":1,"price":50}]'));
+  PERFORM pg_temp.check((pg_temp.doc(17, (r->>'doc_entry')::integer)).fx_rate = 3.7, 'Financials saves an order at its own rate (3.7)', left(r::text, 200));
+  r := pg_temp.ssubmit(admin, 17, (r->>'doc_entry')::integer);
+  PERFORM pg_temp.check(r->>'status' = 'open', 'the kept rate passes the re-check at submit', r::text);
   r := pg_temp.call(sales, format('SELECT erp.sales_doc_checks(%L, 17, NULL, %L::jsonb, %L::jsonb)', 'ZZ99', '{"card_code":"C0013","doc_date":"2026-11-10","whs_code":"WH01"}',
                                   '[{"item_code":"SMP-1010","qty":10,"price":50}]'));
   PERFORM pg_temp.check((r->'credit'->>'this_order')::numeric = 1928.06 AND r->'credit'->>'currency' = 'AED', 'credit position counts the order in AED (525 USD = 1,928.06 AED)', left(r->>'credit', 300));

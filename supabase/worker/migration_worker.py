@@ -7,13 +7,19 @@
     python migration_worker.py --dsn "$DB" --run <run_id> --source local --folder /data/SA01_export
     # no UI: create a run and process it (company must be in sap._company)
     python migration_worker.py --dsn "$DB" --new SA01 --kind full --source local --folder /data/SA01_export
+    # A12: copy the SAP attachments (ATC1) of a run to Storage again, without reloading (the SAP folder is only read)
+    python migration_worker.py --dsn "$DB" --attachments-only <run_id> --attachments-root /mnt/sap_attachments
 
 --source storage downloads every object under the run's storage_prefix from the Supabase Storage bucket
 "sap-exports" (env SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY; Storage REST API). --source local uses --folder.
 .zip / .tar / .tar.gz / .tgz files in the upload are unpacked first.
 
 Steps (each one written to erp.migration_step with timing and rows): validate, stage, cast, clean_02, orphans_03,
-links_04, real_keys, security_06, app_sync, check_sync, check_deleted, cross_check. The run ends in needs_review.
+links_04, real_keys, security_06, app_sync, check_sync, check_deleted, cross_check, attachments. The run ends in needs_review.
+A12: kind 'opening_only' runs erp.migration_opening_apply after the app sync (one opening journal at the opening date);
+cross_check calls erp.migration_cross_check_all (13's checks + 5.3, 5.5-5.10, duplicates, custom-field register);
+'attachments' runs after the commit: every ATC1 file is read (never written) from --attachments-root, hashed (SHA-256)
+and copied to Storage bucket 'attachments' as <company>/<obj_type>/<doc_entry>/<file name>; missing files become issues.
 Failure safety: stage only fills session temp tables. Everything from cast to cross_check (04z, the company's rows,
 02, 04, the app sync as one transaction via erp.migration_sync_company, the checks) is ONE database transaction,
 committed at the end. A failure - or "Stop run" (erp.migration_cancel on a running run, checked between steps) -
@@ -37,6 +43,7 @@ sys.path.insert(0, HERE)
 import load_company  # noqa: E402
 
 BUCKET = 'sap-exports'
+ATT_BUCKET = 'attachments'
 LOCK_KEY = 7212026          # pg_advisory_lock: one rebuild at a time (links are global)
 DATA_STEPS = ['validate', 'stage', 'cast', 'clean_02', 'orphans_03', 'links_04', 'real_keys', 'security_06',
               'app_sync', 'check_sync', 'check_deleted', 'cross_check']
@@ -352,7 +359,7 @@ class Run:
         self.root = folder
         self.bk.execute("update erp.migration_run set status = 'validating', started_at = now(), finished_at = null, worker = %s where run_id = %s",
                         ['%s:%d' % (socket.gethostname(), os.getpid()), self.run_id])
-        self.init_steps(DATA_STEPS)
+        self.init_steps(DATA_STEPS + ['attachments'])
         print('run %s  company %s  kind %s  folder %s' % (self.run_id, self.company, self.kind, folder), flush=True)
         locked = False
         try:
@@ -393,6 +400,7 @@ class Run:
                                  [self.run_id]).fetchone()
             print('run %s: needs_review - committed (%d locks held at commit) - open issues: %d critical, %d warning, %d info'
                   % (self.run_id, self.locks, *st))
+            self.attachments_step()
             return 'needs_review'
         except StopRun as e:
             note = self.roll_back()
@@ -712,11 +720,16 @@ class Run:
 
     def s_app_sync(self):
         before = self.con.execute('select coalesce(max(sync_id), 0) from erp.sync_log').fetchone()[0]
-        self.con.execute('select erp.migration_sync_company(%s)', [self.company])   # all 83 steps inside the run's transaction
+        self.con.execute('select erp.migration_sync_company(%s)', [self.company])   # all sync steps inside the run's transaction
         n, steps, err = self.con.execute('select coalesce(sum(rows_written), 0), count(*), string_agg(error, \'; \') from erp.sync_log where company_code = %s and sync_id > %s',
                                          [self.company, before]).fetchone()
         if err:
             raise StepError('sync errors: ' + err)
+        if self.kind == 'opening_only':     # A12: keep open items and balances only, one opening journal
+            o = self.con.execute('select erp.migration_opening_apply(%s, %s)', [self.company, self.run_id]).fetchone()[0]
+            return ('warning' if float(o.get('remainder') or 0) != 0 else 'ok', n,
+                    '%d sync steps, %d rows written; opening balances at %s: %s open documents kept, %s closed removed, %s SAP journals replaced, clearing remainder %s'
+                    % (steps, n, o.get('opening_date'), o.get('open_documents'), o.get('closed_removed'), o.get('journals_replaced'), o.get('remainder')))
         return ('ok', n, '%d sync steps, %d rows written' % (steps, n))
 
     def s_check_sync(self):
@@ -730,9 +743,114 @@ class Run:
         return ('warning' if n else 'ok', n, ('; '.join('%s %d' % r for r in rows)) if rows else 'no app rows missing from SAP')
 
     def s_cross_check(self):
-        c, checks, failed, crit, warn, info = self.con.execute('select * from erp.migration_cross_check(NULL, %s)', [self.run_id]).fetchone()
+        self.con.execute('select erp._cf_build(%s)', [self.company])      # A12 custom-field register (keeps decisions)
+        c, checks, failed, crit, warn, info = self.con.execute('select * from erp.migration_cross_check_all(NULL, %s)', [self.run_id]).fetchone()
         return ('warning' if failed or crit else 'ok', checks,
                 '%d companies cross-checked: %d checks, %d failed; open issues %d critical, %d warning, %d info' % (c, checks, failed, crit, warn, info))
+
+    # --- A12: attachments (ATC1 -> Storage), after the data commit; the SAP folder is only read
+    def attachments_step(self):
+        """Runs the 'attachments' step; a failure here never undoes the committed load (step failed + critical issue)."""
+        if not self.bk.execute("select 1 from erp.migration_step where run_id = %s and code = 'attachments'", [self.run_id]).fetchone():
+            self.bk.execute("insert into erp.migration_step (run_id, step_no, code) select %s, coalesce(max(step_no), 0) + 1, 'attachments' "
+                            "from erp.migration_step where run_id = %s", [self.run_id, self.run_id])
+        try:
+            return self.step('attachments', self.s_attachments)
+        except StepError as e:
+            self.issue('critical', 'attachments', 'att_job_failed', 'Attachment copy failed: ' + str(e)[:160], str(e))
+            return 'failed'
+
+    def att_source(self, path, name):
+        """Local path of an ATC1 file: --attachments-map PREFIX=LOCAL rewrites the SAP path, else the file is looked up by
+        name under --attachments-root. Refuses anything that resolves outside the root."""
+        root = os.path.realpath(self.a.attachments_root)
+        cand = None
+        p = (path or '').strip()
+        for m in sorted(self.a.attachments_map or [], key=lambda x: -len(x.split('=', 1)[0])):
+            pre, loc = m.split('=', 1)
+            if p.lower().startswith(pre.lower()):
+                rest = p[len(pre):].replace('\\', '/').strip('/')
+                cand = os.path.join(loc, *[x for x in rest.split('/') if x], name)
+                break
+        if cand is None:
+            cand = os.path.join(root, name)
+        real = os.path.realpath(cand)
+        if not (real == root or real.startswith(root + os.sep)):
+            raise StepError('attachment path outside the attachments folder: %s' % cand)
+        return real
+
+    def s_attachments(self):
+        if not getattr(self.a, 'attachments_root', None):
+            self.bk.execute('select erp.migration_attachment_check(%s, %s)', [self.run_id, self.company])
+            return ('skipped', None, 'no SAP attachments folder given (--attachments-root); check 5.10 waits for it')
+        import hashlib, mimetypes
+        rows = self.bk.execute('select abs_entry, line, src_path, trgt_path, file_name, file_ext, obj_type, doc_key '
+                               'from erp.migration_attachment_list(%s)', [self.company]).fetchall()
+        dest = self.a.attachments_dest or 'storage'
+        self.bk.execute('delete from erp.migration_attachment where run_id = %s', [self.run_id])
+        seen, recs, n_ok, n_miss, n_err, total = set(), [], 0, 0, 0, 0
+        for abs_entry, line, src_path, trgt_path, fname, ext, obj, key in rows:
+            name = os.path.basename((fname or '').replace('\\', '/')) or 'file_%s_%s' % (abs_entry, line)
+            if ext and not name.lower().endswith('.' + ext.lower()):
+                name += '.' + ext
+            spath = '%s/%s/%s/%s' % (self.company, obj, key, name)
+            if spath in seen:
+                spath = '%s/%s/%s/%s_%s' % (self.company, obj, key, line, name)
+            seen.add(spath)
+            src, size, digest, status, msg = None, None, None, 'missing', None
+            try:
+                src = self.att_source(trgt_path or src_path, name)
+                if os.path.isfile(src):
+                    h = hashlib.sha256()
+                    fd = os.open(src, os.O_RDONLY)              # read only: the SAP folder is never written
+                    with os.fdopen(fd, 'rb') as fh:
+                        while chunk := fh.read(1 << 20):
+                            h.update(chunk)
+                    size, digest = os.path.getsize(src), h.hexdigest()
+                    self.att_put(dest, src, spath, size, mimetypes.guess_type(name)[0] or 'application/octet-stream', digest)
+                    status = 'copied'
+                    n_ok += 1
+                    total += size
+                else:
+                    n_miss += 1
+                    msg = 'file not found in the SAP attachments folder'
+            except Exception as e:      # one bad file never stops the others
+                status, msg = 'error', '%s: %s' % (type(e).__name__, str(e)[:300])
+                n_err += 1
+            recs.append((self.run_id, self.company, abs_entry, line, obj, key, name, src or (trgt_path or src_path), spath if status == 'copied' else None,
+                         size, digest, status, msg))
+        with self.bk.cursor() as cur:
+            cur.executemany('insert into erp.migration_attachment (run_id, company_code, abs_entry, line, obj_type, doc_key, file_name, source_path, '
+                            'storage_path, bytes, sha256, status, message) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)', recs)
+        self.bk.execute('select erp.migration_attachment_check(%s, %s)', [self.run_id, self.company])
+        return ('warning' if n_miss or n_err else 'ok', len(rows),
+                '%d files listed in ATC1: %d copied (%d bytes, SHA-256 recorded), %d missing, %d errors; destination %s'
+                % (len(rows), n_ok, total, n_miss, n_err, dest if dest.startswith('local:') else ATT_BUCKET))
+
+    def att_put(self, dest, src, spath, size, ctype, digest):
+        if dest.startswith('local:'):           # tests / offline: copy into a local folder and verify the copy
+            import hashlib
+            out = os.path.join(dest[6:], spath)
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with open(src, 'rb') as fi, open(out, 'wb') as fo:
+                shutil.copyfileobj(fi, fo, 1 << 20)
+            h = hashlib.sha256()
+            with open(out, 'rb') as fh:
+                while chunk := fh.read(1 << 20):
+                    h.update(chunk)
+            if h.hexdigest() != digest:
+                raise StepError('copy does not match the source hash')
+            return
+        base = os.environ.get('SUPABASE_URL', '').rstrip('/')
+        key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+        if not base or not key:
+            raise StepError('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to copy attachments to Storage')
+        with open(src, 'rb') as fh:
+            req = urllib.request.Request('%s/storage/v1/object/%s/%s' % (base, ATT_BUCKET, urllib.parse.quote(spath)), data=fh, method='POST',
+                                         headers={'Authorization': 'Bearer ' + key, 'apikey': key, 'Content-Type': ctype,
+                                                  'Content-Length': str(size), 'x-upsert': 'true'})
+            with urllib.request.urlopen(req, timeout=600) as r:
+                r.read()
 
 
 def claim(con, run_id=None):
@@ -783,18 +901,28 @@ def main():
     ap.add_argument('--folder', help='--source local: folder holding the upload')
     ap.add_argument('--run', help='process this run once')
     ap.add_argument('--new', metavar='COMPANY', help='create a run for COMPANY (no UI) and process it')
-    ap.add_argument('--kind', default='full', choices=['full', 'tables', 'structure_only'], help='with --new')
+    ap.add_argument('--kind', default='full', choices=['full', 'tables', 'structure_only', 'opening_only'], help='with --new')
     ap.add_argument('--notes', help='with --new')
     ap.add_argument('--poll', action='store_true', help='keep polling for queued runs')
     ap.add_argument('--interval', type=int, default=30, help='seconds between polls')
     ap.add_argument('--scripts', help='folder of 02/03/04/04z/06 (default: next to this file)')
     ap.add_argument('--workdir', help='--source storage: where downloads go (default: system temp)')
     ap.add_argument('--keep', action='store_true', help='--source storage: keep the downloaded files after the run')
+    ap.add_argument('--attachments-root', help='A12: the SAP attachments folder (mounted read only); without it the attachments step is skipped')
+    ap.add_argument('--attachments-map', action='append', metavar='SAP_PREFIX=LOCAL_DIR',
+                    help='rewrite an ATC1 path prefix (e.g. \\\\sapsrv\\Attachments=/mnt/sap_att); repeatable')
+    ap.add_argument('--attachments-dest', default='storage', help="'storage' (bucket attachments) or local:<dir> for tests")
+    ap.add_argument('--attachments-only', metavar='RUN', help='copy the attachments of an existing run again (no reload)')
     a = ap.parse_args()
     with psycopg.connect(a.dsn, autocommit=True) as con, psycopg.connect(a.dsn, autocommit=True) as bk:
         for c in (con, bk):
             c.execute('set statement_timeout = 0')
             c.execute('set idle_in_transaction_session_timeout = 0')
+        if a.attachments_only:
+            run = Run(con, bk, a.attachments_only, a)
+            st = run.attachments_step()
+            print(a.attachments_only, 'attachments', st)
+            sys.exit(2 if st == 'failed' else 0)
         if a.new:
             rid = con.execute("insert into erp.migration_run (company_code, kind, status, notes) values (%s, %s, 'queued', %s) returning run_id",
                               [a.new, a.kind, a.notes]).fetchone()[0]

@@ -252,7 +252,12 @@ BEGIN
         parts := parts || format('%L, jsonb_build_array(count(nullif(btrim(%I::text), '''')), max(%s) FILTER (WHERE nullif(btrim(%I::text), '''') IS NOT NULL))',
                                  flds[j], flds[j], v_date, flds[j]);
       END LOOP;
-      q := format('SELECT jsonb_build_object(%s) FROM sap.%I WHERE company_code = $1', array_to_string(parts, ', '), t.table_name);
+      -- jsonb_build_object takes at most 100 arguments: blocks of 40 fields joined with ||
+      q := format('SELECT %s FROM sap.%I WHERE company_code = $1',
+                  (SELECT string_agg('jsonb_build_object(' || b.blk || ')', ' || ')
+                     FROM (SELECT array_to_string(array_agg(x.p ORDER BY x.o), ', ') blk
+                             FROM unnest(parts) WITH ORDINALITY x(p, o) GROUP BY (x.o - 1) / 40) b),
+                  t.table_name);
       EXECUTE q INTO res USING p_company;
       UPDATE _cf f SET rows_used = (res->f.field_name->>0)::bigint, last_used = (res->f.field_name->>1)::date
        WHERE f.table_name = t.table_name AND f.kind = 'field' AND res ? f.field_name;
@@ -436,12 +441,18 @@ CREATE OR REPLACE FUNCTION erp.migration_attachment_list(p_company varchar)
 RETURNS TABLE (abs_entry integer, line integer, src_path text, trgt_path text, file_name text, file_ext text, obj_type text, doc_key text)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = erp, pg_temp AS $$
 DECLARE t record; parts text[] := '{}'; links text;
+  -- object type of the SAP document tables (used when a row's ObjType is empty)
+  v_obj constant jsonb := '{"OQUT":"23","ORDR":"17","ODLN":"15","ORDN":"16","OINV":"13","ORIN":"14","ODPI":"203","OPRQ":"1470000113",
+                            "OPQT":"540000006","OPOR":"22","OPDN":"20","ORPD":"21","OPCH":"18","ORPC":"19","ODPO":"204","OWTQ":"1250000001",
+                            "OWTR":"67","OIGN":"59","OIGE":"60","OJDT":"30","ORCT":"24","OVPM":"46"}';
 BEGIN
   IF NOT erp._mig_has('ATC1', 'AbsEntry', 'Line', 'FileName') THEN RETURN; END IF;
   FOR t IN SELECT c.relname FROM pg_class c JOIN pg_attribute a ON a.attrelid = c.oid
             WHERE c.relnamespace = 'sap'::regnamespace AND c.relkind = 'r' AND a.attname = 'AtcEntry' AND NOT a.attisdropped ORDER BY 1 LOOP
-    IF erp._mig_has(t.relname, 'DocEntry', 'ObjType') THEN
-      parts := parts || format('SELECT "AtcEntry"::int a, "ObjType"::text o, "DocEntry"::text k FROM sap.%I WHERE company_code = $1 AND "AtcEntry" IS NOT NULL', t.relname);
+    IF erp._mig_has(t.relname, 'DocEntry') AND (erp._mig_has(t.relname, 'ObjType') OR v_obj ? t.relname) THEN
+      parts := parts || format('SELECT "AtcEntry"::int a, coalesce(%s, %L) o, "DocEntry"::text k FROM sap.%I WHERE company_code = $1 AND "AtcEntry" IS NOT NULL',
+                               CASE WHEN erp._mig_has(t.relname, 'ObjType') THEN 'nullif(btrim("ObjType"::text), '''')' ELSE 'NULL::text' END,
+                               coalesce(v_obj->>t.relname, t.relname), t.relname);
     ELSIF t.relname = 'OCRD' THEN
       parts := parts || text 'SELECT "AtcEntry"::int, ''2'', "CardCode"::text FROM sap."OCRD" WHERE company_code = $1 AND "AtcEntry" IS NOT NULL';
     ELSIF t.relname = 'OITM' THEN

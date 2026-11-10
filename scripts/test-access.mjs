@@ -33,6 +33,13 @@ try {
     r = await tryq(C, `select erp.company_go_live('AE01', '${run}')`); res('go-live refused before signed_off', !r.ok, r.msg);
     await tx`update erp.migration_run set status = 'signed_off' where run_id = ${run}`;
     r = await tryq(F, `select erp.company_go_live('AE01', '${run}')`); res('go-live refused for non-CFO', !r.ok, r.msg);
+    // A14 (29_go_live.sql): go-live also needs checklist steps 2–5. Tick them inside this rolled-back transaction when 29 is applied.
+    const [{ gl }] = await tx`select to_regclass('erp.go_live_step') is not null as gl`;
+    if (gl) {
+      r = await tryq(C, `select erp.company_go_live('AE01', '${run}')`); res('go-live refused until the checklist is done (A14)', !r.ok && /go-live checklist/.test(r.msg), r.msg);
+      await tx`insert into erp.go_live_step (company_code, step, done, done_at) select 'AE01', s, true, now() from unnest(array[2,3,4,5]) s
+               on conflict (company_code, step) do update set done = true`;
+    }
     r = await tryq(C, `select erp.company_go_live('AE01', '${run}')`); res('CFO go-live on signed_off run', r.ok, r.msg ?? '');
     r = await tryq(C, `select erp.company_go_live('AE01', '${run}'); select erp.company_go_live('AE01', '${run}')`); res('second go-live refused', !r.ok && /already live/.test(r.msg), r.msg);
     const pub = await tx`select tablename from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'erp' order by 1`;

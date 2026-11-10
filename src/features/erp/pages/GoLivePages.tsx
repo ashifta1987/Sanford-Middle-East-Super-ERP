@@ -179,7 +179,7 @@ export function GoLiveChecklistPage() {
                         <textarea id="gl-note" dir="auto" rows={2} className="input mt-1 min-h-[64px] py-2 text-[15px] text-ink" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
                       </label>
                       <div className="flex flex-wrap justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setForm(null)} icon={<X className="h-4 w-4" aria-hidden />}>{t('app.cancel')}</Button>
+                        <Button id="gl-cancel" variant="ghost" onClick={() => setForm(null)} icon={<X className="h-4 w-4" aria-hidden />}>{t('app.cancel')}</Button>
                         <Button id="gl-save" variant="primary" disabled={busy} onClick={saveStep} icon={<CircleCheck className="h-4 w-4" aria-hidden />}>
                           {form.done ? t('gl.confirmDone', { n: s.step }) : t('gl.confirmReopen', { n: s.step })}
                         </Button>

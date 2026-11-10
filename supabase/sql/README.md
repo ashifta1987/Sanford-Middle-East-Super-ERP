@@ -22,6 +22,7 @@ independent review (security, loader, SAP -1 values, history tables, speed).
 | 12 | `CALL erp.sync_company('AE01');` then `SELECT * FROM erp.check_sync('AE01');` and `SELECT * FROM erp.check_deleted('AE01');` | Per company. Commits after each step; progress in `erp.sync_log`. Every check must say `ok`. |
 | 13 | `python migration_worker.py --dsn <db> --source storage --poll` | Runs on a server next to these files. Rebuilds a company each time the console queues a run (see below). |
 | 14 | `16_module_access.sql` (A1) | After 10–15. Module-level read rules (Full / Read / None per position): `erp.position_module`, `erp.module_level/can_read/can_write`, RESTRICTIVE read policies. Safe to run again. Tests: `supabase/tests/a1_module_access.sql` (local stack only). |
+| 15 | `17_sales_order.sql` … `29_go_live.sql` (A2–A14) | In number order, on a Supabase branch first, then live. Exact order, tests, verification queries, Edge Functions and rollback: `docs/go-live.md` (list: `scripts/local-stack/sql-order-supabase.txt`). Never run `15_sample_company.sql` or `scripts/local-stack/test-users.sql` on live. |
 
 Reload a company once links exist: `04z_drop_foreign_keys.sql`, the loader, then 02, 03, 04. If
 `apply_keys.py` has run, these files already use the real keys. The migration worker does exactly this for

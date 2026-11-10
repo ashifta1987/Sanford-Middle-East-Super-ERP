@@ -23,3 +23,4 @@ supabase/sql/27_migration_more.sql
 supabase/sql/28_production_service.sql
 supabase/sql/29_go_live.sql
 supabase/sql/30_numbering_company.sql
+supabase/sql/31_approvals.sql

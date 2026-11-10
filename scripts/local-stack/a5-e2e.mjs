@@ -117,6 +117,7 @@ ok('Banking module: Incoming Payments marked live', (await pa.locator('text=Inco
 await pa.goto(`${BASE}/banking/payments/in`); await settle(pa);
 ok('incoming payments list: + New incoming payment', await pa.locator('#new-payment-in').isVisible());
 await pa.click('#new-payment-in'); await settle(pa);
+await pa.locator('h1', { hasText: 'New incoming payment' }).waitFor({ timeout: 15000 }).catch(() => {}); // A14: pages are lazy-loaded
 ok('payment form opens', (await txt(pa.locator('h1'))).includes('New incoming payment'));
 await pickCombo(pa, pa.locator('#bk-bp'), 'C0011', 'C0011');
 await pa.locator('[data-testid=bk-doc]').first().waitFor({ timeout: 10000 }).catch(() => {});

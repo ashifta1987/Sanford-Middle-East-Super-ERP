@@ -102,6 +102,7 @@ await pa.goto(`${BASE}/docs/sales_quotation`); await settle(pa);
 ok('quotations list: "+ New sales quotation" is a link', (await pa.locator('a#new-sales_quotation').count()) === 1);
 await pa.click('a#new-sales_quotation');
 await pa.waitForURL(/\/docs\/sales_quotation\/new$/); await settle(pa);
+await pa.locator('h1', { hasText: 'New sales quotation' }).waitFor({ timeout: 15000 }).catch(() => {}); // A14: pages are lazy-loaded
 ok('quotation form: title and "Valid until"', (await pa.locator('h1', { hasText: 'New sales quotation' }).count()) === 1 && (await pa.locator('label', { hasText: 'Valid until' }).count()) === 1);
 await pickCombo(pa, pa.locator('#so-card_code'), 'C0011', 'C0011');
 await fillLine(pa, 0, 'SMP-1010', { qty: 20, disc: 12 });

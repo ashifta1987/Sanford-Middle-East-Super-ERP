@@ -60,9 +60,10 @@ export const REPORTS: ReportDef[] = [
       { key: 'card_code', type: 'code', link: bp }, { key: 'card_name', type: 'text' }, { key: 'docs', type: 'int', hide: 'lg' },
       { key: 'not_due', type: 'money', total: true, hide: 'md' }, { key: 'd1_30', type: 'money', total: true, hide: 'md' },
       { key: 'd31_60', type: 'money', total: true, hide: 'md' }, { key: 'd61_90', type: 'money', total: true, hide: 'md' },
-      { key: 'd90_plus', type: 'money', total: true, hide: 'sm' }, { key: 'total', type: 'money', total: true },
-      // B4: the partner's document currency and the open amount in it (one foreign currency only).
+      { key: 'd90_plus', type: 'money', total: true, hide: 'sm' },
+      // B4: the partner's document currency and the open amount in it (one foreign currency only); the LC total stays last.
       { key: 'currency', type: 'code', hide: 'md' }, { key: 'total_fc', type: 'money', hide: 'md' },
+      { key: 'total', type: 'money', total: true },
     ],
     chart: { label: 'card_name', value: 'total', top: 8 },
   },
@@ -73,9 +74,10 @@ export const REPORTS: ReportDef[] = [
       { key: 'card_code', type: 'code', link: bp }, { key: 'card_name', type: 'text' }, { key: 'docs', type: 'int', hide: 'lg' },
       { key: 'not_due', type: 'money', total: true, hide: 'md' }, { key: 'd1_30', type: 'money', total: true, hide: 'md' },
       { key: 'd31_60', type: 'money', total: true, hide: 'md' }, { key: 'd61_90', type: 'money', total: true, hide: 'md' },
-      { key: 'd90_plus', type: 'money', total: true, hide: 'sm' }, { key: 'total', type: 'money', total: true },
-      // B4: the partner's document currency and the open amount in it (one foreign currency only).
+      { key: 'd90_plus', type: 'money', total: true, hide: 'sm' },
+      // B4: the partner's document currency and the open amount in it (one foreign currency only); the LC total stays last.
       { key: 'currency', type: 'code', hide: 'md' }, { key: 'total_fc', type: 'money', hide: 'md' },
+      { key: 'total', type: 'money', total: true },
     ],
     chart: { label: 'card_name', value: 'total', top: 8 },
   },

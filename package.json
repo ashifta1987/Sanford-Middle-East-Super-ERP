@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/check-env.mjs && tsc --noEmit && vite build && node scripts/check-bundle.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "db:install": "node scripts/install-db.mjs",
-    "gen:types": "supabase gen types typescript --project-id xhsfkbbcejgwvqxpqdgq --schema erp > src/lib/database.types.ts"
+    "gen:types": "supabase gen types typescript --project-id xhsfkbbcejgwvqxpqdgq --schema erp > src/lib/database.types.ts",
+    "check-env": "node scripts/check-env.mjs",
+    "test:sql": "node scripts/local-stack/run-sql-tests.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

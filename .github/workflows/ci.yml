@@ -1,0 +1,82 @@
+name: CI
+
+# Runs on every pull request and on pushes to main and the phase branches.
+# Nothing here talks to Supabase or Vercel: the build uses placeholder browser variables and the SQL suites run
+# against a throwaway Postgres container inside the job.
+on:
+  pull_request:
+  push:
+    branches: [main, 'a*-*', 'stage-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Env guard, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Placeholders only: the real values live in Vercel (Production / Preview), never in the repo.
+      VITE_SUPABASE_URL: https://placeholder-project.supabase.co
+      VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: No secrets in browser variables or committed env files
+        run: |
+          npm run check-env
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "An .env file is committed. Remove it from git; keep values in Vercel or Supabase secrets."; exit 1
+          fi
+          if git grep -nE 'sb_secret_[A-Za-z0-9]|"role"\s*:\s*"service_role"' -- src index.html vite.config.ts; then
+            echo "A Supabase secret / service_role token appears in browser code."; exit 1
+          fi
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Bundle carries no service key
+        run: |
+          node scripts/check-bundle.mjs
+          ls -la dist/assets/index-*.js
+
+  sql:
+    name: SQL suites (local Postgres 17)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Start Postgres 17
+        run: |
+          docker run -d --name pg -p 5433:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17 \
+            -c max_locks_per_transaction=1024
+          for i in $(seq 1 30); do docker exec pg pg_isready -U postgres && break; sleep 2; done
+      - name: Fresh rebuild + every phase suite (a1 … a14)
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5433'
+          PGUSER: postgres
+          PGDATABASE: erp_local
+        run: npm run test:sql
+      - name: Supabase order without the sample company applies cleanly, twice for 15+
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5433'
+          PGUSER: postgres
+          PGDATABASE: erp_supabase_order
+        run: |
+          FRESH=1 node scripts/local-stack/load.mjs @scripts/local-stack/sql-order-supabase.txt
+          # 10–14 were written before the "safe to run twice" rule and are already live; 15 onwards must re-run cleanly.
+          node scripts/local-stack/load.mjs $(grep -E '^supabase/sql/(1[5-9]|[2-9][0-9])_' scripts/local-stack/sql-order-supabase.txt)

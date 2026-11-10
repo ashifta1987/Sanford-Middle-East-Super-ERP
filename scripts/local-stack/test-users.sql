@@ -172,3 +172,20 @@ INSERT INTO erp.app_user (user_id, company_code, emp_id, display_name, email, po
 ON CONFLICT (user_id) DO NOTHING;
 INSERT INTO erp.user_company (user_id, company_code) VALUES ('00000000-0000-4000-8000-000000000023', 'ZZ99')
 ON CONFLICT DO NOTHING;
+
+-- A13 · production planner (Production full), service desk (Service full + Inventory full: logs calls and issues spare parts) and
+-- a technician (Service full only: can't issue spare parts). Production read-only is covered by qa.stock (Inventory opens Production).
+INSERT INTO erp.position (position_code, name, module_access) VALUES
+  ('QA_PROD', 'QA · production planner', '{production}'),
+  ('QA_SERVICE', 'QA · service desk', '{service,inventory}'),
+  ('QA_TECH', 'QA · service technician', '{service}')
+ON CONFLICT (position_code) DO UPDATE SET module_access = EXCLUDED.module_access, name = EXCLUDED.name;
+INSERT INTO erp.app_user (user_id, company_code, emp_id, display_name, email, position_code, language, active) VALUES
+  ('00000000-0000-4000-8000-000000000024', 'ZZ99', NULL, 'QA Production planner', 'qa.prod@sample.test', 'QA_PROD', 'en', true),
+  ('00000000-0000-4000-8000-000000000025', 'ZZ99', NULL, 'QA Service desk', 'qa.service@sample.test', 'QA_SERVICE', 'en', true),
+  ('00000000-0000-4000-8000-000000000026', 'ZZ99', NULL, 'QA Technician', 'qa.tech@sample.test', 'QA_TECH', 'en', true)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO erp.user_company (user_id, company_code) VALUES
+  ('00000000-0000-4000-8000-000000000024', 'ZZ99'), ('00000000-0000-4000-8000-000000000025', 'ZZ99'),
+  ('00000000-0000-4000-8000-000000000026', 'ZZ99')
+ON CONFLICT DO NOTHING;

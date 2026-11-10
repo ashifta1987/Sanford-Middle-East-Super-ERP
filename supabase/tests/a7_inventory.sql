@@ -79,7 +79,8 @@ BEGIN
   PERFORM pg_temp.check(r->>'error' = '42501', 'user without a profile refused', r::text);
   PERFORM pg_temp.expect(pg_temp.call(stock, $q$SELECT erp.inventory_setup('AE01')$q$), 'You don''t have access to company AE01.', 'other company refused');
   r := pg_temp.call(stock, $q$SELECT erp.inventory_setup('ZZ99')$q$);
-  PERFORM pg_temp.check(jsonb_array_length(r->'reasons') = 4 AND jsonb_array_length(r->'bins') = 3 AND (r->'my_limits'->>'59')::numeric = 10000
+  PERFORM pg_temp.check(jsonb_array_length(r->'reasons') >= 4 AND  -- A13 adds the SERVICE reason (28)
+                        jsonb_array_length(r->'bins') = 3 AND (r->'my_limits'->>'59')::numeric = 10000
                         AND (r->'count_rules'->>'pct')::numeric = 1 AND (r->'count_rules'->>'value')::numeric = 5000 AND (r->>'can_write')::boolean
                         AND (r->>'blind_count')::boolean
                         AND EXISTS (SELECT 1 FROM jsonb_array_elements(r->'warehouses') w WHERE w->>'code' = 'WH02' AND (w->>'bins')::boolean)

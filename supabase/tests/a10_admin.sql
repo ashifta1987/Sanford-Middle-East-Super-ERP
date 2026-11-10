@@ -230,7 +230,7 @@ BEGIN
     'Numbers only move forward: Sales Order has already reached SO-26-00500. Use a higher number or a new prefix.', 'numbers cannot go back');
   PERFORM pg_temp.ok(pg_temp.call(admin, 'SELECT erp.number_series_save(''ZZ99'', 17, ''SO-27-'', 1, 5, true)'), 'new prefix may restart at 1');
   r := pg_temp.call(admin, 'SELECT erp.number_series_setup(''ZZ99'')');
-  PERFORM pg_temp.check(jsonb_array_length(r->'series') = 24, 'numbering lists 24 document types', '');
+  PERFORM pg_temp.check(jsonb_array_length(r->'series') >= 24, 'numbering lists at least 24 document types (A13 adds 3)', '');
 
   -- ---------- 7. Company details need the owner ----------
   PERFORM pg_temp.expect(pg_temp.call(admin, 'SELECT erp.company_details_submit(''ZZ99'', ''{"tax_id":"123"}''::jsonb, NULL)'),

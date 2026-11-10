@@ -136,5 +136,23 @@
     "email": "qa.it@sample.test",
     "password": "local-only-23",
     "name": "QA IT support (Administration read-only)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000024",
+    "email": "qa.prod@sample.test",
+    "password": "local-only-24",
+    "name": "QA Production planner"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000025",
+    "email": "qa.service@sample.test",
+    "password": "local-only-25",
+    "name": "QA Service desk (Service + Inventory)"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000026",
+    "email": "qa.tech@sample.test",
+    "password": "local-only-26",
+    "name": "QA Technician (Service only)"
   }
 ]

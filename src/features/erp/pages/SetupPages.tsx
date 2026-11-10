@@ -162,11 +162,11 @@ export function GlAccountDeterminationPage() {
             <div className="flex flex-wrap items-center gap-2">
               {changed.length > 0 && <Button variant="ghost" id="gld-discard" onClick={() => setDraft({})} icon={<Undo2 className="h-4 w-4" aria-hidden />}>{t('stp.discard')}</Button>}
               <Button variant="primary" id="gld-save" disabled={busy || changed.length === 0} disabledReason={changed.length === 0 ? t('stp.nothingChanged') : undefined}
-                onClick={save} icon={<Save className="h-4 w-4" aria-hidden />}>{t('stp.saveChanges', { count: changed.length })}</Button>
+                onClick={save} icon={<Save className="h-4 w-4" aria-hidden />}>{changed.length ? t('stp.saveChanges', { count: changed.length }) : t('stp.save')}</Button>
             </div>
           ) : undefined}>
             <div className="relative overflow-x-auto">
-              <table className="w-full text-[14px]" data-testid="gld-table">
+              <table className="w-full min-w-[640px] text-[14px] md:min-w-0" data-testid="gld-table">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-2.5 text-start">{t('stp.gl.key')}</th>
                   <th scope="col" className="w-[44%] px-4 py-2.5 text-start">{t('erp.col.account')}</th>
@@ -267,7 +267,7 @@ function OverrideGrid({ company, level, refCode, keys, rows, canWrite, onSaved, 
   return (
     <div className="border-t border-line">
       <div className="relative overflow-x-auto">
-        <table className="w-full text-[14px]" data-testid={`${idPrefix}-table`}>
+        <table className="w-full min-w-[640px] text-[14px] md:min-w-0" data-testid={`${idPrefix}-table`}>
           <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
             <th scope="col" className="px-4 py-2.5 text-start">{t('stp.gl.key')}</th>
             <th scope="col" className="w-[50%] px-4 py-2.5 text-start">{t('erp.col.account')}</th>
@@ -299,7 +299,7 @@ function OverrideGrid({ company, level, refCode, keys, rows, canWrite, onSaved, 
         <div className="flex flex-wrap justify-end gap-2 border-t border-line p-4">
           {changed.length > 0 && <Button variant="ghost" onClick={() => setDraft({})} icon={<Undo2 className="h-4 w-4" aria-hidden />}>{t('stp.discard')}</Button>}
           <Button variant="primary" id={`${idPrefix}-save`} disabled={busy || changed.length === 0} disabledReason={changed.length === 0 ? t('stp.nothingChanged') : undefined}
-            onClick={save} icon={<Save className="h-4 w-4" aria-hidden />}>{t('stp.saveChanges', { count: changed.length })}</Button>
+            onClick={save} icon={<Save className="h-4 w-4" aria-hidden />}>{changed.length ? t('stp.saveChanges', { count: changed.length }) : t('stp.save')}</Button>
         </div>
       )}
     </div>
@@ -644,7 +644,7 @@ export function ReasonsPage() {
       <SectionCard title={t('stp.rs.list')}>
         {q.isLoading ? <SkeletonRows rows={5} /> : (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]" data-testid="rs-table">
+            <table className="w-full min-w-[640px] text-[14px] md:min-w-0" data-testid="rs-table">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('stp.rs.reason')}</th>
                 <th scope="col" className="px-4 py-2.5 text-start max-sm:hidden">{t('stp.rs.direction')}</th>
@@ -729,7 +729,7 @@ export function LandedCostTypesPage() {
       <SectionCard title={t('stp.lc.types')}>
         {q.isLoading ? <SkeletonRows rows={5} /> : S && (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]" data-testid="lc-table">
+            <table className="w-full min-w-[640px] text-[14px] md:min-w-0" data-testid="lc-table">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('stp.lc.type')}</th>
                 <th scope="col" className="px-4 py-2.5 text-start">{t('stp.lc.method')}</th>

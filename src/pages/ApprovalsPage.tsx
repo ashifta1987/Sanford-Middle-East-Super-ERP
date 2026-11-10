@@ -147,7 +147,7 @@ function DocumentApprovals() {
                         {t('apr.stageOfShort', { n: r.step, of: r.stages ?? r.step })} · <span dir="auto">{r.stage_name ?? r.approver_position_name}</span>
                         {(r.need_approvals ?? 1) > 1 && <> · <span className="num">{t('apr.votes', { a: r.approvals ?? 0, n: r.need_approvals })}</span></>}
                       </div>
-                      <div className="text-xs text-muted" dir="auto">{r.approver_position_name}</div>
+                      <div className="text-xs text-muted" dir="auto">{t(`so.rule.${r.rule_code}`)} · {r.approver_position_name}</div>
                     </td>
                     <td className="px-4 py-2.5 max-md:hidden">
                       {view === 'decided'

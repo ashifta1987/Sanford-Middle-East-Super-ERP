@@ -163,7 +163,8 @@ try {
     ok('admin sets qa.sales’ default Sales Order series', (await flash(p)).includes('Default series for Sales Order saved') && Boolean(await one('SELECT 1 FROM erp.series_user_default WHERE user_id = $1 AND obj_type = 17 AND series_id = $2', [UID.sales, sid])));
     await p.screenshot({ path: `${OUT}/b1-numbering-en-light-1440.png`, fullPage: true });
 
-    await p.goto(`${BASE}/admin/approval-templates`); await settle(p);
+    // B2: the A10 rule list moved to /admin/approval-rules (the credit memo rule is also a template in Approval Templates).
+    await p.goto(`${BASE}/admin/approval-rules`); await settle(p);
     ok('approval templates: credit memo template with the ZZ99 sample rule', await seen(p.locator('[data-rule=credit_memo_amount] [data-testid=adm-rule-row]')));
     await p.goto(`${BASE}/purchasing/setup`); await settle(p);
     ok('purchasing setup: "QC must pass" is always on', await p.locator('#ps-qc').isChecked().catch(() => false) && await p.locator('#ps-qc').isDisabled().catch(() => false));

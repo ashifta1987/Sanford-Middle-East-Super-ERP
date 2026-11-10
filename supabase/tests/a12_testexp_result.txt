@@ -1,4 +1,4 @@
-== erp_a12mig: 22 SQL files applied
+== erp_a12mig: 23 SQL files applied
 == 30 raw tables created from testexp create.sql
 == empty stand-ins (LIKE OINV): ODLN, ODPI, ODPO, OIGE, OIGN, OPDN, OPOR, OPQT, OPRQ, OQUT, ORDN, ORDR, ORIN, ORPC, ORPD, OWTQ, OWTR; still missing: -
 PASS load_company AE01 (testexp)                                            {'loaded': 30}
@@ -24,14 +24,14 @@ PASS every check area written (13 + A12)                                    ['ap
      finding vat           info     AE01: check skipped - VAT accounts, last open period
 PASS cross-check reports the SAP partner not applied (coexistence warning)  
 PASS register from the sap schema: U_ fields and @ tables, mapping read from the sync code {'mapped': 403, 'raw_only': 3216}
-   worker: attachments    warning  rows=2          0.0s  2 files listed in ATC1: 1 copied (860 bytes, SHA-256 recorded), 1 missing, 0 errors; destination local:/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/ | 13e494af-83a5-4fce-a268-5392bf040b0a attachments warning
+   worker: attachments    warning  rows=2          0.0s  2 files listed in ATC1: 1 copied (860 bytes, SHA-256 recorded), 1 missing, 0 errors; destination local:/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/ | 5f34f585-ecc0-481b-b909-d47ad39bcc8b attachments warning
 PASS attachment job ran for both ATC1 rows                                  [(1, 'copied', 860, '286903b07538071c1f76220a03cf0bb063b48d9f86823a5ca1824c45a43b87d5', 'AE01/13/1/contract.pdf'), (2, 'missing', None, None, None)]
 PASS copied file: size and SHA-256 recorded, path <company>/<obj_type>/<doc_entry>/<name> [(1, 'copied', 860, '286903b07538071c1f76220a03cf0bb063b48d9f86823a5ca1824c45a43b87d5', 'AE01/13/1/contract.pdf')]
 PASS file copied to the destination                                         
 PASS missing file recorded as missing                                       [(2, 'missing', None, None, None)]
-PASS the attachment job reports the missing file (critical issue)           ('critical', '/private/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/T/a12att_2lmrz3ye/sap_attachments/scan.jpg')
+PASS the attachment job reports the missing file (critical issue)           ('critical', '/private/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/T/a12att_4b8xhhn4/sap_attachments/scan.jpg')
 PASS SAP folder untouched (read-only folder, same mtime, nothing added)     
-PASS attachments step recorded on the run                                   ('warning', '2 files listed in ATC1: 1 copied (860 bytes, SHA-256 recorded), 1 missing, 0 errors; destination local:/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/T/a12att_2lmrz3ye/storage')
+PASS attachments step recorded on the run                                   ('warning', '2 files listed in ATC1: 1 copied (860 bytes, SHA-256 recorded), 1 missing, 0 errors; destination local:/var/folders/z3/0kkbzddj3vn35yx_ss8sjznw0000gn/T/a12att_4b8xhhn4/storage')
    opening: {"debit": 940.0, "credit": 940.0, "remainder": -300.0, "opening_date": "2026-11-04", "closed_removed": 0, "open_documents": 2, "payments_removed": 1, "journals_replaced": 2, "accounts_differing": 2}
 PASS opening loader: one balanced opening journal for AE01                  
 PASS opening_only run: history trial-balance checks replaced by the opening checks (0, 9)

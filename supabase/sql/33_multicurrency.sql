@@ -314,17 +314,26 @@ BEGIN
   RETURN round(p_amount_fc * v_olc / v_ofc, 2);
 END $$;
 
--- Open items per partner and currency (Super ERP documents), both in the document currency and in LC. Owner rights (the
--- open-amount helpers are internal); the access rule is in WHERE: the company, and Sales (receivables) / Purchasing
--- (payables) / Banking / Financials.
+-- Open items per partner and currency (Super ERP documents), both in the document currency and in LC (same rule as
+-- _bk_doc_open / _bk_doc_open_fc). Owner rights; the access rule is in WHERE: the company, and Sales (receivables) /
+-- Purchasing (payables) / Banking / Financials.
 DROP VIEW IF EXISTS erp.bp_balance_fc;
 CREATE VIEW erp.bp_balance_fc AS
 SELECT d.company_code, d.card_code, max(d.card_name) AS card_name, d.currency,
        CASE WHEN d.obj_type IN (13, 14) THEN 'receivable' ELSE 'payable' END AS side,
        count(*) AS docs,
-       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * erp._bk_doc_open_fc(d.company_code, d.obj_type, d.doc_entry)), 2) AS open_fc,
-       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * erp._bk_doc_open(d.company_code, d.obj_type, d.doc_entry)), 2) AS open_lc
+       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * (coalesce(d.total_fc, 0) - coalesce(d.paid_fc, 0) - cm.fc)), 2) AS open_fc,
+       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * (coalesce(d.total, 0) - coalesce(d.paid, 0) - cm.lc)), 2) AS open_lc
   FROM erp.document d
+  CROSS JOIN LATERAL (
+    -- credit memos based on an invoice (13 / 18), or the part of a credit memo based on invoices (14 / 19), as in _bk_doc_open
+    SELECT coalesce(sum(coalesce(cl.line_total_fc, 0) + coalesce(cl.vat_fc, 0)), 0) AS fc, coalesce(sum(cl.line_total + coalesce(cl.vat, 0)), 0) AS lc
+      FROM erp.document_line cl
+      JOIN erp.document c ON c.company_code = cl.company_code AND c.obj_type = cl.obj_type AND c.doc_entry = cl.doc_entry
+     WHERE cl.company_code = d.company_code
+       AND ((d.obj_type IN (13, 18) AND cl.obj_type = d.obj_type + 1 AND cl.base_obj_type = d.obj_type AND cl.base_doc_entry = d.doc_entry
+             AND c.status NOT IN ('cancelled', 'cancellation'))
+         OR (d.obj_type IN (14, 19) AND cl.obj_type = d.obj_type AND cl.doc_entry = d.doc_entry AND cl.base_obj_type = d.obj_type - 1))) cm
  WHERE d.source = 'erp' AND d.obj_type IN (13, 14, 18, 19, 204) AND d.status NOT IN ('cancelled', 'cancellation', 'draft') AND d.total_fc IS NOT NULL
    AND erp.can_see(d.company_code)
    AND (erp.can_read('finance') OR erp.can_read('banking') OR (d.obj_type IN (13, 14) AND erp.can_read('sales')) OR (d.obj_type IN (18, 19, 204) AND erp.can_read('purchase')))
@@ -2313,10 +2322,11 @@ BEGIN
         JOIN erp.document_line g ON g.company_code = l.company_code AND g.obj_type = 20 AND g.doc_entry = l.base_doc_entry AND g.line_num = l.base_line
        WHERE l.company_code = p_company AND l.obj_type = 18 AND l.doc_entry = p_doc_entry AND l.base_obj_type = 20;
       IF v_grni > 0 AND v_grni <> round(v_net, 2) THEN
-        v_lines := jsonb_build_array(jsonb_build_object('acct_code', v_clr, 'debit', v_grni),
+        v_lines := jsonb_build_array(jsonb_build_object('acct_code', v_clr, 'debit', v_grni,
+                                       'fc_debit', (SELECT sum(line_total_fc) FROM erp.document_line WHERE company_code = p_company AND obj_type = 18 AND doc_entry = p_doc_entry)),
           CASE WHEN round(v_net, 2) > v_grni
-               THEN jsonb_build_object('acct_code', erp.gl_account(p_company, 'purchasing', 'fx_loss'), 'debit', round(v_net, 2) - v_grni, 'memo', 'Exchange rate difference to the goods receipt')
-               ELSE jsonb_build_object('acct_code', erp.gl_account(p_company, 'sales', 'fx_gain'), 'credit', v_grni - round(v_net, 2), 'memo', 'Exchange rate difference to the goods receipt') END);
+               THEN jsonb_build_object('acct_code', erp.gl_account(p_company, 'purchasing', 'fx_loss'), 'debit', round(v_net, 2) - v_grni, 'fc_debit', 0, 'fc_credit', 0, 'memo', 'Exchange rate difference to the goods receipt')
+               ELSE jsonb_build_object('acct_code', erp.gl_account(p_company, 'sales', 'fx_gain'), 'credit', v_grni - round(v_net, 2), 'fc_debit', 0, 'fc_credit', 0, 'memo', 'Exchange rate difference to the goods receipt') END);
       END IF;
     END IF;
     v_lines := v_lines || coalesce((
@@ -2326,8 +2336,10 @@ BEGIN
     v_lines := v_lines || jsonb_build_array(jsonb_build_object('acct_code', v_ap, 'short_name', d.card_code, 'credit', round(v_net + v_vatsum, 2)));
     IF v_drawn > 0 THEN
       v_dp := erp.gl_account(p_company, 'purchasing', 'down_payments');
-      v_lines := v_lines || jsonb_build_array(jsonb_build_object('acct_code', v_ap, 'short_name', d.card_code, 'debit', round(v_drawn, 2), 'memo', 'Down payment drawn'),
-                                              jsonb_build_object('acct_code', v_dp, 'credit', round(v_drawn, 2), 'memo', 'Down payment drawn'));
+      v_lines := v_lines || jsonb_build_array(jsonb_build_object('acct_code', v_ap, 'short_name', d.card_code, 'debit', round(v_drawn, 2), 'memo', 'Down payment drawn',
+                                                                 'fc_debit', (SELECT sum(amount_fc) FROM erp.ap_dp_draw WHERE company_code = p_company AND invoice_entry = p_doc_entry)),
+                                              jsonb_build_object('acct_code', v_dp, 'credit', round(v_drawn, 2), 'memo', 'Down payment drawn',
+                                                                 'fc_credit', (SELECT sum(amount_fc) FROM erp.ap_dp_draw WHERE company_code = p_company AND invoice_entry = p_doc_entry)));
     END IF;
     v_trans := erp.post_journal(p_company, d.doc_date, format('A/P invoice %s · %s', v_ref, coalesce(d.card_name, d.card_code)), v_lines,
       jsonb_build_object('trans_type', 18, 'base_ref', v_ref, 'ref1', v_ref, 'ref2', d.customer_ref, 'due_date', d.due_date,
@@ -2541,12 +2553,10 @@ END $$;
 -- B4: + currency and rate of the base.
 
 -- ============ 7b. Reports: aging with the document currency ============
--- Replaces 26 (return type changes, so DROP + CREATE): the same LC buckets and total, plus the partner's document
--- currency (several = comma-separated) and the open amount in that currency when it is one foreign currency.
-DROP FUNCTION IF EXISTS erp.rpt_ar_aging(varchar, date);
-DROP FUNCTION IF EXISTS erp.rpt_ap_aging(varchar, date);
-DROP FUNCTION IF EXISTS erp._rpt_aging(varchar, date, integer[]);
-CREATE FUNCTION erp._rpt_aging(p_company varchar, p_as_of date, p_objs integer[])
+-- New functions next to 26's (26 is left as it is, so re-running 26 keeps working): the same LC buckets and total, plus the
+-- partner's document currency (several = comma-separated) and the open amount in that currency when it is one foreign
+-- currency. The Reports screen calls these; erp.rpt_ar_aging / rpt_ap_aging stay for the AI tools.
+CREATE OR REPLACE FUNCTION erp._rpt_aging_fc(p_company varchar, p_as_of date, p_objs integer[])
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
@@ -2567,27 +2577,27 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
     FROM o GROUP BY o.cc ORDER BY sum(o.amt) DESC, o.cc
 $$;
 
-CREATE FUNCTION erp.rpt_ar_aging(p_company varchar, p_as_of date)
+CREATE OR REPLACE FUNCTION erp.rpt_ar_aging_fc(p_company varchar, p_as_of date)
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
 BEGIN
   PERFORM erp._rpt_need(p_company, ARRAY['sales', 'finance'], 'Sales or Financials');
   IF p_as_of IS NULL THEN RAISE EXCEPTION 'Choose the aging date.' USING ERRCODE = 'P0001'; END IF;
-  RETURN QUERY SELECT * FROM erp._rpt_aging(p_company, p_as_of, ARRAY[13, 14]);
+  RETURN QUERY SELECT * FROM erp._rpt_aging_fc(p_company, p_as_of, ARRAY[13, 14]);
 END $$;
 
-CREATE FUNCTION erp.rpt_ap_aging(p_company varchar, p_as_of date)
+CREATE OR REPLACE FUNCTION erp.rpt_ap_aging_fc(p_company varchar, p_as_of date)
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
 BEGIN
   PERFORM erp._rpt_need(p_company, ARRAY['purchase', 'finance'], 'Purchasing or Financials');
   IF p_as_of IS NULL THEN RAISE EXCEPTION 'Choose the aging date.' USING ERRCODE = 'P0001'; END IF;
-  RETURN QUERY SELECT * FROM erp._rpt_aging(p_company, p_as_of, ARRAY[18, 19]);
+  RETURN QUERY SELECT * FROM erp._rpt_aging_fc(p_company, p_as_of, ARRAY[18, 19]);
 END $$;
-REVOKE ALL ON FUNCTION erp._rpt_aging(varchar, date, integer[]), erp.rpt_ar_aging(varchar, date), erp.rpt_ap_aging(varchar, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION erp._rpt_aging(varchar, date, integer[]), erp.rpt_ar_aging(varchar, date), erp.rpt_ap_aging(varchar, date) TO authenticated;
+REVOKE ALL ON FUNCTION erp._rpt_aging_fc(varchar, date, integer[]), erp.rpt_ar_aging_fc(varchar, date), erp.rpt_ap_aging_fc(varchar, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION erp._rpt_aging_fc(varchar, date, integer[]), erp.rpt_ar_aging_fc(varchar, date), erp.rpt_ap_aging_fc(varchar, date) TO authenticated;
 
 
 -- ============ 8. Payments in the documents' currency, realised FX gain / loss ============
@@ -2986,6 +2996,17 @@ BEGIN
     v_lines := v_lines || jsonb_build_object('acct_code', v_ctl, 'short_name', h->>'card_code', v_oside, v_ctl_amt);
   ELSE
     v_lines := jsonb_build_array(jsonb_build_object('acct_code', v_ctl, 'short_name', h->>'card_code', v_oside, v_ctl_amt)) || v_lines;
+  END IF;
+  IF v_isfc THEN
+    -- FC amounts of the lines: each means of payment as entered, the partner line = what it cleared in the documents' currency.
+    v_lines := (SELECT jsonb_agg(CASE WHEN l->>'short_name' = h->>'card_code'
+                                      THEN l || jsonb_build_object('fc_' || v_oside, round(coalesce((SELECT sum((a->>'amount_fc')::numeric * (a->>'sign')::integer) FROM jsonb_array_elements(e->'lines') a), 0)
+                                                                                    + coalesce((efc->'totals'->>'on_account')::numeric, 0), 2), 'fc_' || v_side, 0)
+                                      ELSE l || jsonb_build_object('fc_' || v_side,
+                                             CASE WHEN l->>'memo' = 'Cash' THEN (hfc->>'cash')::numeric WHEN l->>'memo' LIKE 'Transfer%' THEN (hfc->>'transfer')::numeric
+                                                  WHEN l->>'memo' LIKE 'Cheques%' THEN (hfc->>'cheque_total')::numeric WHEN l->>'memo' LIKE 'Card%' THEN (hfc->>'card')::numeric END,
+                                             'fc_' || v_oside, 0) END ORDER BY x.ord)
+                   FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS x(l, ord));
   END IF;
   IF v_isfc AND v_fxd <> 0 THEN
     -- Realised exchange rate difference: incoming more LC than the invoices carried = gain; outgoing more LC = loss.

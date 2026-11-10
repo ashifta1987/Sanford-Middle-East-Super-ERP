@@ -25,3 +25,4 @@ supabase/sql/29_go_live.sql
 supabase/sql/30_numbering_company.sql
 supabase/sql/31_approvals.sql
 supabase/sql/32_gl_setup.sql
+supabase/sql/33_multicurrency.sql

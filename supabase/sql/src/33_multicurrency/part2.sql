@@ -1,11 +1,9 @@
 
 -- ============ 7b. Reports: aging with the document currency ============
--- Replaces 26 (return type changes, so DROP + CREATE): the same LC buckets and total, plus the partner's document
--- currency (several = comma-separated) and the open amount in that currency when it is one foreign currency.
-DROP FUNCTION IF EXISTS erp.rpt_ar_aging(varchar, date);
-DROP FUNCTION IF EXISTS erp.rpt_ap_aging(varchar, date);
-DROP FUNCTION IF EXISTS erp._rpt_aging(varchar, date, integer[]);
-CREATE FUNCTION erp._rpt_aging(p_company varchar, p_as_of date, p_objs integer[])
+-- New functions next to 26's (26 is left as it is, so re-running 26 keeps working): the same LC buckets and total, plus the
+-- partner's document currency (several = comma-separated) and the open amount in that currency when it is one foreign
+-- currency. The Reports screen calls these; erp.rpt_ar_aging / rpt_ap_aging stay for the AI tools.
+CREATE OR REPLACE FUNCTION erp._rpt_aging_fc(p_company varchar, p_as_of date, p_objs integer[])
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
@@ -26,24 +24,24 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
     FROM o GROUP BY o.cc ORDER BY sum(o.amt) DESC, o.cc
 $$;
 
-CREATE FUNCTION erp.rpt_ar_aging(p_company varchar, p_as_of date)
+CREATE OR REPLACE FUNCTION erp.rpt_ar_aging_fc(p_company varchar, p_as_of date)
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
 BEGIN
   PERFORM erp._rpt_need(p_company, ARRAY['sales', 'finance'], 'Sales or Financials');
   IF p_as_of IS NULL THEN RAISE EXCEPTION 'Choose the aging date.' USING ERRCODE = 'P0001'; END IF;
-  RETURN QUERY SELECT * FROM erp._rpt_aging(p_company, p_as_of, ARRAY[13, 14]);
+  RETURN QUERY SELECT * FROM erp._rpt_aging_fc(p_company, p_as_of, ARRAY[13, 14]);
 END $$;
 
-CREATE FUNCTION erp.rpt_ap_aging(p_company varchar, p_as_of date)
+CREATE OR REPLACE FUNCTION erp.rpt_ap_aging_fc(p_company varchar, p_as_of date)
 RETURNS TABLE (card_code varchar, card_name text, docs bigint, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric,
                d90_plus numeric, total numeric, currency text, total_fc numeric)
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
 BEGIN
   PERFORM erp._rpt_need(p_company, ARRAY['purchase', 'finance'], 'Purchasing or Financials');
   IF p_as_of IS NULL THEN RAISE EXCEPTION 'Choose the aging date.' USING ERRCODE = 'P0001'; END IF;
-  RETURN QUERY SELECT * FROM erp._rpt_aging(p_company, p_as_of, ARRAY[18, 19]);
+  RETURN QUERY SELECT * FROM erp._rpt_aging_fc(p_company, p_as_of, ARRAY[18, 19]);
 END $$;
-REVOKE ALL ON FUNCTION erp._rpt_aging(varchar, date, integer[]), erp.rpt_ar_aging(varchar, date), erp.rpt_ap_aging(varchar, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION erp._rpt_aging(varchar, date, integer[]), erp.rpt_ar_aging(varchar, date), erp.rpt_ap_aging(varchar, date) TO authenticated;
+REVOKE ALL ON FUNCTION erp._rpt_aging_fc(varchar, date, integer[]), erp.rpt_ar_aging_fc(varchar, date), erp.rpt_ap_aging_fc(varchar, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION erp._rpt_aging_fc(varchar, date, integer[]), erp.rpt_ar_aging_fc(varchar, date), erp.rpt_ap_aging_fc(varchar, date) TO authenticated;

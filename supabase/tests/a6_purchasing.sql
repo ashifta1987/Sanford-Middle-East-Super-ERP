@@ -109,7 +109,7 @@ BEGIN
 
   -- ---------- 2 · Quotations from two suppliers, compared ----------
   PERFORM pg_temp.expect(pg_temp.save(purch, 540000006, NULL, '{"card_code":"S0001","doc_date":"2026-11-10"}', '[{"item_code":"SMP-1140","qty":1000,"price":16}]'),
-    'Supplier S0001 is billed in USD. Purchasing in a foreign currency comes in a later stage.', 'USD supplier refused (company currency only)');
+    'There is no exchange rate for USD on 10 Nov 2026. Enter it in Administration › Exchange Rates, then try again.', 'USD supplier: needs the day''s USD rate (B4: purchasing in USD allowed)');
   PERFORM pg_temp.expect(pg_temp.save(purch, 540000006, NULL, '{"card_code":"C0001","doc_date":"2026-11-10"}', '[{"item_code":"SMP-1140","qty":1,"price":1}]'),
     'C0001 is not a supplier. Choose a supplier.', 'customer as supplier refused');
   PERFORM pg_temp.expect(pg_temp.save(purch, 540000006, NULL, '{"card_code":"S0009","doc_date":"2026-11-10"}', '[{"item_code":"SMP-1140","qty":1,"price":1,"tax_code":"SR"}]'),

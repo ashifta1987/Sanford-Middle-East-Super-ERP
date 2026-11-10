@@ -467,10 +467,11 @@ t = patch(t, """    v_lines := jsonb_build_array(jsonb_build_object('acct_code',
         JOIN erp.document_line g ON g.company_code = l.company_code AND g.obj_type = 20 AND g.doc_entry = l.base_doc_entry AND g.line_num = l.base_line
        WHERE l.company_code = p_company AND l.obj_type = 18 AND l.doc_entry = p_doc_entry AND l.base_obj_type = 20;
       IF v_grni > 0 AND v_grni <> round(v_net, 2) THEN
-        v_lines := jsonb_build_array(jsonb_build_object('acct_code', v_clr, 'debit', v_grni),
+        v_lines := jsonb_build_array(jsonb_build_object('acct_code', v_clr, 'debit', v_grni,
+                                       'fc_debit', (SELECT sum(line_total_fc) FROM erp.document_line WHERE company_code = p_company AND obj_type = 18 AND doc_entry = p_doc_entry)),
           CASE WHEN round(v_net, 2) > v_grni
-               THEN jsonb_build_object('acct_code', erp.gl_account(p_company, 'purchasing', 'fx_loss'), 'debit', round(v_net, 2) - v_grni, 'memo', 'Exchange rate difference to the goods receipt')
-               ELSE jsonb_build_object('acct_code', erp.gl_account(p_company, 'sales', 'fx_gain'), 'credit', v_grni - round(v_net, 2), 'memo', 'Exchange rate difference to the goods receipt') END);
+               THEN jsonb_build_object('acct_code', erp.gl_account(p_company, 'purchasing', 'fx_loss'), 'debit', round(v_net, 2) - v_grni, 'fc_debit', 0, 'fc_credit', 0, 'memo', 'Exchange rate difference to the goods receipt')
+               ELSE jsonb_build_object('acct_code', erp.gl_account(p_company, 'sales', 'fx_gain'), 'credit', v_grni - round(v_net, 2), 'fc_debit', 0, 'fc_credit', 0, 'memo', 'Exchange rate difference to the goods receipt') END);
       END IF;
     END IF;
     v_lines := v_lines || coalesce((
@@ -478,6 +479,12 @@ t = patch(t, """    v_lines := jsonb_build_array(jsonb_build_object('acct_code',
         FROM (SELECT tax_code, sum(vat) AS vat FROM erp.document_line
                WHERE company_code = p_company AND obj_type = 18 AND doc_entry = p_doc_entry GROUP BY tax_code HAVING sum(vat) <> 0) t), '[]'::jsonb);""",
           label='pd 18 grni')
+t = patch(t, """      v_lines := v_lines || jsonb_build_array(jsonb_build_object('acct_code', v_ap, 'short_name', d.card_code, 'debit', round(v_drawn, 2), 'memo', 'Down payment drawn'),
+                                              jsonb_build_object('acct_code', v_dp, 'credit', round(v_drawn, 2), 'memo', 'Down payment drawn'));""",
+          """      v_lines := v_lines || jsonb_build_array(jsonb_build_object('acct_code', v_ap, 'short_name', d.card_code, 'debit', round(v_drawn, 2), 'memo', 'Down payment drawn',
+                                                                 'fc_debit', (SELECT sum(amount_fc) FROM erp.ap_dp_draw WHERE company_code = p_company AND invoice_entry = p_doc_entry)),
+                                              jsonb_build_object('acct_code', v_dp, 'credit', round(v_drawn, 2), 'memo', 'Down payment drawn',
+                                                                 'fc_credit', (SELECT sum(amount_fc) FROM erp.ap_dp_draw WHERE company_code = p_company AND invoice_entry = p_doc_entry)));""", label='pd 18 draw')
 add('post_document', '32_gl_setup.sql', ln, t + """
 -- B4: unchanged for local-currency documents; a foreign-currency A/P invoice clears GRNI at the goods receipt value and posts
 -- the rate difference (purchasing / fx_loss, sales / fx_gain). post_journal fills the FC amounts of every line.""")
@@ -631,7 +638,18 @@ t = patch(t, """  v_memo := format('%s %s · %s', erp._bk_name(v_obj), nb->>'no'
   v_trans := erp.post_journal(p_company, (h->>'doc_date')::date, v_memo, v_lines,
     jsonb_build_object('trans_type', v_obj, 'base_ref', nb->>'no', 'ref1', nb->>'no', 'ref2', h->>'transfer_ref', 'allow_control', true,
                        'action', 'payment_post', 'object', 'payment', 'object_ref', p_dir || '/' || v_entry));""",
-          """  IF v_isfc AND v_fxd <> 0 THEN
+          """  IF v_isfc THEN
+    -- FC amounts of the lines: each means of payment as entered, the partner line = what it cleared in the documents' currency.
+    v_lines := (SELECT jsonb_agg(CASE WHEN l->>'short_name' = h->>'card_code'
+                                      THEN l || jsonb_build_object('fc_' || v_oside, round(coalesce((SELECT sum((a->>'amount_fc')::numeric * (a->>'sign')::integer) FROM jsonb_array_elements(e->'lines') a), 0)
+                                                                                    + coalesce((efc->'totals'->>'on_account')::numeric, 0), 2), 'fc_' || v_side, 0)
+                                      ELSE l || jsonb_build_object('fc_' || v_side,
+                                             CASE WHEN l->>'memo' = 'Cash' THEN (hfc->>'cash')::numeric WHEN l->>'memo' LIKE 'Transfer%' THEN (hfc->>'transfer')::numeric
+                                                  WHEN l->>'memo' LIKE 'Cheques%' THEN (hfc->>'cheque_total')::numeric WHEN l->>'memo' LIKE 'Card%' THEN (hfc->>'card')::numeric END,
+                                             'fc_' || v_oside, 0) END ORDER BY x.ord)
+                   FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS x(l, ord));
+  END IF;
+  IF v_isfc AND v_fxd <> 0 THEN
     -- Realised exchange rate difference: incoming more LC than the invoices carried = gain; outgoing more LC = loss.
     v_lines := v_lines || CASE WHEN (v_in AND v_fxd > 0) OR (NOT v_in AND v_fxd < 0)
       THEN jsonb_build_object('acct_code', erp.gl_account(p_company, 'sales', 'fx_gain'), 'credit', abs(v_fxd), 'fc_debit', 0, 'fc_credit', 0, 'memo', 'Exchange rate gain')

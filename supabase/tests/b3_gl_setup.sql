@@ -426,8 +426,8 @@ BEGIN
   PERFORM pg_temp.check((r->>'window_days')::int = 3 AND (r->>'matched')::int = 1, 'no window set: ±3 days by default (the unmatched line matches again)', r::text);
 
   -- ================= 12. Health, grants =================
-  PERFORM pg_temp.check(EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '32_gl_setup.sql' AND object = 'gl_setup') AND (SELECT count(*) FROM erp._health_files()) = 20,
-                        'system health knows 32_gl_setup.sql (20 files)');
+  PERFORM pg_temp.check(EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '32_gl_setup.sql' AND object = 'gl_setup') AND (SELECT count(*) FROM erp._health_files()) >= 20,
+                        'system health knows 32_gl_setup.sql (20 files; 21 with B4)');
   r := pg_temp.call(NULL, $q$SELECT erp.gl_setup('ZZ99')$q$, 'anon');
   PERFORM pg_temp.check(r->>'error' = '42501', 'anon can''t call the setup functions', r::text);
   r := pg_temp.call(fin, $q$WITH x AS (INSERT INTO erp.gl_determination_group (company_code, group_code, area, posting_key, acct_code) VALUES ('ZZ99', 102, 'inventory', 'cogs', '5100') RETURNING 1) SELECT to_jsonb(count(*)) FROM x$q$);

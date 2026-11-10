@@ -314,17 +314,26 @@ BEGIN
   RETURN round(p_amount_fc * v_olc / v_ofc, 2);
 END $$;
 
--- Open items per partner and currency (Super ERP documents), both in the document currency and in LC. Owner rights (the
--- open-amount helpers are internal); the access rule is in WHERE: the company, and Sales (receivables) / Purchasing
--- (payables) / Banking / Financials.
+-- Open items per partner and currency (Super ERP documents), both in the document currency and in LC (same rule as
+-- _bk_doc_open / _bk_doc_open_fc). Owner rights; the access rule is in WHERE: the company, and Sales (receivables) /
+-- Purchasing (payables) / Banking / Financials.
 DROP VIEW IF EXISTS erp.bp_balance_fc;
 CREATE VIEW erp.bp_balance_fc AS
 SELECT d.company_code, d.card_code, max(d.card_name) AS card_name, d.currency,
        CASE WHEN d.obj_type IN (13, 14) THEN 'receivable' ELSE 'payable' END AS side,
        count(*) AS docs,
-       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * erp._bk_doc_open_fc(d.company_code, d.obj_type, d.doc_entry)), 2) AS open_fc,
-       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * erp._bk_doc_open(d.company_code, d.obj_type, d.doc_entry)), 2) AS open_lc
+       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * (coalesce(d.total_fc, 0) - coalesce(d.paid_fc, 0) - cm.fc)), 2) AS open_fc,
+       round(sum(CASE WHEN d.obj_type IN (14, 19) THEN -1 ELSE 1 END * (coalesce(d.total, 0) - coalesce(d.paid, 0) - cm.lc)), 2) AS open_lc
   FROM erp.document d
+  CROSS JOIN LATERAL (
+    -- credit memos based on an invoice (13 / 18), or the part of a credit memo based on invoices (14 / 19), as in _bk_doc_open
+    SELECT coalesce(sum(coalesce(cl.line_total_fc, 0) + coalesce(cl.vat_fc, 0)), 0) AS fc, coalesce(sum(cl.line_total + coalesce(cl.vat, 0)), 0) AS lc
+      FROM erp.document_line cl
+      JOIN erp.document c ON c.company_code = cl.company_code AND c.obj_type = cl.obj_type AND c.doc_entry = cl.doc_entry
+     WHERE cl.company_code = d.company_code
+       AND ((d.obj_type IN (13, 18) AND cl.obj_type = d.obj_type + 1 AND cl.base_obj_type = d.obj_type AND cl.base_doc_entry = d.doc_entry
+             AND c.status NOT IN ('cancelled', 'cancellation'))
+         OR (d.obj_type IN (14, 19) AND cl.obj_type = d.obj_type AND cl.doc_entry = d.doc_entry AND cl.base_obj_type = d.obj_type - 1))) cm
  WHERE d.source = 'erp' AND d.obj_type IN (13, 14, 18, 19, 204) AND d.status NOT IN ('cancelled', 'cancellation', 'draft') AND d.total_fc IS NOT NULL
    AND erp.can_see(d.company_code)
    AND (erp.can_read('finance') OR erp.can_read('banking') OR (d.obj_type IN (13, 14) AND erp.can_read('sales')) OR (d.obj_type IN (18, 19, 204) AND erp.can_read('purchase')))

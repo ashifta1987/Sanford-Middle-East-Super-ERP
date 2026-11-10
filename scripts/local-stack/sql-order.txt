@@ -27,3 +27,4 @@ supabase/sql/30_numbering_company.sql
 scripts/local-stack/test-users-b1.sql
 supabase/sql/31_approvals.sql
 supabase/sql/32_gl_setup.sql
+supabase/sql/33_multicurrency.sql

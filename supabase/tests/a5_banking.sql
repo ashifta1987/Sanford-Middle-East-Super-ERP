@@ -133,7 +133,7 @@ BEGIN
     'Cheque 1: enter the cheque number.', 'cheque without number refused');
   PERFORM pg_temp.expect(pg_temp.pay(fin, 'I', '{"card_code":"S0005","doc_date":"2026-11-09","cash":10}', '[]'), 'S0005 is not a customer. Choose a customer.', 'supplier on an incoming payment refused');
   PERFORM pg_temp.expect(pg_temp.pay(fin, 'O', '{"card_code":"S0001","doc_date":"2026-11-09","transfer":10,"transfer_bank":"BNK-AED"}', '[]'),
-    'Supplier S0001 is billed in USD. Payments in a foreign currency come in a later stage.', 'foreign-currency supplier refused');
+    'There is no exchange rate for USD on 09 Nov 2026. Enter it in Administration › Exchange Rates, then try again.', 'USD supplier: payments in USD need the day''s rate (B4: foreign-currency payments allowed)');
   PERFORM pg_temp.expect(pg_temp.pay(fin, 'O', '{"card_code":"S0005","doc_date":"2026-11-09","card":10}', '[]'),
     'Outgoing payments by card are not supported. Pay by transfer, cheque or cash.', 'outgoing card refused');
   PERFORM pg_temp.expect(pg_temp.pay(fin, 'O', '{"card_code":"S0005","doc_date":"2026-11-09","cheques":[{"cheque_no":"900001","amount":10,"due_date":"2026-11-09"}]}', '[]'),

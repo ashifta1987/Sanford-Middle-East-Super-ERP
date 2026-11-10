@@ -3939,5 +3939,172 @@
       "months": "Months",
       "add": "Add warranty period"
     }
+  },
+  "gl": {
+    "title": "Go-live checklist",
+    "desc": "One checklist per company, in the order of the go-live plan. Every tick is recorded with who, when and the reference.",
+    "none": "No companies yet",
+    "noneBody": "Companies appear here once they are in your company list.",
+    "progress": "{{done}} of {{total}} steps done",
+    "preparing": "Preparing",
+    "liveSince": "Live since {{date}}",
+    "next": "Next: step {{n}} · {{title}}",
+    "allDone": "All steps done. Hypercare is finished.",
+    "hypercareUntil": "Hypercare until {{date}}",
+    "openIssues": "Open issues: {{n}}",
+    "howTitle": "How a company goes live",
+    "companyTitle": "Go-live · {{company}}",
+    "companyDesc": "Work through the steps in order. Steps 1 and 6 fill in by themselves; the others are ticked by a system admin with a note or reference.",
+    "step": {
+      "1": {
+        "title": "Migration run signed off",
+        "desc": "Finance, IT and Business have signed off the migration run in the console."
+      },
+      "2": {
+        "title": "Ashif's written approval",
+        "desc": "Written approval to import production data for this company. Record where the approval is kept."
+      },
+      "3": {
+        "title": "Users ready",
+        "desc": "Users invited, positions and limits set, and each department head has signed in once to test."
+      },
+      "4": {
+        "title": "Opening balances reconciled",
+        "desc": "Opening balances agree with SAP (migration plan §5)."
+      },
+      "5": {
+        "title": "SAP frozen and final run signed",
+        "desc": "SAP posting frozen. Final backup, then the final run, reconcile and sign. Record the backup reference."
+      },
+      "6": {
+        "title": "Go-live date recorded",
+        "desc": "The CFO takes the company live. The SAP sync stops for this company and Super ERP documents become the source of truth."
+      },
+      "7": {
+        "title": "Hypercare finished",
+        "desc": "Two weeks after go-live: daily reconciliation, an issue list and a fast path for fixes. Close it when no issue is open."
+      }
+    },
+    "st": {
+      "done": "Done",
+      "todo": "To do",
+      "waiting": "Waits for step {{n}}",
+      "afterLive": "After go-live",
+      "auto": "Automatic"
+    },
+    "markDone": "Mark done",
+    "reopen": "Reopen",
+    "confirmDone": "Mark step {{n}} done",
+    "confirmReopen": "Reopen step {{n}}",
+    "noteOptional": "Note (optional)",
+    "reopenWhy": "Why is this step being reopened?",
+    "ev": {
+      "2": "Where the written approval is kept (email date and subject, or document reference)",
+      "5": "Final backup reference (backup name or time)"
+    },
+    "evidence": "Reference",
+    "doneBy": "{{who}} · {{when}}",
+    "flash": {
+      "done": "Step {{n}} marked done.",
+      "reopened": "Step {{n}} reopened.",
+      "issue": "Issue logged.",
+      "closed": "Issue closed.",
+      "live": "{{company}} is live. The SAP sync has stopped for this company."
+    },
+    "run": "Latest run: {{status}}",
+    "noRun": "No migration run yet.",
+    "openRun": "Open the run",
+    "role": {
+      "finance": "Finance",
+      "it": "IT",
+      "business": "Business"
+    },
+    "dec": {
+      "approved": "approved",
+      "rejected": "rejected"
+    },
+    "users": "Active users: {{n}} · positions: {{p}}",
+    "pendingInvites": "Invitations not accepted yet: {{n}}",
+    "openUsers": "Users and invitations",
+    "openCheck": "Open the cross-check",
+    "dailyRecon": "Daily reconciliation (cross-check)",
+    "sapStops": "The SAP sync no longer updates this company.",
+    "goLive": "Go live",
+    "goLiveWait": "Finish steps 1 to 5 first.",
+    "goLiveTitle": "Take {{company}} live?",
+    "goLiveBody": "This records today as the go-live date for {{company}}. The SAP sync stops for this company and Super ERP documents become the source of truth. It can't be undone from the app.",
+    "goLiveConfirm": "Take the company live",
+    "facts": "Summary",
+    "f": {
+      "company": "Company",
+      "goLive": "Go-live",
+      "by": "Taken live by",
+      "hypercare": "Hypercare until",
+      "run": "Migration run"
+    },
+    "issues": "Hypercare issues",
+    "issuesBeforeLive": "The issue list opens at go-live. Before that, use the migration issue list in the console.",
+    "issueTitle": "New issue",
+    "severity": "Severity",
+    "sev": {
+      "normal": "Normal",
+      "critical": "Critical"
+    },
+    "addIssue": "Log issue",
+    "noIssues": "No issues logged.",
+    "is": {
+      "open": "Open",
+      "fixed": "Fixed"
+    },
+    "fixed": "Fixed by {{who}}",
+    "closeIssue": "Close issue",
+    "howFixed": "How was it fixed?",
+    "close": "Close",
+    "activity": "Activity",
+    "noActivity": "Nothing recorded yet.",
+    "act": {
+      "go_live_step_done": "Step {{n}} marked done",
+      "go_live_step_reopened": "Step {{n}} reopened",
+      "company_go_live": "Company taken live",
+      "go_live_issue_raised": "Issue logged",
+      "go_live_issue_fixed": "Issue closed"
+    },
+    "health": {
+      "title": "System health",
+      "desc": "Read-only checks on the database: which SQL files are in, security checks, the release log and each company's sync and go-live state.",
+      "refresh": "Check again",
+      "checkedAt": "Checked {{when}}",
+      "overall": {
+        "ok": "All checks passed",
+        "warn": "Working, with warnings to review",
+        "error": "Something needs fixing before go-live"
+      },
+      "db": "Database",
+      "version": "Postgres version",
+      "size": "Database size",
+      "locks": "max_locks_per_transaction",
+      "locksNote": "A real SAP load needs 2048 (see docs/hosting.md).",
+      "checks": "Security checks",
+      "check": {
+        "files_missing": "SQL files missing",
+        "tables_without_rls": "Tables without row-level security",
+        "definer_without_search_path": "Definer functions without a fixed search_path",
+        "definer_anon_execute": "Definer functions open to signed-out visitors",
+        "direct_write_grants": "Tables that signed-in users can write directly"
+      },
+      "ok": "OK",
+      "found": "{{n}} found",
+      "grantsNote": "From 12_erp_security.sql: field visits, trade requests and trip stops, each limited to the user's own rows by row-level security.",
+      "companies": "Companies",
+      "lastLoad": "Last SAP load",
+      "checklist": "Checklist",
+      "files": "SQL files",
+      "file": "File",
+      "object": "Checked object",
+      "present": "In place",
+      "missing": "Missing",
+      "releases": "Release log",
+      "noReleases": "No release recorded yet. After applying each file, record it with erp.schema_release_record (docs/go-live.md)."
+    }
   }
 }

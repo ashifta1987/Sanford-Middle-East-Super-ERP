@@ -227,6 +227,8 @@ const LIVE_ITEMS: Record<string, string> = {
   'Company Details': '/admin/company', 'Authorizations ›': '/admin/authorizations', 'Document Numbering': '/admin/numbering',
   'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approval-templates', 'Approval Stages': '/admin/approval-templates',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
+  // A14 · go-live checklist and system health
+  'Implementation Center ›': '/admin/go-live',
   // A11 · reports and Ask AI
   'Financial ›': '/reports?cat=financials', 'Open Items List': '/reports/open-items', 'Sales Analysis': '/reports/sales-analysis',
   'Customer receivables ageing': '/reports/ar-aging', 'Supplier liabilities ageing': '/reports/ap-aging', 'Aging ›': '/reports/ar-aging',

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ModuleTabs } from './ModuleTabs';
 import { AskAiProvider } from '@/features/erp/components/AskAi';
+import { PageLoading } from '@/components/States';
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ export function AppShell() {
         {inBackOffice && <ModuleTabs />}
         <main id="main" className="flex-1">
           <div className="mx-auto w-full max-w-content px-4 py-6 sm:px-7">
-            <Outlet />
+            <Suspense fallback={<PageLoading />}><Outlet /></Suspense>
           </div>
         </main>
       </div>

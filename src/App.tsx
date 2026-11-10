@@ -1,52 +1,78 @@
+import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppShell } from '@/layout/AppShell';
 import { CompanyProvider } from '@/layout/CompanyContext';
 import { LoginPage } from '@/auth/LoginPage';
 import { RequireAccess } from '@/auth/RequireAccess';
 import { NoAccessPage, PlaceholderPage } from '@/pages/SystemPages';
-import { MigrationCentrePage } from '@/features/migration/pages/MigrationCentrePage';
-import { UploadPage } from '@/features/migration/pages/UploadPage';
-import { RunPage } from '@/features/migration/pages/RunPage';
-import { CrossCheckPage } from '@/features/migration/pages/CrossCheckPage';
-import { CustomFieldsPage } from '@/features/migration/pages/CustomFieldsPage';
-import { DiscountGroupsPage, SpecialPricesPage } from '@/features/erp/pages/SpecialPricePages';
+import { PageLoading } from '@/components/States';
 import { useAuth } from '@/auth/AuthProvider';
-import { ApprovalsPage } from '@/pages/ApprovalsPage';
 import { ControlTowerPage, HomePage, ModulePage, SearchPage } from '@/features/erp/pages/HomePages';
-import { PreviewPage } from '@/features/erp/pages/PreviewPage';
-import {
-  AccountsPage, BusinessPartnersPage, DocumentsPage, EmployeesPage, ItemsPage, JournalsPage, PaymentsPage, PricesPage, StockPage,
-} from '@/features/erp/pages/ListPages';
-import { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } from '@/features/erp/pages/DetailPages';
-import { SalesOrderDetailPage, SalesOrderEditPage, SalesOrderNewPage } from '@/features/erp/pages/SalesOrderPages';
-import {
-  AtpCheckPage, AtpRulesPage, CreditMemoNewPage, DeliveryNewPage, InvoiceNewPage, SalesDocPage, SalesPrintPage,
-} from '@/features/erp/pages/SalesCyclePages';
-import { JournalDraftPage, JournalDraftsPage, JournalNewPage } from '@/features/erp/pages/JournalPages';
-import { GlDeterminationPage, PostingPeriodsPage } from '@/features/erp/pages/FinanceSetupPages';
-import { PaymentDetailPage, PaymentDraftPage, PaymentDraftsPage, PaymentNewPage } from '@/features/erp/pages/BankingPages';
-import {
-  BankingSetupPage, BpBankAccountsPage, CashPositionPage, DepositNewPage, DepositsPage, StatementPage, StatementsPage,
-} from '@/features/erp/pages/BankingMorePages';
-import {
-  ApInvoiceNewPage, GrpoNewPage, LandedCostNewPage, LandedCostPage, LandedCostsPage, PurchaseDocEditPage, PurchaseDocNewPage, PurchaseDocPage,
-  PurchaseViewPage, PurchasingSetupPage, QuotationComparePage,
-} from '@/features/erp/pages/PurchasingPages';
-import { BpChangesPage, BpFormPage, ItemFormPage, TrademarksPage } from '@/features/erp/pages/MasterDataPages';
-import { AttendancePage, ExpiryPage, LeaveListPage, LeavePage, PayslipPage, PortalPage } from '@/features/erp/pages/HrPages';
-import { EmployeeDetailPage, EmployeeFormPage, HrSetupPage, PayrollListPage, PayrollRunPage } from '@/features/erp/pages/HrAdminPages';
-import {
-  CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage,
-} from '@/features/erp/pages/InventoryPages';
-import { AuthorizationsPage, UserFormPage, UsersPage } from '@/features/erp/pages/AdminPages';
-import { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage, NumberingPage } from '@/features/erp/pages/AdminSetupPages';
-import { ReportPage, ReportPrintPage, ReportsLibraryPage } from '@/features/erp/pages/ReportPages';
-import {
-  BomFormPage, BomPage, BomsPage, MouldPage, MouldsPage, ProdOrderNewPage, ProdOrderPage, ProdOrdersPage, ProductionSetupPage,
-} from '@/features/erp/pages/ProductionPages';
-import {
-  ContractFormPage, ContractPage, ContractsPage, EquipmentCardPage, EquipmentPage, ServiceCallFormPage, ServiceCallPage, ServiceCallsPage, ServiceSetupPage,
-} from '@/features/erp/pages/ServicePages';
+
+// A14 · route-level code splitting: each page module is its own chunk, loaded when its route opens, so the first load only
+// carries the shell, sign-in and Home. (The PDF and Excel libraries were already split out with dynamic imports.)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyComponent = ComponentType<any>;
+function from<M extends Record<string, unknown>>(load: () => Promise<M>) {
+  return <K extends keyof M & string>(...names: K[]) =>
+    Object.fromEntries(names.map((n) => [n, lazy(() => load().then((m) => ({ default: m[n] as Extract<M[K], AnyComponent> })))])) as
+      { [P in K]: LazyExoticComponent<Extract<M[P], AnyComponent>> };
+}
+
+const P_MigrationCentrePage = from(() => import('@/features/migration/pages/MigrationCentrePage'));
+const { MigrationCentrePage } = P_MigrationCentrePage('MigrationCentrePage');
+const P_UploadPage = from(() => import('@/features/migration/pages/UploadPage'));
+const { UploadPage } = P_UploadPage('UploadPage');
+const P_RunPage = from(() => import('@/features/migration/pages/RunPage'));
+const { RunPage } = P_RunPage('RunPage');
+const P_CrossCheckPage = from(() => import('@/features/migration/pages/CrossCheckPage'));
+const { CrossCheckPage } = P_CrossCheckPage('CrossCheckPage');
+const P_CustomFieldsPage = from(() => import('@/features/migration/pages/CustomFieldsPage'));
+const { CustomFieldsPage } = P_CustomFieldsPage('CustomFieldsPage');
+const P_SpecialPricePages = from(() => import('@/features/erp/pages/SpecialPricePages'));
+const { DiscountGroupsPage, SpecialPricesPage } = P_SpecialPricePages('DiscountGroupsPage', 'SpecialPricesPage');
+const P_ApprovalsPage = from(() => import('@/pages/ApprovalsPage'));
+const { ApprovalsPage } = P_ApprovalsPage('ApprovalsPage');
+const P_PreviewPage = from(() => import('@/features/erp/pages/PreviewPage'));
+const { PreviewPage } = P_PreviewPage('PreviewPage');
+const P_ListPages = from(() => import('@/features/erp/pages/ListPages'));
+const { AccountsPage, BusinessPartnersPage, DocumentsPage, EmployeesPage, ItemsPage, JournalsPage, PaymentsPage, PricesPage, StockPage } = P_ListPages('AccountsPage', 'BusinessPartnersPage', 'DocumentsPage', 'EmployeesPage', 'ItemsPage', 'JournalsPage', 'PaymentsPage', 'PricesPage', 'StockPage');
+const P_DetailPages = from(() => import('@/features/erp/pages/DetailPages'));
+const { BusinessPartnerDetail, DocumentDetail, ItemDetail, JournalDetail } = P_DetailPages('BusinessPartnerDetail', 'DocumentDetail', 'ItemDetail', 'JournalDetail');
+const P_SalesOrderPages = from(() => import('@/features/erp/pages/SalesOrderPages'));
+const { SalesOrderDetailPage, SalesOrderEditPage, SalesOrderNewPage } = P_SalesOrderPages('SalesOrderDetailPage', 'SalesOrderEditPage', 'SalesOrderNewPage');
+const P_SalesCyclePages = from(() => import('@/features/erp/pages/SalesCyclePages'));
+const { AtpCheckPage, AtpRulesPage, CreditMemoNewPage, DeliveryNewPage, InvoiceNewPage, SalesDocPage, SalesPrintPage } = P_SalesCyclePages('AtpCheckPage', 'AtpRulesPage', 'CreditMemoNewPage', 'DeliveryNewPage', 'InvoiceNewPage', 'SalesDocPage', 'SalesPrintPage');
+const P_JournalPages = from(() => import('@/features/erp/pages/JournalPages'));
+const { JournalDraftPage, JournalDraftsPage, JournalNewPage } = P_JournalPages('JournalDraftPage', 'JournalDraftsPage', 'JournalNewPage');
+const P_FinanceSetupPages = from(() => import('@/features/erp/pages/FinanceSetupPages'));
+const { GlDeterminationPage, PostingPeriodsPage } = P_FinanceSetupPages('GlDeterminationPage', 'PostingPeriodsPage');
+const P_BankingPages = from(() => import('@/features/erp/pages/BankingPages'));
+const { PaymentDetailPage, PaymentDraftPage, PaymentDraftsPage, PaymentNewPage } = P_BankingPages('PaymentDetailPage', 'PaymentDraftPage', 'PaymentDraftsPage', 'PaymentNewPage');
+const P_BankingMorePages = from(() => import('@/features/erp/pages/BankingMorePages'));
+const { BankingSetupPage, BpBankAccountsPage, CashPositionPage, DepositNewPage, DepositsPage, StatementPage, StatementsPage } = P_BankingMorePages('BankingSetupPage', 'BpBankAccountsPage', 'CashPositionPage', 'DepositNewPage', 'DepositsPage', 'StatementPage', 'StatementsPage');
+const P_PurchasingPages = from(() => import('@/features/erp/pages/PurchasingPages'));
+const { ApInvoiceNewPage, GrpoNewPage, LandedCostNewPage, LandedCostPage, LandedCostsPage, PurchaseDocEditPage, PurchaseDocNewPage, PurchaseDocPage, PurchaseViewPage, PurchasingSetupPage, QuotationComparePage } = P_PurchasingPages('ApInvoiceNewPage', 'GrpoNewPage', 'LandedCostNewPage', 'LandedCostPage', 'LandedCostsPage', 'PurchaseDocEditPage', 'PurchaseDocNewPage', 'PurchaseDocPage', 'PurchaseViewPage', 'PurchasingSetupPage', 'QuotationComparePage');
+const P_MasterDataPages = from(() => import('@/features/erp/pages/MasterDataPages'));
+const { BpChangesPage, BpFormPage, ItemFormPage, TrademarksPage } = P_MasterDataPages('BpChangesPage', 'BpFormPage', 'ItemFormPage', 'TrademarksPage');
+const P_HrPages = from(() => import('@/features/erp/pages/HrPages'));
+const { AttendancePage, ExpiryPage, LeaveListPage, LeavePage, PayslipPage, PortalPage } = P_HrPages('AttendancePage', 'ExpiryPage', 'LeaveListPage', 'LeavePage', 'PayslipPage', 'PortalPage');
+const P_HrAdminPages = from(() => import('@/features/erp/pages/HrAdminPages'));
+const { EmployeeDetailPage, EmployeeFormPage, HrSetupPage, PayrollListPage, PayrollRunPage } = P_HrAdminPages('EmployeeDetailPage', 'EmployeeFormPage', 'HrSetupPage', 'PayrollListPage', 'PayrollRunPage');
+const P_InventoryPages = from(() => import('@/features/erp/pages/InventoryPages'));
+const { CountNewPage, CountPage, CountsPage, InvDocPage, InventorySetupPage, LotPage, LotsPage, StockDocNewPage, TransferNewPage } = P_InventoryPages('CountNewPage', 'CountPage', 'CountsPage', 'InvDocPage', 'InventorySetupPage', 'LotPage', 'LotsPage', 'StockDocNewPage', 'TransferNewPage');
+const P_AdminPages = from(() => import('@/features/erp/pages/AdminPages'));
+const { AuthorizationsPage, UserFormPage, UsersPage } = P_AdminPages('AuthorizationsPage', 'UserFormPage', 'UsersPage');
+const P_AdminSetupPages = from(() => import('@/features/erp/pages/AdminSetupPages'));
+const { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage, NumberingPage } = P_AdminSetupPages('AiAssistantPage', 'ApprovalTemplatesPage', 'CompanyDetailsPage', 'ExchangeRatesPage', 'NumberingPage');
+const P_ReportPages = from(() => import('@/features/erp/pages/ReportPages'));
+const { ReportPage, ReportPrintPage, ReportsLibraryPage } = P_ReportPages('ReportPage', 'ReportPrintPage', 'ReportsLibraryPage');
+const P_ProductionPages = from(() => import('@/features/erp/pages/ProductionPages'));
+const { BomFormPage, BomPage, BomsPage, MouldPage, MouldsPage, ProdOrderNewPage, ProdOrderPage, ProdOrdersPage, ProductionSetupPage } = P_ProductionPages('BomFormPage', 'BomPage', 'BomsPage', 'MouldPage', 'MouldsPage', 'ProdOrderNewPage', 'ProdOrderPage', 'ProdOrdersPage', 'ProductionSetupPage');
+const P_GoLivePages = from(() => import('@/features/erp/pages/GoLivePages'));
+const { GoLiveChecklistPage, GoLiveOverviewPage, SystemHealthPage } = P_GoLivePages('GoLiveChecklistPage', 'GoLiveOverviewPage', 'SystemHealthPage');
+const P_ServicePages = from(() => import('@/features/erp/pages/ServicePages'));
+const { ContractFormPage, ContractPage, ContractsPage, EquipmentCardPage, EquipmentPage, ServiceCallFormPage, ServiceCallPage, ServiceCallsPage, ServiceSetupPage } = P_ServicePages('ContractFormPage', 'ContractPage', 'ContractsPage', 'EquipmentCardPage', 'EquipmentPage', 'ServiceCallFormPage', 'ServiceCallPage', 'ServiceCallsPage', 'ServiceSetupPage');
 
 // Paths from the first app shell, kept so old links and bookmarks still land somewhere sensible.
 const legacy: Array<[string, string]> = [
@@ -68,6 +94,7 @@ function ModuleRoute() {
 
 export default function App() {
   return (
+    <Suspense fallback={<PageLoading />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       {/* A4 · Print / PDF: a clean A4 page without the app shell */}
@@ -199,6 +226,10 @@ export default function App() {
         <Route path="admin/company" element={<CompanyDetailsPage />} />
         <Route path="admin/exchange-rates" element={<ExchangeRatesPage />} />
         <Route path="admin/ai-assistant" element={<AiAssistantPage />} />
+        {/* A14 · go-live checklist per company and system health */}
+        <Route path="admin/go-live" element={<GoLiveOverviewPage />} />
+        <Route path="admin/go-live/:company" element={<GoLiveChecklistPage />} />
+        <Route path="admin/health" element={<SystemHealthPage />} />
         <Route path="portal/payslip/:company/:run" element={<PayslipPage />} />
         {/* A11 · Reports */}
         <Route path="reports" element={<ReportsLibraryPage />} />
@@ -244,5 +275,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }

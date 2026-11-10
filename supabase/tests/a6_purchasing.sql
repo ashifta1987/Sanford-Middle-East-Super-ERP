@@ -375,7 +375,9 @@ BEGIN
   r := pg_temp.call(fin, $q$SELECT erp.landed_cost_code_save('ZZ99', '{"code":"demurrage","name":"Demurrage","split_method":"cbm"}')$q$);
   PERFORM pg_temp.check(r->>'code' = 'DEMURRAGE', 'finance (full) adds a landed cost code', r::text);
   PERFORM pg_temp.expect(pg_temp.call(purch, $q$SELECT erp.landed_cost_code_save('ZZ99', '{"code":"X","name":"X","split_method":"area"}')$q$),
-    'Choose how X is split: volume (CBM), quantity, value or weight.', 'unknown split method refused');
+    -- B3 (32_gl_setup.sql) adds the split method 'equal' (decisions C4), so the message lists five methods.
+    CASE WHEN to_regclass('erp.gl_determination_group') IS NOT NULL THEN 'Choose how X is split: quantity, weight, volume (CBM), value or equal.'
+         ELSE 'Choose how X is split: volume (CBM), quantity, value or weight.' END, 'unknown split method refused');
 
   -- ---------- Safety ----------
   r := pg_temp.call(purch, $q$WITH x AS (INSERT INTO erp.purchase_pi (company_code, po_doc_entry, card_code, vendor_pi_no, pi_date, status, created_by) VALUES ('ZZ99', 1, 'S0009', 'H', current_date, 'received', '00000000-0000-4000-8000-000000000010') RETURNING 1) SELECT to_jsonb(count(*)) FROM x$q$);

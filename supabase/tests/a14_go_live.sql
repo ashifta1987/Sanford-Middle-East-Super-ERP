@@ -252,7 +252,7 @@ BEGIN
   PERFORM pg_temp.expect(r, 'Only the system admin, IT and the owner can open Administration.', 'sales user cannot open system health');
   r := pg_temp.call(admin, 'SELECT erp.system_health()');
   PERFORM pg_temp.check(r->>'error' IS NULL AND r->>'server_time' IS NOT NULL AND r->'database'->>'version' IS NOT NULL, 'admin reads system health', left(r::text, 200));
-  PERFORM pg_temp.check((SELECT bool_and((f->>'present')::boolean) AND count(*) = CASE WHEN to_regclass('erp.apr_template') IS NOT NULL THEN 19 WHEN to_regclass('erp.sales_doc_request') IS NULL THEN 17 ELSE 18 END FROM jsonb_array_elements(r->'files') f), 'every SQL file 14–29 (14–30 with B1, 14–31 with B2) is present');
+  PERFORM pg_temp.check((SELECT bool_and((f->>'present')::boolean) AND count(*) = CASE WHEN to_regclass('erp.gl_determination_group') IS NOT NULL THEN 20 WHEN to_regclass('erp.apr_template') IS NOT NULL THEN 19 WHEN to_regclass('erp.sales_doc_request') IS NULL THEN 17 ELSE 18 END FROM jsonb_array_elements(r->'files') f), 'every SQL file 14–29 (14–30 with B1, 14–31 with B2, 14–32 with B3) is present');
   PERFORM pg_temp.check(EXISTS (SELECT 1 FROM jsonb_array_elements(r->'releases') x WHERE x->>'file' = '29_go_live.sql' AND x->>'applied_by' = 'QA test'),
                         'health lists the recorded release');
   PERFORM pg_temp.check((SELECT e->>'status' FROM jsonb_array_elements(r->'checks') e WHERE e->>'key' = 'tables_without_rls') = 'ok', 'every erp table has RLS on');

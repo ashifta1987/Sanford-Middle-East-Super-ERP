@@ -3462,7 +3462,32 @@
       "modeBasic": "Basic mode: no AI model answered in the last 30 days",
       "fallbacks_one": "{{count}} answer fell back to basic mode because the model didn’t answer.",
       "fallbacks_other": "{{count}} answers fell back to basic mode because the model didn’t answer.",
-      "never4": "Changes of any kind: Sana only reads."
+      "never4": "Changes of any kind: Sana only reads.",
+      "voiceMode": "Voice mode",
+      "vm": {
+        "browser": "Device voice (browser)",
+        "browserHint": "The browser listens and speaks. Free, but some devices have no voice for Malayalam or Urdu.",
+        "provider": "Gemini voice (through Southfield)",
+        "providerHint": "Recordings go to Gemini once to be transcribed; answers are read aloud by Gemini. Works for every listed language. Nothing is recorded or kept."
+      },
+      "voiceCalls": "Gemini voice calls",
+      "prov": {
+        "provider": "Provider",
+        "model": "Model",
+        "stt": "Speech to text",
+        "tts": "Text to speech",
+        "key": "Key configured",
+        "fallbackKey": "Fallback key (Anthropic)",
+        "gemini": "Google Gemini",
+        "anthropic": "Anthropic (fallback)",
+        "yes": "Yes",
+        "no": "No",
+        "modeAi": "AI model connected: Sana answers with the model.",
+        "modeBasic": "Basic mode: no key for the chosen provider, so Sana answers simple questions without a model.",
+        "body": "The provider, models and key are server settings that IT keeps as Supabase secrets. They are never stored in the database, never shown here and never reach the browser.",
+        "unavailable": "The server settings could not be read right now. Sana still works; try again later.",
+        "mock": "Local test mock — not AI"
+      }
     }
   },
   "rpt": {
@@ -5075,6 +5100,9 @@
         "stock": "How much is in stock?",
         "where": "Which warehouses have it?"
       }
-    }
+    },
+    "transcribing": "Transcribing…",
+    "listeningProvider": "Listening… tap the microphone again when you finish",
+    "voiceProviderNote": "Voice is transcribed and read aloud by Gemini through Southfield; recordings are not kept."
   }
 }

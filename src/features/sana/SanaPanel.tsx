@@ -8,7 +8,10 @@ import { useAuth } from '@/auth/AuthProvider';
 import { errorMessage } from '@/lib/format';
 import { SanaMark } from './SanaMark';
 import { sanaContextSuggestions, sanaSuggestions, useSana, useSanaHistory, type SanaContext, type SanaMessage } from './SanaProvider';
-import { SANA_LANGUAGES, languageLabel, speak, speechLocale, stopSpeaking, useSpeechInput, useVoicesReady } from './voice';
+import { SANA_LANGUAGES, languageLabel, speak, speechLocale, stopSpeaking as stopBrowserSpeaking, useSpeechInput, useVoicesReady } from './voice';
+import { speakProvider, stopProviderAudio, useProviderSpeechInput } from './providerVoice';
+
+const stopSpeaking = () => { stopBrowserSpeaking(); stopProviderAudio(); };
 
 const fmtWhen = (iso: string, lang: string) => new Date(iso).toLocaleString(lang === 'ar' ? 'ar-AE' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', numberingSystem: 'latn' });
 
@@ -148,7 +151,13 @@ export function SanaPanel() {
   const opener = useRef<HTMLElement | null>(null);
   useVoicesReady();
   const locale = speechLocale(s.language, i18n.language);
-  const mic = useSpeechInput((said) => { void send(said, 'voice'); });
+  // S2: voice mode 'provider' = record → sana-voice (Gemini) → text, and answers read by Gemini's TTS; 'browser' = Web Speech (S1).
+  const providerVoice = s.status?.voice_mode === 'provider';
+  const bmic = useSpeechInput((said) => { void send(said, 'voice'); });
+  const pmic = useProviderSpeechInput((said) => { void send(said, 'voice'); }, () => ({ language: s.language, company: s.status?.company ?? null }));
+  const mic = providerVoice
+    ? { supported: pmic.supported, listening: pmic.listening, interim: pmic.interim, error: pmic.error, errorText: pmic.errorText, transcribing: pmic.transcribing, start: (l: string) => { void pmic.start(l); }, stop: pmic.stop }
+    : { supported: bmic.supported, listening: bmic.listening, interim: bmic.interim, error: bmic.error, errorText: null as string | null, transcribing: false, start: bmic.start, stop: bmic.stop };
   const first = profile?.user?.display_name?.split(/\s+/)[0] ?? '';
   const voiceOn = s.status?.voice_enabled !== false;
   const off = s.status && !s.status.enabled;
@@ -164,6 +173,17 @@ export function SanaPanel() {
     setVoiceNote(null);
     if (speakingId === m.id) { stopSpeaking(); setSpeakingId(null); return; }
     const loc = m.language ? speechLocale(m.language, i18n.language) : locale;
+    if (providerVoice) {
+      stopSpeaking();
+      setSpeakingId(m.id);
+      speakProvider(m.text, m.language, s.status?.company ?? null, () => setSpeakingId((id) => (id === m.id ? null : id))).catch((e: Error) => {
+        setSpeakingId(null);
+        // the provider is not reachable: fall back to the device's voice when it has one for the language, else say why
+        const r = speak(m.text, loc, () => setSpeakingId(null));
+        if (r === 'ok') setSpeakingId(m.id); else setVoiceNote({ id: m.id, text: e.message });
+      });
+      return;
+    }
     const r = speak(m.text, loc, () => setSpeakingId(null));
     if (r === 'ok') setSpeakingId(m.id);
     else setVoiceNote({ id: m.id, text: r === 'no-voice' ? t('sana.noVoice', { language: languageLabel(m.language ?? loc) }) : t('sana.noSpeech') });
@@ -198,7 +218,7 @@ export function SanaPanel() {
 
   if (!s.open) return null;
   const suggestions = s.context ? sanaContextSuggestions(s.context) : sanaSuggestions(profile?.modules ?? []);
-  const micMsg = mic.error === 'not-allowed' ? t('sana.mic.denied') : mic.error === 'unsupported' ? t('sana.mic.unsupported') : mic.error === 'no-speech' ? t('sana.mic.noSpeech') : mic.error ? t('sana.mic.other') : null;
+  const micMsg = mic.errorText ? mic.errorText : mic.error === 'not-allowed' ? t('sana.mic.denied') : mic.error === 'unsupported' ? t('sana.mic.unsupported') : mic.error === 'no-speech' ? t('sana.mic.noSpeech') : mic.error ? t('sana.mic.other') : null;
   const left = s.status?.daily_limit != null && s.status.used != null ? Math.max(s.status.daily_limit - s.status.used, 0) : null;
 
   return (
@@ -284,10 +304,10 @@ export function SanaPanel() {
 
         {/* Composer */}
         <form onSubmit={onSubmit} className="border-t border-line bg-surface px-3 pb-3 pt-2">
-          {(mic.listening || mic.interim) && (
-            <p dir="auto" className="mb-2 flex items-center gap-2 rounded-btn bg-primary-soft px-3 py-2 text-[14px] text-primary-text" aria-live="assertive" data-testid="sana-listening">
+          {(mic.listening || mic.interim || mic.transcribing) && (
+            <p dir="auto" className="mb-2 flex items-center gap-2 rounded-btn bg-primary-soft px-3 py-2 text-[14px] text-primary-text" aria-live="assertive" data-testid={mic.transcribing ? 'sana-transcribing' : 'sana-listening'}>
               <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-brand-coral opacity-75 motion-safe:animate-ping" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-coral" /></span>
-              {mic.interim || t('sana.listening')}
+              <span className="min-w-0 flex-1">{mic.transcribing ? t('sana.transcribing') : mic.interim || (providerVoice ? t('sana.listeningProvider') : t('sana.listening'))}</span>
             </p>
           )}
           {micMsg && <p role="alert" className="mb-2 text-[13px] text-crit-fg" data-testid="sana-mic-msg">{micMsg}</p>}
@@ -298,7 +318,7 @@ export function SanaPanel() {
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(text); } }}
               placeholder={t('sana.placeholder')}
               className="max-h-32 min-h-[48px] flex-1 resize-none rounded-[14px] border border-line-strong bg-page px-4 py-3 text-[15px] text-ink outline-none placeholder:text-muted focus:border-primary" />
-            <button type="button" onClick={() => (mic.listening ? mic.stop() : (stopSpeaking(), mic.start(locale)))} disabled={s.busy || off || !voiceOn} data-testid="sana-mic"
+            <button type="button" onClick={() => (mic.listening ? mic.stop() : (stopSpeaking(), mic.start(locale)))} disabled={s.busy || off || !voiceOn || mic.transcribing} data-testid="sana-mic" data-voice-mode={providerVoice ? 'provider' : 'browser'}
               aria-pressed={mic.listening} aria-label={mic.listening ? t('sana.stopListening') : t('sana.speak')}
               title={!voiceOn ? t('sana.voiceOff') : mic.supported ? (mic.listening ? t('sana.stopListening') : t('sana.speak')) : t('sana.mic.unsupported')}
               className={clsx('grid h-12 w-12 shrink-0 place-items-center rounded-full border transition',
@@ -312,7 +332,7 @@ export function SanaPanel() {
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[11.5px] leading-snug text-muted">
             <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-brand-teal" aria-hidden />
-            <span>{t('sana.privacy')}{left != null && left <= 20 ? ` ${t('sana.left', { count: left })}` : ''}</span>
+            <span>{t('sana.privacy')}{providerVoice && voiceOn ? ` ${t('sana.voiceProviderNote')}` : ''}{left != null && left <= 20 ? ` ${t('sana.left', { count: left })}` : ''}</span>
           </p>
         </form>
       </aside>

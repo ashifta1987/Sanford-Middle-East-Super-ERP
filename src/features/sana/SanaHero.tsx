@@ -9,8 +9,9 @@ import { useCompany } from '@/layout/CompanyContext';
 import { erp } from '@/lib/supabase';
 import { ApiError } from '@/lib/format';
 import { PoweredBySana, SanaMark } from './SanaMark';
-import { sanaSuggestions, useSana } from './SanaProvider';
+import { sanaSuggestions, useSana, useSanaStatusQuery } from './SanaProvider';
 import { speechLocale, useSpeechInput } from './voice';
+import { useProviderSpeechInput } from './providerVoice';
 
 interface Alert { check: string; severity: string; company: string; subject: string; detail: string; amount: number | null }
 
@@ -26,7 +27,14 @@ export function SanaHero() {
   const { company } = useCompany();
   const sana = useSana();
   const [q, setQ] = useState('');
-  const mic = useSpeechInput((said) => sana.openAndAsk(said, 'voice'));
+  // S2: the company's voice mode decides who listens — the browser (Web Speech) or the provider (Gemini via sana-voice).
+  const status = useSanaStatusQuery(true);
+  const provider = status.data?.voice_mode === 'provider';
+  const bmic = useSpeechInput((said) => sana.openAndAsk(said, 'voice'));
+  const pmic = useProviderSpeechInput((said) => sana.openAndAsk(said, 'voice'), () => ({ language: sana.language, company: status.data?.company ?? null }));
+  const mic = provider
+    ? { supported: pmic.supported, listening: pmic.listening || pmic.transcribing, interim: pmic.transcribing ? t('sana.transcribing') : '', error: pmic.error, start: (l: string) => { void pmic.start(l); }, stop: pmic.stop }
+    : bmic;
   const first = profile?.user?.display_name?.split(/\s+/)[0];
   const alerts = useQuery({
     queryKey: ['sana-alerts', company],
@@ -63,7 +71,7 @@ export function SanaHero() {
             <input id="sana-home" dir="auto" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('sana.home.placeholder')}
               className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-[16px] text-[#012746] outline-none placeholder:text-[#5F6F86] focus-visible:outline-none" />
             <button type="button" onClick={() => (mic.listening ? mic.stop() : mic.start(speechLocale(sana.language, i18n.language)))}
-              aria-pressed={mic.listening} aria-label={mic.listening ? t('sana.stopListening') : t('sana.speak')} disabled={!mic.supported}
+              aria-pressed={mic.listening} aria-label={mic.listening ? t('sana.stopListening') : t('sana.speak')} disabled={!mic.supported} data-voice-mode={provider ? 'provider' : 'browser'}
               title={mic.supported ? t('sana.speak') : t('sana.mic.unsupported')}
               className={clsx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition disabled:opacity-40',
                 mic.listening ? 'border-brand-coral bg-brand-coral text-white' : 'border-[#CBD3E1] text-[#012746] hover:border-brand-blue hover:text-brand-blue')}>

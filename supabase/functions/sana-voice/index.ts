@@ -32,6 +32,6 @@ Deno.serve(async (req: Request) => {
   if (size > 2_200_000) return Response.json({ error: 'Keep voice questions under 60 seconds.' }, { status: 413, headers: cors });
   const body = await req.json().catch(() => null);
   const r = await handleVoice(req.headers.get('Authorization'), body, env());
-  if ('audio' in r) return new Response(r.audio, { status: r.status, headers: { ...cors, ...r.headers } });
+  if ('audio' in r) return new Response(r.audio.slice().buffer as ArrayBuffer, { status: r.status, headers: { ...cors, ...r.headers } });
   return Response.json(r.json, { status: r.status, headers: cors });
 });

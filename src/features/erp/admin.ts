@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { ApiError } from '@/lib/format';
 import { rpc } from './api';
 
@@ -65,10 +65,11 @@ export interface FxRow { company_code: string; rate_date: string; currency: stri
 /** U0+S1 · Add-Ons › AI Assistant (Sana): settings and usage counts (never question text). */
 export interface SanaSetup {
   company: string; can_edit: boolean; all_languages: string[];
-  settings: { enabled: boolean; voice_enabled: boolean; daily_limit: number; languages: string[]; saved: boolean; updated_at: string | null; updated_by: string | null };
+  settings: { enabled: boolean; voice_enabled: boolean; voice_mode?: 'browser' | 'provider'; daily_limit: number; languages: string[]; saved: boolean; updated_at: string | null; updated_by: string | null };
+  voice_modes?: Array<'browser' | 'provider'>;
   usage: {
-    days: Array<{ day: string; questions: number; refused: number; voice: number; ai: number; basic: number; users: number }>;
-    total_30_days: { questions: number; refused: number; voice: number; ai: number; basic: number; fallback: number; users: number };
+    days: Array<{ day: string; questions: number; refused: number; voice: number; ai: number; basic: number; voice_calls?: number; users: number }>;
+    total_30_days: { questions: number; refused: number; voice: number; ai: number; basic: number; fallback: number; voice_calls?: number; users: number };
     feedback: { up: number; down: number };
   };
 }
@@ -148,6 +149,28 @@ export const useSanaSetup = (company: string) => useQuery({
   queryKey: ['adm-sana', company], enabled: Boolean(company), queryFn: () => rpc<SanaSetup>('sana_setup', { p_company: company }),
 });
 export const sanaSave = (company: string, p: Record<string, unknown>) => rpc<{ enabled: boolean }>('sana_settings_save', { p_company: company, p });
+
+/** S2 · what the sana Edge Function runs on (admin-only; names and yes/no only — the function never returns a key). */
+export interface SanaProviderConfig {
+  provider: 'gemini' | 'anthropic'; model: string; key_configured: boolean; mode: 'ai' | 'basic';
+  voice: { provider: 'gemini'; stt_model: string; tts_model: string; tts_voice: string; key_configured: boolean };
+  fallback: { provider: 'anthropic'; key_configured: boolean };
+  local_mock?: boolean;
+}
+export const useSanaConfig = (company: string) => useQuery({
+  queryKey: ['adm-sana-config', company], enabled: Boolean(company), retry: false, staleTime: 60_000,
+  queryFn: async () => {
+    const { data } = await supabase.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/sana`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}`, apikey: (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ?? '', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'config', company }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((j as { error?: string }).error || `sana ${res.status}`);
+    return j as SanaProviderConfig;
+  },
+});
 
 /** Parse "date,currency,rate" CSV text (header optional; comma or semicolon). */
 export function parseRatesCsv(text: string) {

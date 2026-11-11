@@ -44,17 +44,24 @@ const ROUTES = [
   [/alert|problem|exception|risk|attention|control tower|മുന്നറിയിപ്പ്|تنبيه/i, { name: 'alerts' }],
   [/(inventory|stock) (summary|overview)|below minimum|low stock/i, { name: 'inventory_summary' }],
   [/purchase order|\bpo\b|أوامر الشراء|പർച്ചേസ് ഓർഡ/i, { name: 'list_documents', args: (q) => ({ kind: 'purchase_order', ...(/open|pending|തുറന്ന|مفتوح/i.test(q) ? { status: 'open' } : {}) }) }],
-  [/sales order|\borders?\b|أوامر البيع|ഓർഡർ|ഓർഡറ/i, { name: 'list_documents', args: (q) => ({ kind: 'sales_order', ...(/open|pending|തുറന്ന|مفتوح/i.test(q) ? { status: 'open' } : {}) }) }],
+  [/sales order|\borders?\b|commandes?|заказ|订单|ऑर्डर|آرڈر|أوامر البيع|ഓർഡർ|ഓർഡറ/i, { name: 'list_documents', args: (q) => ({ kind: 'sales_order', ...(/open|pending|തുറന്ന|مفتوح/i.test(q) ? { status: 'open' } : {}) }) }],
   [/invoice|فاتورة|ഇൻവോയ്/i, { name: 'list_documents', args: () => ({ kind: 'ar_invoice' }) }],
-  [/stock|inventory|available|on hand|സ്റ്റോക്ക്|مخزون|متوفر/i, { name: 'get_stock', args: (q) => ({ query: q.match(/\b[A-Z]{2,6}-[A-Z0-9-]{2,12}\b/i)?.[0] ?? q.replace(/[?؟.]/g, '').split(/\s+/).slice(-1)[0] }) }],
-  [/supplier|vendor|customer|client|partner|\b[CS]\d{4}\b|عميل|مورد|ഉപഭോക്താ/i, { name: 'get_partner', args: (q) => ({ query: q.match(/\b[CS]\d{4,6}\b/i)?.[0] ?? q }) }],
+  [/stock|inventory|available|on hand|स्टॉक|اسٹاک|库存|запас|остат|സ്റ്റോക്ക്|مخزون|متوفر/i, { name: 'get_stock', args: (q) => ({ query: q.match(/\b[A-Z]{2,6}-[A-Z0-9-]{2,12}\b/i)?.[0] ?? q.replace(/[?؟.]/g, '').split(/\s+/).slice(-1)[0] }) }],
+  [/supplier|vendor|customer|client|partner|\b[CS]\d{4}\b|عميل|مورد|ഉപഭോക്താ/i, { name: 'get_partner', args: (q) => ({ query: q.match(/\b[CS][0-9A-Z]{4,6}\b/)?.[0] ?? q }) }],
   [/purchas|buying|വാങ്ങൽ|مشتريات/i, { name: 'purchase_summary', args: () => ({ from: monthStart(), to: today() }) }],
   [/sales|revenue|sold|വിൽപ്പന|مبيعات/i, { name: 'sales_summary', args: () => ({ from: monthStart(), to: today() }) }],
 ];
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => today().slice(0, 8) + '01';
 
-function route(question, declared) {
+function route(question, declared, system = '') {
+  // page context ("Ask Sana about this"): the system prompt names the record; fetch it with the matching tool
+  const ctx = system.match(/The user opened Sana from this screen: (document|partner|item)(?: ([a-z_]+))?(?: ([A-Z0-9-]+))?/);
+  if (ctx && /\bthis\b|balance|in stock|هذا|ഇത്/i.test(question)) {
+    const [, type, a, b] = ctx;
+    const want = type === 'document' ? { name: 'get_document', args: { kind: a, number: b } } : type === 'partner' ? { name: 'get_partner', args: { query: a ?? b } } : { name: 'get_stock', args: { query: a ?? b } };
+    return declared.includes(want.name) ? { call: want } : { refuse: true };
+  }
   const docNo = question.match(/\b([A-Z]{1,5}-\d{2}-\d{3,8})\b/i)?.[1];
   if (docNo && declared.includes('get_document')) {
     const kind = /purchase/i.test(question) ? 'purchase_order' : /invoice/i.test(question) ? 'ar_invoice' : /delivery/i.test(question) ? 'delivery' : 'sales_order';
@@ -77,10 +84,11 @@ function facts(results) {
   const add = (k, v) => { if (out.length < 4) out.push(`${k.replace(/_/g, ' ')} ${typeof v === 'number' ? v.toLocaleString('en-US') : v}`); };
   for (const r of results) {
     if (!r || typeof r !== 'object') continue;
+    for (const k of ['code', 'number', 'name', 'manager', 'department', 'status']) if (typeof r[k] === 'string') add(k, r[k]);
     for (const [k, v] of Object.entries(r)) {
       if (typeof v === 'number') add(k, v);
       else if (Array.isArray(v) && v.length && typeof v[0] === 'object') {
-        const f = v[0]; const label = f.code ?? f.number ?? f.name ?? f.customer ?? f.bank;
+        const f = v[0]; const label = f.code ?? f.number ?? f.name ?? f.customer ?? f.bank ?? f.subject;
         if (label != null) add(k, `${v.length} (first: ${label})`);
       } else if (v && typeof v === 'object' && !Array.isArray(v)) {
         for (const [k2, v2] of Object.entries(v)) if (typeof v2 === 'number') add(`${k} ${k2}`, v2);
@@ -167,7 +175,9 @@ async function gemini(req, res, url) {
   const fnResp = last.parts.filter((p) => p.functionResponse).map((p) => p.functionResponse.response);
   const base = { provider: 'gemini', model, stream, system_chars: system.length, tools_chars: JSON.stringify(decls).length, tools: decls.length,
     contents: contents.length, contents_chars: JSON.stringify(contents.map((c) => c.parts.map((p) => (p.inlineData ? 0 : p)))).length,
-    function_response_chars: JSON.stringify(fnResp).length, est_prompt_tokens: promptTokens };
+    function_response_chars: JSON.stringify(fnResp).length, est_prompt_tokens: promptTokens,
+    est_system: estimateTokens(system), est_tools: estimateTokens(JSON.stringify(decls)), est_function_response: estimateTokens(JSON.stringify(fnResp)),
+    est_contents: estimateTokens(JSON.stringify(contents.map((c) => c.parts.map((p) => (p.inlineData ? { inlineData: '…' } : p))))) };
 
   // ---- text-to-speech ----
   if ((gc.responseModalities ?? []).map((x) => String(x).toUpperCase()).includes('AUDIO')) {
@@ -200,7 +210,7 @@ async function gemini(req, res, url) {
   else if (/\[\[mock:malformed\]\]/.test(question)) { parts = []; finish = 'MALFORMED_FUNCTION_CALL'; }
   else if (fnResp.length) parts = [{ text: finalText(system, fnResp, question) }];
   else {
-    const r = route(question, decls.map((d) => d.name));
+    const r = route(question, decls.map((d) => d.name), system);
     if (r.call) parts = [{ functionCall: { name: r.call.name, args: r.call.args }, thoughtSignature: `mock-sig-${crypto.randomBytes(6).toString('hex')}` }];
     else if (r.whoami) parts = [{ text: whoamiText(system) }];
     else parts = [{ text: refusalFrom(system) }];
@@ -260,14 +270,15 @@ async function anthropic(req, res) {
   if (/\[\[mock:safety\]\]/.test(qText)) { content = []; stop = 'refusal'; }
   else if (toolResults.length) content = [{ type: 'text', text: finalText(system, toolResults, qText) }];
   else {
-    const r = route(qText, (body.tools ?? []).map((t) => t.name));
+    const r = route(qText, (body.tools ?? []).map((t) => t.name), system);
     if (r.call) { content = [{ type: 'tool_use', id: `toolu_mock_${crypto.randomBytes(6).toString('hex')}`, name: r.call.name, input: r.call.args }]; stop = 'tool_use'; }
     else content = [{ type: 'text', text: r.whoami ? whoamiText(system) : refusalFrom(system) }];
   }
   const outTokens = estimateTokens(JSON.stringify(content));
   record({ provider: 'anthropic', model: body.model, stream: Boolean(body.stream), kind: 'text', system_chars: system.length, tools_chars: JSON.stringify(body.tools ?? []).length,
     tools: (body.tools ?? []).length, contents: msgs.length, contents_chars: JSON.stringify(msgs).length, function_response_chars: JSON.stringify(toolResults).length,
-    est_prompt_tokens: promptTokens, est_output_tokens: outTokens, function_call: content.find((b) => b.type === 'tool_use')?.name ?? null });
+    est_prompt_tokens: promptTokens, est_system: estimateTokens(system), est_tools: estimateTokens(JSON.stringify(body.tools ?? [])),
+    est_function_response: estimateTokens(JSON.stringify(toolResults)), est_contents: estimateTokens(JSON.stringify(msgs)), est_output_tokens: outTokens, function_call: content.find((b) => b.type === 'tool_use')?.name ?? null });
   const id = `msg_mock_${crypto.randomBytes(6).toString('hex')}`;
   if (!body.stream) return json(res, 200, { id, type: 'message', role: 'assistant', model: body.model, content, stop_reason: stop, stop_sequence: null, usage: { input_tokens: promptTokens, output_tokens: outTokens } });
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });

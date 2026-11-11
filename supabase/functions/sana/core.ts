@@ -258,6 +258,15 @@ export function systemPrompt(who: Who, company: string | null, lang: string, via
   ].filter(Boolean).join('\n');
 }
 
+/** Asked about a kind of partner the role never sees (suppliers without purchasing/finance, customers without sales/finance):
+ *  refused on the question, before any lookup or model call — in basic and in AI mode (S2). Returns the refusal topic. */
+export function partnerKindDenied(ql: string, who: Who): string | null {
+  const has = (...m: string[]) => m.some((x) => who.modules?.includes(x));
+  if (/supplier|vendor|مورد|fournisseur|поставщик|供应商|വിതരണക്കാര/.test(ql) && !has('purchase', 'finance', 'bp', 'business')) return 'purchasing';
+  if (/customer|client|عميل|عملاء|ഉപഭോക്താ/.test(ql) && !/supplier|വിതരണക്കാര/.test(ql) && !has('sales', 'finance', 'bp', 'business') && !/overdue|receivable|കുടിശ്ശിക/.test(ql)) return 'sales';
+  return null;
+}
+
 // ---------- Basic mode: works without an AI model (and in tests) ----------
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 3 });
@@ -331,10 +340,8 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
     const overdue = Number(r.d1_30) + Number(r.d31_60) + Number(r.d61_90) + Number(r.over_90);
     return { reply: ml ? `തുറന്ന കിട്ടാനുള്ള തുക ${fmt(r.open_total)} ${cur}; അതിൽ ${fmt(overdue)} കാലാവധി കഴിഞ്ഞു.${top ? ` ഏറ്റവും വലിയ കുടിശ്ശിക ${top.customer} (${fmt(top.overdue)}).` : ''}` : ar ? `إجمالي المستحقات المفتوحة ${fmt(r.open_total)} ${cur}، منها ${fmt(overdue)} متأخرة.` : `Open receivables are ${fmt(r.open_total)} ${cur}; ${fmt(overdue)} is overdue.${top ? ` The largest overdue customer is ${top.customer} (${fmt(top.overdue)}).` : ''}`, results: [r], used };
   }
-  const has = (...m: string[]) => m.some((x) => who.modules?.includes(x));
-  // Asked about a kind of partner the role never sees: refuse on the question (the data is never looked up).
-  if (/supplier|vendor|مورد|fournisseur|поставщик|供应商|വിതരണക്കാര/.test(ql) && !has('purchase', 'finance', 'bp', 'business')) return deny('purchasing');
-  if (/customer|client|عميل|عملاء|ഉപഭോക്താ/.test(ql) && !/supplier|വിതരണക്കാര/.test(ql) && !has('sales', 'finance', 'bp', 'business') && !/overdue|receivable|കുടിശ്ശിക/.test(ql)) return deny('sales');
+  const pk = partnerKindDenied(ql, who);
+  if (pk) return deny(pk);
   if (/(inventory|stock) (summary|overview|movements?)|below minimum|low stock|transfer requests?|സ്റ്റോക്ക് സംഗ്രഹം|മിനിമത്തിന് താഴെ/.test(ql)) {
     const r = await call('sana_inventory_summary', { p_company: company });
     if (isDenied(r)) return deny('inventory', r);
@@ -499,6 +506,8 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       out = { reply: refusalText('hr', lang), results: [{ denied: true }], used: [{ tool: 'guard', input: { rule: 'sensitive' } }] };
     } else if (INJECTION.test(question)) {
       out = { reply: refusalText('responsible', lang), results: [{ denied: true }], used: [{ tool: 'guard', input: { rule: 'injection' } }] };
+    } else if (model && partnerKindDenied(question.toLowerCase(), who)) {
+      out = { reply: refusalText(partnerKindDenied(question.toLowerCase(), who)!, lang), results: [{ denied: true }], used: [{ tool: 'guard', input: { rule: 'partner_kind' } }] };
     } else if (model) {
       const redactor = emit ? new StreamRedactor() : undefined;
       const ac = new AbortController();

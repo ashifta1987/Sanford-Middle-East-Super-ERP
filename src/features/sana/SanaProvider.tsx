@@ -23,7 +23,8 @@ export interface SanaMessage {
 }
 /** What the user is looking at when they press "Ask Sana about this". A hint only: the server still checks every record. */
 export interface SanaContext { type: 'document' | 'partner' | 'item' | 'report' | 'page'; company?: string; kind?: string; number?: string; code?: string; label?: string }
-export interface SanaStatus { profile: boolean; enabled: boolean; voice_enabled?: boolean; daily_limit?: number; used?: number; languages?: string[]; company?: string }
+/** voice_mode (S2): 'browser' = the device's own speech; 'provider' = Gemini speech through the sana-voice function. */
+export interface SanaStatus { profile: boolean; enabled: boolean; voice_enabled?: boolean; voice_mode?: 'browser' | 'provider'; daily_limit?: number; used?: number; voice_calls?: number; languages?: string[]; company?: string }
 export interface SanaConversation { conversation_id: string; title: string; company: string | null; started_at: string; last_at: string; messages: number }
 
 interface OpenOpts { context?: SanaContext | null; question?: string; via?: 'text' | 'voice' }
@@ -62,7 +63,7 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-interface AskReply { conversation_id: string; message_id: number | null; reply: string; sources: SanaSource[]; mode: 'ai' | 'basic'; fallback: boolean; denied: boolean; language: string }
+interface AskReply { conversation_id: string; message_id: number | null; reply: string; sources: SanaSource[]; mode: 'ai' | 'basic'; fallback: boolean; denied: boolean; language: string; provider?: string | null; model?: string | null }
 type OnEvent = (event: string, data: Record<string, unknown>) => void;
 
 /**
@@ -130,7 +131,7 @@ export function SanaProvider({ children }: { children: ReactNode }) {
   const conversation = useRef<string | null>(null);
   const pending = useRef<{ text: string; via: 'text' | 'voice' } | null>(null);
   const co = company === 'GRP' ? null : company;
-  const status = useQuery({ queryKey: ['sana-status', co], queryFn: () => rpc<SanaStatus>('sana_status', { p_company: co }), enabled: open, staleTime: 15_000 });
+  const status = useSanaStatusQuery(open);
 
   const setConv = (id: string | null) => { conversation.current = id; setConversationId(id); };
 
@@ -220,6 +221,13 @@ export function useSana() {
   const c = useContext(Ctx);
   if (!c) throw new Error('useSana must be used inside SanaProvider');
   return c;
+}
+
+/** Sana status for the selected company (shared cache: the panel, the home hero's microphone). */
+export function useSanaStatusQuery(enabled: boolean) {
+  const { company } = useCompany();
+  const co = company === 'GRP' ? null : company;
+  return useQuery({ queryKey: ['sana-status', co], queryFn: () => rpc<SanaStatus>('sana_status', { p_company: co }), enabled, staleTime: 15_000 });
 }
 
 /** My conversations (History view). */

@@ -13,7 +13,7 @@ import { Dialog } from '../components/Dialog';
 import { todayIso } from '../journal';
 import {
   adminSettingSave, sanaSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave,
-  uploadLogo, useSanaSetup, useCompanyInfo, useFxSetup, useTemplates,
+  uploadLogo, useSanaConfig, useSanaSetup, useCompanyInfo, useFxSetup, useTemplates,
   type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec,
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
@@ -463,12 +463,15 @@ export function ExchangeRatesPage() {
 
 // ---------- Add-Ons › AI Assistant (Sana) ----------
 // U0+S1: Sana replaced A11's "Ask AI". One screen: on/off, voice, daily limit, languages, and usage as counts only.
+// S2: voice mode per company (browser | provider) and a read-only card of what the sana function runs on (provider, models,
+// key configured yes/no — from the admin-only config action; there is no key and no field for one anywhere in this UI).
 export function AiAssistantPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const sc = useAdminCompany();
   const { company } = sc;
   const q = useSanaSetup(company);
+  const cfg = useSanaConfig(company);
   const [f, setF] = useState<Record<string, unknown>>({});
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -515,6 +518,18 @@ export function AiAssistantPage() {
                     onChange={(e) => setF({ ...f, daily_limit: e.target.value === '' ? '' : Number(e.target.value.replace(/\D/g, '')) })} />
                   <span className="mt-1 block font-normal">{t('adm.ai.dailyLimitHint')}</span>
                 </label>
+                <fieldset className="sm:col-span-2" data-testid="adm-ai-voice-mode">
+                  <legend className="text-xs font-medium text-muted">{t('adm.ai.voiceMode')}</legend>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {(['browser', 'provider'] as const).map((m) => (
+                      <label key={m} className={clsx('flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-btn border px-3 py-2.5 text-sm', v('voice_mode', 'browser') === m ? 'border-primary bg-primary-soft' : 'border-line')}>
+                        <input id={`adm-ai-voice-mode-${m}`} type="radio" name="adm-ai-voice-mode" className="mt-0.5 h-4 w-4" disabled={!canWrite} checked={v('voice_mode', 'browser') === m}
+                          onChange={() => setF({ ...f, voice_mode: m })} />
+                        <span><span className="block font-medium text-ink">{t(`adm.ai.vm.${m}`)}</span><span className="mt-0.5 block text-xs text-muted">{t(`adm.ai.vm.${m}Hint`)}</span></span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               </div>
             </SectionCard>
             <SectionCard title={t('adm.ai.languages', { n: langs.length })}>
@@ -553,16 +568,31 @@ export function AiAssistantPage() {
                 <dt className="text-muted">{t('adm.ai.col.questions')}</dt><dd className="num text-end text-lg font-semibold">{tot?.questions ?? 0}</dd>
                 <dt className="text-muted">{t('adm.ai.refusalRate')}</dt><dd className="num text-end">{pct(tot?.refused ?? 0, tot?.questions ?? 0)}</dd>
                 <dt className="text-muted">{t('adm.ai.voiceShare')}</dt><dd className="num text-end">{pct(tot?.voice ?? 0, tot?.questions ?? 0)}</dd>
+                <dt className="text-muted">{t('adm.ai.voiceCalls')}</dt><dd className="num text-end" data-testid="adm-ai-voice-calls">{tot?.voice_calls ?? 0}</dd>
                 <dt className="text-muted">{t('adm.ai.col.users')}</dt><dd className="num text-end">{tot?.users ?? 0}</dd>
                 <dt className="text-muted">{t('adm.ai.feedback')}</dt><dd className="num text-end" data-testid="adm-ai-feedback">👍 {q.data.usage.feedback.up} · 👎 {q.data.usage.feedback.down}</dd>
               </dl>
               <p className="border-t border-line px-5 py-3 text-xs text-muted">{t('adm.ai.usageBody')}</p>
             </SectionCard>
-            <SectionCard title={t('adm.ai.keyTitle')}>
-              <div className="space-y-2 p-5 text-sm text-ink-2" data-testid="adm-ai-key">
-                <p className="flex items-center gap-2 font-medium text-ink"><KeyRound className="h-4 w-4" aria-hidden />{(tot?.ai ?? 0) > 0 ? t('adm.ai.modeAi') : t('adm.ai.modeBasic')}</p>
-                <p>{t('adm.ai.keyBody', { name: 'ANTHROPIC_API_KEY' })}</p>
-                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set ANTHROPIC_API_KEY=… SANA_MODEL=…</code>
+            <SectionCard title={t('adm.ai.keyTitle')} right={cfg.data?.local_mock ? <span className="pill pill-warning" data-testid="adm-ai-mock">{t('adm.ai.prov.mock')}</span> : undefined}>
+              <div className="space-y-3 p-5 text-sm text-ink-2" data-testid="adm-ai-key">
+                {cfg.isLoading ? <SkeletonRows rows={4} /> : cfg.error ? (
+                  <p className="text-warn-fg" role="status" data-testid="adm-ai-prov-error">{t('adm.ai.prov.unavailable')}</p>
+                ) : cfg.data && (
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2" data-testid="adm-ai-provider">
+                    <dt className="text-muted">{t('adm.ai.prov.provider')}</dt><dd className="text-end font-medium text-ink" data-testid="adm-ai-prov-name">{t(`adm.ai.prov.${cfg.data.provider}`)}</dd>
+                    <dt className="text-muted">{t('adm.ai.prov.model')}</dt><dd className="truncate text-end font-mono text-[12.5px]" dir="ltr" data-testid="adm-ai-prov-model">{cfg.data.model}</dd>
+                    <dt className="text-muted">{t('adm.ai.prov.stt')}</dt><dd className="truncate text-end font-mono text-[12.5px]" dir="ltr" data-testid="adm-ai-prov-stt">{cfg.data.voice.stt_model}</dd>
+                    <dt className="text-muted">{t('adm.ai.prov.tts')}</dt><dd className="truncate text-end font-mono text-[12.5px]" dir="ltr" data-testid="adm-ai-prov-tts">{cfg.data.voice.tts_model} · {cfg.data.voice.tts_voice}</dd>
+                    <dt className="text-muted">{t('adm.ai.prov.key')}</dt>
+                    <dd className="text-end"><span className={clsx('pill', cfg.data.key_configured ? 'pill-ok' : 'pill-neutral')} data-testid="adm-ai-prov-key">{cfg.data.key_configured ? t('adm.ai.prov.yes') : t('adm.ai.prov.no')}</span></dd>
+                    <dt className="text-muted">{t('adm.ai.prov.fallbackKey')}</dt>
+                    <dd className="text-end"><span className={clsx('pill', cfg.data.fallback.key_configured ? 'pill-ok' : 'pill-neutral')}>{cfg.data.fallback.key_configured ? t('adm.ai.prov.yes') : t('adm.ai.prov.no')}</span></dd>
+                  </dl>
+                )}
+                <p className="flex items-center gap-2 font-medium text-ink"><KeyRound className="h-4 w-4" aria-hidden />{cfg.data ? (cfg.data.mode === 'ai' ? t('adm.ai.prov.modeAi') : t('adm.ai.prov.modeBasic')) : (tot?.ai ?? 0) > 0 ? t('adm.ai.modeAi') : t('adm.ai.modeBasic')}</p>
+                <p>{t('adm.ai.prov.body')}</p>
+                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-2.5-flash</code>
                 {(tot?.fallback ?? 0) > 0 && <p className="text-warn-fg">{t('adm.ai.fallbacks', { count: tot?.fallback ?? 0 })}</p>}
               </div>
             </SectionCard>

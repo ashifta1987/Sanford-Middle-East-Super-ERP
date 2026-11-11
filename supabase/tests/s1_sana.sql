@@ -124,7 +124,9 @@ BEGIN
   PERFORM pg_temp.expect(pg_temp.call(pg_temp.u(23), 'SELECT erp.sana_settings_save(''ZZ99'', ''{"enabled": false}'')'),
                          'Only a system admin with full Administration access can change this.', 'save: IT (read-only) refused');
   PERFORM pg_temp.expect(pg_temp.call(pg_temp.u(1), 'SELECT erp.sana_settings_save(''ZZ99'', ''{"anthropic_api_key": "sk-x"}'')'),
-                         'API keys are never stored in the database. IT sets the Supabase secret ANTHROPIC_API_KEY; only the sana server function reads it.', 'save: keys refused');
+                         CASE WHEN EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '37_sana_gemini.sql')
+                           THEN 'API keys are never stored in the database. IT sets the Supabase secret GEMINI_API_KEY; only the Sana server functions read it.'
+                           ELSE 'API keys are never stored in the database. IT sets the Supabase secret ANTHROPIC_API_KEY; only the sana server function reads it.' END, 'save: keys refused');
   PERFORM pg_temp.expect(pg_temp.call(pg_temp.u(1), 'SELECT erp.sana_settings_save(''ZZ99'', ''{"model": "x"}'')'), 'Unknown Sana setting model.', 'save: unknown setting refused');
   PERFORM pg_temp.expect(pg_temp.call(pg_temp.u(1), 'SELECT erp.sana_settings_save(''ZZ99'', ''{"daily_limit": 6000}'')'),
                          'Enter a daily limit from 0 to 5,000 questions per person.', 'save: daily limit range');
@@ -172,8 +174,9 @@ BEGIN
   PERFORM pg_temp.check((SELECT NOT enabled FROM erp.sana_settings WHERE company_code = 'ZZ99'), 'migration: re-running never overwrites Sana''s own setting');
 
   -- ---------- health, grants, IT rule ----------
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = 24 AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '36_sana.sql' AND object = 'sana_settings_save'),
-                        'system health lists 36_sana.sql (24 files)');
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regprocedure('erp.sana_voice_use(varchar,text,text,numeric,text,text,boolean)') IS NOT NULL THEN 25 ELSE 24 END
+                          AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '36_sana.sql' AND object = 'sana_settings_save'),
+                        'system health lists 36_sana.sql (24 files, 25 with S2)');
   r := pg_temp.call(pg_temp.u(1), 'SELECT erp.system_health()');
   PERFORM pg_temp.check(EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'files') f WHERE f ->> 'file' = '36_sana.sql' OR f ->> 'file_name' = '36_sana.sql'),
                         'system health shows the file', left((r -> 'files')::text, 200));

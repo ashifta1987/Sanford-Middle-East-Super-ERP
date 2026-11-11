@@ -12,13 +12,14 @@ import { Fields, SectionCard, fmtDay, fmtMoney } from '../components/ui';
 import { Dialog } from '../components/Dialog';
 import { todayIso } from '../journal';
 import {
-  adminSettingSave, aiSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave,
-  uploadLogo, useAiSetup, useCompanyInfo, useFxSetup, useTemplates,
+  adminSettingSave, sanaSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave,
+  uploadLogo, useSanaSetup, useCompanyInfo, useFxSetup, useTemplates,
   type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec,
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
 import { ApprovalStageNote } from '../components/ApprovalStageNote';
 import { SystemCurrencyCard } from './ConversionPages';
+import { SANA_LANGUAGES } from '@/features/sana/voice';
 
 const OBJ_LABEL: Record<number, string> = {
   17: 'Sales Order', 22: 'Purchase Order', 46: 'Outgoing Payment', 30: 'Journal Entry', 59: 'Goods Receipt', 60: 'Goods Issue',
@@ -460,35 +461,35 @@ export function ExchangeRatesPage() {
   );
 }
 
-// ---------- Add-Ons › AI Assistant ----------
+// ---------- Add-Ons › AI Assistant (Sana) ----------
+// U0+S1: Sana replaced A11's "Ask AI". One screen: on/off, voice, daily limit, languages, and usage as counts only.
 export function AiAssistantPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const sc = useAdminCompany();
   const { company } = sc;
-  const q = useAiSetup(company);
+  const q = useSanaSetup(company);
   const [f, setF] = useState<Record<string, unknown>>({});
-  const [filter, setFilter] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const s = q.data?.setting;
-  const canWrite = Boolean(q.data?.can_write);
+  const s = q.data?.settings;
+  const canWrite = Boolean(q.data?.can_edit);
   const v = <T,>(k: string, d: T): T => (k in f ? f[k] : (s as unknown as Record<string, unknown> | undefined)?.[k] ?? d) as T;
-  const mods = v<string[]>('allowed_modules', []);
-  const tabs = v<string[]>('allowed_tables', []);
-  const toggle = (k: 'allowed_modules' | 'allowed_tables', x: string, on: boolean) => setF({ ...f, [k]: on ? [...v<string[]>(k, []), x] : v<string[]>(k, []).filter((y) => y !== x) });
-  const limit = v<number | null>('monthly_limit', null);
+  const langs = v<string[]>('languages', []);
+  const tot = q.data?.usage.total_30_days;
+  const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)} %` : '—');
 
   async function save() {
     setErr(null); setFlash(null); setBusy(true);
     try {
       const body = { ...f };
-      if ('monthly_limit' in body) body.monthly_limit = body.monthly_limit === '' ? null : body.monthly_limit;
-      const r = await aiSave(company, body);
+      if ('daily_limit' in body) body.daily_limit = body.daily_limit === '' ? null : body.daily_limit;
+      const r = await sanaSave(company, body);
       setFlash(r.enabled ? t('adm.ai.savedOn') : t('adm.ai.savedOff'));
       setF({});
-      await qc.invalidateQueries({ queryKey: ['adm-ai', company] });
+      await qc.invalidateQueries({ queryKey: ['adm-sana', company] });
+      await qc.invalidateQueries({ queryKey: ['sana-status'] });
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
 
@@ -501,66 +502,72 @@ export function AiAssistantPage() {
       {q.isLoading ? <div className="card"><SkeletonRows rows={8} /></div> : q.error ? <div className="card"><ErrorState error={q.error} onRetry={() => q.refetch()} /></div> : q.data && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-5">
-            <SectionCard title={t('adm.ai.general')} right={<span className={clsx('pill', v('enabled', false) ? 'pill-ok' : 'pill-neutral')} data-testid="adm-ai-state">{v('enabled', false) ? t('adm.ai.on') : t('adm.ai.off')}</span>}>
+            <SectionCard title={t('adm.ai.general')} right={<span className={clsx('pill', v('enabled', true) ? 'pill-ok' : 'pill-neutral')} data-testid="adm-ai-state">{v('enabled', true) ? t('adm.ai.on') : t('adm.ai.off')}</span>}>
               <div className="grid gap-4 p-5 sm:grid-cols-2">
                 <label className="inline-flex min-h-[44px] items-center gap-2 text-sm sm:col-span-2">
-                  <input id="adm-ai-enabled" type="checkbox" className="h-4 w-4" disabled={!canWrite} checked={v('enabled', false)} onChange={(e) => setF({ ...f, enabled: e.target.checked })} />{t('adm.ai.enabledLabel', { company })}
+                  <input id="adm-ai-enabled" type="checkbox" className="h-4 w-4" disabled={!canWrite} checked={v('enabled', true)} onChange={(e) => setF({ ...f, enabled: e.target.checked })} />{t('adm.ai.enabledLabel', { company })}
                 </label>
-                <label className="block text-xs font-medium text-muted">{t('adm.ai.chat')}
-                  <select id="adm-ai-chat" className="input mt-1 text-[15px] text-ink" disabled={!canWrite} value={v<string | null>('chat_provider', null) ?? ''} onChange={(e) => setF({ ...f, chat_provider: e.target.value })}>
-                    <option value="">{t('adm.ai.notChosen')}</option>{q.data.chat_providers.map((p) => <option key={p} value={p}>{t(`adm.ai.prov.${p}`)}</option>)}
-                  </select>
+                <label className="inline-flex min-h-[44px] items-center gap-2 text-sm">
+                  <input id="adm-ai-voice" type="checkbox" className="h-4 w-4" disabled={!canWrite} checked={v('voice_enabled', true)} onChange={(e) => setF({ ...f, voice_enabled: e.target.checked })} />{t('adm.ai.voiceLabel')}
                 </label>
-                <label className="block text-xs font-medium text-muted">{t('adm.ai.model')}
-                  <input id="adm-ai-model" dir="ltr" className="input mt-1 font-mono text-[15px] text-ink" disabled={!canWrite} value={v<string | null>('chat_model', null) ?? ''} onChange={(e) => setF({ ...f, chat_model: e.target.value })} placeholder="gemini-2.5-flash" />
-                </label>
-                <label className="block text-xs font-medium text-muted">{t('adm.ai.voice')}
-                  <select id="adm-ai-voice" className="input mt-1 text-[15px] text-ink" disabled={!canWrite} value={v<string | null>('voice_provider', null) ?? ''} onChange={(e) => setF({ ...f, voice_provider: e.target.value })}>
-                    <option value="">{t('adm.ai.notChosen')}</option>{q.data.voice_providers.map((p) => <option key={p} value={p}>{t(`adm.ai.prov.${p}`)}</option>)}
-                  </select>
-                </label>
-                <label className="block text-xs font-medium text-muted">{t('adm.ai.limit')}
-                  <input id="adm-ai-limit" inputMode="numeric" className="input num mt-1 text-[15px] text-ink" disabled={!canWrite} value={limit === null ? '' : String(limit)} onChange={(e) => setF({ ...f, monthly_limit: e.target.value === '' ? '' : Number(e.target.value.replace(/\D/g, '')) })} />
+                <label className="block text-xs font-medium text-muted">{t('adm.ai.dailyLimit')}
+                  <input id="adm-ai-limit" inputMode="numeric" className="input num mt-1 text-[15px] text-ink" disabled={!canWrite} value={String(v<number | string>('daily_limit', 200))}
+                    onChange={(e) => setF({ ...f, daily_limit: e.target.value === '' ? '' : Number(e.target.value.replace(/\D/g, '')) })} />
+                  <span className="mt-1 block font-normal">{t('adm.ai.dailyLimitHint')}</span>
                 </label>
               </div>
             </SectionCard>
-            <SectionCard title={t('adm.ai.modules')}>
-              <div className="flex flex-wrap gap-2 p-5">
-                {q.data.modules.map((m) => (
-                  <label key={m} className="inline-flex min-h-[40px] items-center gap-2 rounded-btn border border-line px-3 text-sm">
-                    <input type="checkbox" className="h-4 w-4" data-module={m} disabled={!canWrite} checked={mods.includes(m)} onChange={(e) => toggle('allowed_modules', m, e.target.checked)} />{t(`adm.mod.${m}`)}
+            <SectionCard title={t('adm.ai.languages', { n: langs.length })}>
+              <div className="flex flex-wrap gap-2 p-5" data-testid="adm-ai-langs">
+                {q.data.all_languages.map((l) => (
+                  <label key={l} className="inline-flex min-h-[40px] items-center gap-2 rounded-btn border border-line px-3 text-sm">
+                    <input type="checkbox" className="h-4 w-4" data-lang={l} disabled={!canWrite} checked={langs.includes(l)}
+                      onChange={(e) => setF({ ...f, languages: e.target.checked ? [...langs, l] : langs.filter((x) => x !== l) })} />
+                    <span dir="auto">{SANA_LANGUAGES.find((x) => x.code === l)?.label ?? l}</span>
                   </label>
                 ))}
               </div>
             </SectionCard>
-            <SectionCard title={t('adm.ai.tables', { n: tabs.length })} right={<input aria-label={t('adm.ai.filter')} className="input min-h-[40px] w-44 text-sm" placeholder={t('adm.ai.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />}>
-              <p className="px-5 pt-4 text-sm text-ink-2">{t('adm.ai.tablesBody')}</p>
-              <div className="grid max-h-80 gap-1 overflow-y-auto p-5 sm:grid-cols-2 lg:grid-cols-3" data-testid="adm-ai-tables">
-                {q.data.tables.filter((x) => x.includes(filter.toLowerCase())).map((x) => (
-                  <label key={x} className="inline-flex min-h-[36px] items-center gap-2 font-mono text-[13px]">
-                    <input type="checkbox" className="h-4 w-4" data-table={x} disabled={!canWrite} checked={tabs.includes(x)} onChange={(e) => toggle('allowed_tables', x, e.target.checked)} />{x}
-                  </label>
-                ))}
-              </div>
+            <SectionCard title={t('adm.ai.days')}>
+              {q.data.usage.days.length === 0 ? <EmptyState title={t('adm.ai.noUsage')} body={t('adm.ai.noUsageBody')} /> : (
+                <div className="relative overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-[14px]" data-testid="adm-ai-days">
+                    <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                      <th className="px-4 py-2.5 text-start">{t('adm.ai.col.day')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.questions')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.refused')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.voice')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.users')}</th>
+                    </tr></thead>
+                    <tbody className="[&>tr]:border-t [&>tr]:border-line [&_td]:px-4 [&_td]:py-2.5">
+                      {q.data.usage.days.slice(0, 14).map((d) => (
+                        <tr key={d.day}><td>{fmtDay(d.day)}</td><td className="num text-end">{d.questions}</td><td className="num text-end">{d.refused}</td><td className="num text-end">{d.voice}</td><td className="num text-end">{d.users}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </SectionCard>
             {canWrite && <div className="flex justify-end"><Button variant="primary" id="adm-ai-save" disabled={busy || Object.keys(f).length === 0} onClick={save} icon={<Save className="h-4 w-4" aria-hidden />}>{t('adm.save')}</Button></div>}
           </div>
           <aside className="space-y-5">
+            <SectionCard title={t('adm.ai.usage')}>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-5 text-sm" data-testid="adm-ai-usage">
+                <dt className="text-muted">{t('adm.ai.col.questions')}</dt><dd className="num text-end text-lg font-semibold">{tot?.questions ?? 0}</dd>
+                <dt className="text-muted">{t('adm.ai.refusalRate')}</dt><dd className="num text-end">{pct(tot?.refused ?? 0, tot?.questions ?? 0)}</dd>
+                <dt className="text-muted">{t('adm.ai.voiceShare')}</dt><dd className="num text-end">{pct(tot?.voice ?? 0, tot?.questions ?? 0)}</dd>
+                <dt className="text-muted">{t('adm.ai.col.users')}</dt><dd className="num text-end">{tot?.users ?? 0}</dd>
+                <dt className="text-muted">{t('adm.ai.feedback')}</dt><dd className="num text-end" data-testid="adm-ai-feedback">👍 {q.data.usage.feedback.up} · 👎 {q.data.usage.feedback.down}</dd>
+              </dl>
+              <p className="border-t border-line px-5 py-3 text-xs text-muted">{t('adm.ai.usageBody')}</p>
+            </SectionCard>
             <SectionCard title={t('adm.ai.keyTitle')}>
               <div className="space-y-2 p-5 text-sm text-ink-2" data-testid="adm-ai-key">
-                <p className="flex items-center gap-2 font-medium text-ink"><KeyRound className="h-4 w-4" aria-hidden />{t('adm.ai.keyHead')}</p>
-                <p>{t('adm.ai.keyBody', { name: q.data.key_secret_name })}</p>
-                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set {q.data.key_secret_name}=…</code>
+                <p className="flex items-center gap-2 font-medium text-ink"><KeyRound className="h-4 w-4" aria-hidden />{(tot?.ai ?? 0) > 0 ? t('adm.ai.modeAi') : t('adm.ai.modeBasic')}</p>
+                <p>{t('adm.ai.keyBody', { name: 'ANTHROPIC_API_KEY' })}</p>
+                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set ANTHROPIC_API_KEY=… SANA_MODEL=…</code>
+                {(tot?.fallback ?? 0) > 0 && <p className="text-warn-fg">{t('adm.ai.fallbacks', { count: tot?.fallback ?? 0 })}</p>}
               </div>
             </SectionCard>
-            <SectionCard title={t('adm.ai.usage')}>
-              <div className="p-5 text-sm">
-                <div className="num text-2xl font-semibold" data-testid="adm-ai-usage">{q.data.usage?.requests ?? 0}{limit ? ` / ${limit}` : ''}</div>
-                <p className="text-muted">{t('adm.ai.usageBody')}</p>
-              </div>
-            </SectionCard>
-            <SectionCard title={t('adm.ai.neverTitle')}><ul className="list-disc space-y-2 p-5 ps-9 text-sm text-ink-2"><li>{t('adm.ai.never1')}</li><li>{t('adm.ai.never2')}</li><li>{t('adm.ai.never3')}</li></ul></SectionCard>
-            <AuditCard objects={['ai_setting']} />
+            <SectionCard title={t('adm.ai.neverTitle')}><ul className="list-disc space-y-2 p-5 ps-9 text-sm text-ink-2"><li>{t('adm.ai.never1')}</li><li>{t('adm.ai.never2')}</li><li>{t('adm.ai.never3')}</li><li>{t('adm.ai.never4')}</li></ul></SectionCard>
+            <AuditCard objects={['sana_settings', 'ai_setting']} />
           </aside>
         </div>
       )}

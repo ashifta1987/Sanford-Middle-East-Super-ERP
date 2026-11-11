@@ -62,11 +62,15 @@ export interface CompanyInfo {
 }
 export interface FxSetup { currency: string; currencies: string[]; can_write: boolean }
 export interface FxRow { company_code: string; rate_date: string; currency: string; rate: number; source: 'sap' | 'manual' | 'import'; entered_by_name: string | null; entered_at: string | null }
-export interface AiSetup {
-  can_write: boolean;
-  setting: { enabled: boolean; chat_provider: string | null; chat_model: string | null; voice_provider: string | null; allowed_modules: string[]; allowed_tables: string[]; monthly_limit: number | null; updated_at: string | null; updated_by_name: string | null };
-  chat_providers: string[]; voice_providers: string[]; modules: string[]; tables: string[];
-  usage: { month: string; requests: number; tokens: number } | null; key_secret_name: string;
+/** U0+S1 · Add-Ons › AI Assistant (Sana): settings and usage counts (never question text). */
+export interface SanaSetup {
+  company: string; can_edit: boolean; all_languages: string[];
+  settings: { enabled: boolean; voice_enabled: boolean; daily_limit: number; languages: string[]; saved: boolean; updated_at: string | null; updated_by: string | null };
+  usage: {
+    days: Array<{ day: string; questions: number; refused: number; voice: number; ai: number; basic: number; users: number }>;
+    total_30_days: { questions: number; refused: number; voice: number; ai: number; basic: number; fallback: number; users: number };
+    feedback: { up: number; down: number };
+  };
 }
 export interface AuditRow { at: string; actor_name: string; company_code: string | null; action: string; object: string; object_ref: string | null; detail: Record<string, unknown> | null }
 
@@ -140,10 +144,10 @@ export const fxSave = (company: string, date: string, currency: string, rate: nu
 export const fxImport = (company: string, rows: Array<{ date: string; currency: string; rate: string }>) =>
   rpc<{ saved: number; errors: Array<{ row: number; message: string }> }>('fx_rate_import', { p_company: company, p_rows: rows });
 
-export const useAiSetup = (company: string) => useQuery({
-  queryKey: ['adm-ai', company], enabled: Boolean(company), queryFn: () => rpc<AiSetup>('ai_setup', { p_company: company }),
+export const useSanaSetup = (company: string) => useQuery({
+  queryKey: ['adm-sana', company], enabled: Boolean(company), queryFn: () => rpc<SanaSetup>('sana_setup', { p_company: company }),
 });
-export const aiSave = (company: string, p: Record<string, unknown>) => rpc<{ enabled: boolean }>('ai_setting_save', { p_company: company, p });
+export const sanaSave = (company: string, p: Record<string, unknown>) => rpc<{ enabled: boolean }>('sana_settings_save', { p_company: company, p });
 
 /** Parse "date,currency,rate" CSV text (header optional; comma or semicolon). */
 export function parseRatesCsv(text: string) {

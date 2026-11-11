@@ -20,7 +20,7 @@ import { DOC_KINDS, moduleByKey, type DocKind } from '../modules';
 import type { WorkflowState } from '../salesOrder';
 import { FormError, Flash, fmtWhen, useDefaultCompany, useFlash } from './BankingPages';
 import { SourcePill, StatePill, sourceLabel, today } from './SalesOrderPages';
-import { AskAiDocCard } from '../components/AskAi';
+import { AskSanaAbout } from '@/features/sana/SanaPanel';
 import {
   PURCHASE_OBJ, VIEW_OBJ, apInvoiceCreate, depositCreate, grpoCreate, grpoLines, lcCodeSave, lcCreate, lcPreview, piSave, puCancel, puChecks, puCompare,
   puCopySource, puDecide, puListSave, puSave, puSettingSet, puSubmit, purchaseKindOfObj, qcSave, searchBuyItems, searchSuppliers, shipmentSave,
@@ -593,7 +593,7 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
         <aside className="min-w-0 space-y-5">
           {wf && <ApprovalPanel company={company} id={id} info={I!} kind={kind} docNo={docNo} onDone={refresh} />}
           {wf && <ActivityCard items={I!.activity ?? []} />}
-          <AskAiDocCard company={company} obj={obj} entry={id} title={t('ai.docTitle')} label={docNo} />
+          <AskSanaAbout variant="card" context={{ type: 'document', company, kind, number: docNo }} />
         </aside>
       </div>
     </RequireModule>

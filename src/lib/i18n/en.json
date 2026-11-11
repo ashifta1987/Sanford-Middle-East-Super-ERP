@@ -45,12 +45,9 @@
     "companiesSummary": "{{count}} companies",
     "parent": "Parent company",
     "signOut": "Sign out",
-    "askSoon": "AI assistant — planned (Add-Ons › AI Assistant)",
     "light": "Light mode",
     "dark": "Dark mode",
-    "companiesSummary_one": "{{count}} company",
-    "askAi": "Ask AI",
-    "askTitle": "Ask AI about your data"
+    "companiesSummary_one": "{{count}} company"
   },
   "tabs": {
     "requests": "Requests",
@@ -1138,8 +1135,6 @@
       "credit_memo_amount": "Credit memo above the limit",
       "incoming_payment": "Incoming payment approval"
     },
-    "askAi": "Ask AI about this order",
-    "askAiBody": "Comes with Add-Ons › AI Assistant. It will compare this order with the customer’s history.",
     "cantEdit": "This order can’t be edited",
     "cantEditPending": "It is waiting for approval. Ask the approver to reject it first.",
     "cantEditBody": "Only the person who created a draft or rejected order can change it, and only with full Sales access.",
@@ -1447,8 +1442,6 @@
   "sq": {
     "titleNew": "New sales quotation",
     "titleNo": "Sales quotation {{no}}",
-    "askAi": "Ask AI about this quotation",
-    "askAiBody": "Comes with Add-Ons › AI Assistant. It will compare this quotation with the customer’s history.",
     "cantEdit": "This quotation can’t be edited",
     "cantEditBody": "Only the person who created a draft or rejected quotation can change it, and only with full Sales access.",
     "viewOrder": "View the quotation",
@@ -3430,88 +3423,51 @@
       "rule3": "The currencies listed are set in Company Details."
     },
     "ai": {
-      "title": "AI Assistant",
+      "title": "AI Assistant (Sana)",
       "addons": "Add-Ons",
-      "desc": "Provider for chat and voice, what the assistant may read, the monthly limit, and on/off per company.",
-      "general": "Assistant",
+      "desc": "Sana on/off per company, voice, the daily question limit and the languages people may use. Usage is shown as counts only.",
+      "general": "Sana",
       "on": "On",
       "off": "Off",
-      "enabledLabel": "Switch the assistant on for {{company}}",
-      "chat": "Chat provider",
-      "voice": "Voice provider",
-      "model": "Chat model",
-      "limit": "Monthly limit (requests)",
-      "notChosen": "Not chosen",
-      "prov": {
-        "google": "Google Gemini",
-        "openai": "OpenAI",
-        "anthropic": "Anthropic",
-        "azure_openai": "Azure OpenAI",
-        "elevenlabs": "ElevenLabs",
-        "azure": "Azure Speech"
-      },
-      "modules": "Modules it may answer about",
-      "tables": "Tables it may read ({{n}} chosen)",
-      "filter": "Filter tables",
-      "tablesBody": "The assistant reads with the asking user’s own access, so it never sees more than they do. SAP raw tables and salary data are never listed.",
-      "savedOn": "Saved. The assistant is on.",
-      "savedOff": "Saved. The assistant is off.",
-      "keyTitle": "Provider key",
-      "keyHead": "Stored only as a Supabase secret",
-      "keyBody": "The provider’s API key is never saved in the database and never reaches the browser. IT adds it once as the secret {{name}}; only the AI Assistant server function reads it.",
-      "usage": "This month",
-      "usageBody": "Requests used this month. The assistant stops when the limit is reached.",
-      "neverTitle": "Never available to the assistant",
+      "enabledLabel": "Sana is on for {{company}}",
+      "savedOn": "Saved. Sana is on.",
+      "savedOff": "Saved. Sana is off.",
+      "keyTitle": "AI model",
+      "keyBody": "The provider’s API key is never saved in the database and never reaches the browser. IT adds it once as the Supabase secret {{name}}; only the sana server function reads it. Without it Sana works in basic mode.",
+      "usage": "Last 30 days",
+      "usageBody": "Counts only. Nobody — not even admins — sees anyone’s questions or answers.",
+      "neverTitle": "Never available through Sana",
       "never1": "The raw SAP copy (schema sap).",
-      "never2": "Salaries, payroll and bank details of staff.",
-      "never3": "Users, access rights and the audit log."
-    }
-  },
-  "ai": {
-    "title": "Ask AI",
-    "close": "Close Ask AI",
-    "forCompany": "Company {{company}}",
-    "pickCompany": "Choose one company in the top bar first. The assistant answers for one company at a time.",
-    "notConfigured": "AI not configured",
-    "notConfiguredBody": "The AI Assistant is off for {{company}}, or no AI provider is set up yet. Ask the system admin (Administration › Add-Ons › AI Assistant).",
-    "openSettings": "Open AI Assistant settings",
-    "canAsk": "You can ask about:",
-    "question": "Your question",
-    "placeholder": "For example: Who owes us the most? What is in stock in WH01?",
-    "remaining": "{{n}} questions left this month",
-    "ask": "Ask",
-    "asking": "Reading your data…",
-    "testResponder": "Local test responder — not AI",
-    "aiAnswer": "AI answer · {{provider}}",
-    "testNote": "Local stack only: a fixed test script wrote this from the rows listed below. No AI model was used.",
-    "checkSources": "AI can be wrong. Check the sources before you act.",
-    "dataUsed": "Data used",
-    "noTools": "No report matched the question.",
-    "read": "Read with your access",
-    "notUsed": "Not used",
-    "sources": "Sources ({{n}})",
-    "foot": "The assistant reads only what you can already see, never changes anything, and every question is logged in the audit trail.",
-    "docTitle": "Ask AI about this document",
-    "docBody": "Summarises this document and compares it with the partner’s history, using only data you can see.",
-    "docSaveFirst": "Save the draft first, then ask about it.",
-    "docQuestion": "Summarise this document and compare it with the partner’s history.",
-    "tool": {
-      "trial_balance": "Trial balance",
-      "balance_sheet": "Balance sheet",
-      "profit_loss": "Profit and loss",
-      "ar_aging": "Customer receivables",
-      "ap_aging": "Supplier payables",
-      "sales_analysis": "Sales analysis",
-      "open_items": "Open documents",
-      "inventory_in_warehouse": "Stock by warehouse",
-      "inventory_valuation": "Inventory valuation",
-      "document": "This document"
+      "never2": "Salaries, ID and passport numbers, birth dates and bank details.",
+      "never3": "Anything outside the asking person’s role. IT and admin rights don’t unlock business data.",
+      "voiceLabel": "Voice (speak and listen)",
+      "dailyLimit": "Questions per person per day",
+      "dailyLimitHint": "0 to 5,000. Resets at midnight (Dubai).",
+      "languages": "Languages ({{n}} chosen)",
+      "days": "Questions per day (last 30 days)",
+      "noUsage": "No questions yet",
+      "noUsageBody": "Counts appear here once people ask Sana.",
+      "col": {
+        "day": "Day",
+        "questions": "Questions",
+        "refused": "Refused",
+        "voice": "By voice",
+        "users": "People"
+      },
+      "refusalRate": "Refusal rate",
+      "voiceShare": "Voice share",
+      "feedback": "Feedback",
+      "modeAi": "AI model connected (answers in the last 30 days came from it)",
+      "modeBasic": "Basic mode: no AI model answered in the last 30 days",
+      "fallbacks_one": "{{count}} answer fell back to basic mode because the model didn’t answer.",
+      "fallbacks_other": "{{count}} answers fell back to basic mode because the model didn’t answer.",
+      "never4": "Changes of any kind: Sana only reads."
     }
   },
   "rpt": {
     "library": "Report library",
     "libraryDesc": "Read-only reports on live data. Each one runs in the database with your own access rights, shows a table and a chart, and exports to CSV and PDF.",
-    "askAi": "Ask AI for a report",
+    "askAi": "Ask Sana",
     "categories": "Report menus",
     "all": "All",
     "cat": {
@@ -3570,8 +3526,8 @@
     "empty": "Nothing to show",
     "emptyBody": "No amounts for these filters. Try a longer period or clear the filters.",
     "chart": "Chart",
-    "askAboutTitle": "Ask AI about this report",
-    "askAboutBody": "Ask a question in plain words. The answer uses only data you can see and lists its sources.",
+    "askAboutTitle": "Ask Sana about this report",
+    "askAboutBody": "Ask a question in plain words. Sana uses only data you can see and links its sources.",
     "askQ": {
       "trial-balance": "Summarise the trial balance this year.",
       "balance-sheet": "Summarise the balance sheet today.",
@@ -5044,7 +5000,8 @@
       "denied": "Microphone access is blocked. Allow it in your browser’s site settings, then try again.",
       "unsupported": "Voice input isn’t supported in this browser. Use Chrome, Edge or Safari, or type instead.",
       "noSpeech": "I didn’t hear anything. Tap the microphone and try again.",
-      "failed": "Voice input stopped. Try again or type your question."
+      "failed": "Voice input stopped. Try again or type your question.",
+      "other": "Voice input stopped. Try again or type your question."
     },
     "err": {
       "signin": "Sign in again to use Sana.",
@@ -5059,7 +5016,9 @@
       "openPOs": "Open purchase orders",
       "headcount": "Headcount by department",
       "alerts": "What needs my attention?",
-      "whoami": "What can you help me with?"
+      "whoami": "What can you help me with?",
+      "bank": "What is our cash position?",
+      "approvals": "What is waiting for my approval?"
     },
     "home": {
       "morning": "Good morning, {{name}}",
@@ -5075,6 +5034,46 @@
       "openControl": "Open Control Tower ({{n}})",
       "askAbout": "Ask Sana",
       "glance": "Today at a glance"
+    },
+    "fb": {
+      "up": "Helpful",
+      "down": "Not helpful"
+    },
+    "fallback": "The AI model didn’t answer, so this is a basic-mode answer.",
+    "noVoice": "No voice for {{language}} on this device.",
+    "noSpeech": "This browser can’t read answers aloud.",
+    "off": "Sana is switched off for {{company}}. Ask your system admin.",
+    "voiceOff": "Voice is switched off for your company. Type your question instead.",
+    "left_one": "{{count}} question left today.",
+    "left_other": "{{count}} questions left today.",
+    "askAbout": "Ask Sana about this",
+    "askAboutTitle": "Ask Sana about this",
+    "askAboutBody": "Ask in plain words, by text or voice. Sana reads only what your role can see and links its sources.",
+    "history": {
+      "title": "History",
+      "empty": "No conversations yet",
+      "emptyBody": "Your questions to Sana appear here. Only you can see them.",
+      "confirm": "Delete this conversation?",
+      "delete": "Delete",
+      "deleteNamed": "Delete conversation “{{title}}”",
+      "untitled": "Conversation",
+      "messages_one": "{{count}} message",
+      "messages_other": "{{count}} messages"
+    },
+    "ctx": {
+      "about": "About:",
+      "clear": "Stop asking about this record",
+      "intro": "Ask about this record. Sana checks your access before it reads anything.",
+      "document": "Document",
+      "q": {
+        "summary": "Summarize this document",
+        "status": "What is its status and total?",
+        "lines": "Which items are on it?",
+        "balance": "What is the balance and credit left?",
+        "latest": "What are the latest documents?",
+        "stock": "How much is in stock?",
+        "where": "Which warehouses have it?"
+      }
     }
   }
 }

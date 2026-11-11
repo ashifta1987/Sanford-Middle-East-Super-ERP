@@ -77,18 +77,48 @@ export function useSpeechInput(onFinal: (text: string) => void) {
   return { supported: Boolean(ctor), listening, interim, error, start, stop, clearError: () => setError(null) };
 }
 
-/** Read an answer aloud with the best matching system voice. Returns false when the browser cannot speak. */
-export function speak(text: string, locale: string, onEnd?: () => void): boolean {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
+/** The system voice for a locale (exact, then same language). Null = this device cannot speak the language. */
+export function voiceFor(locale: string): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  const base = locale.split('-')[0].toLowerCase();
+  const alt = base === 'tl' ? 'fil' : base === 'fil' ? 'tl' : base;
+  return voices.find((v) => v.lang.toLowerCase() === locale.toLowerCase())
+    ?? voices.find((v) => { const b = v.lang.toLowerCase().split(/[-_]/)[0]; return b === base || b === alt; }) ?? null;
+}
+/** Voices load asynchronously in most browsers; this re-renders once they are there. */
+export function useVoicesReady() {
+  const [n, setN] = useState(() => (typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis.getVoices().length : 0));
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const on = () => setN(window.speechSynthesis.getVoices().length);
+    window.speechSynthesis.addEventListener?.('voiceschanged', on);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', on);
+  }, []);
+  return n;
+}
+
+export type SpeakResult = 'ok' | 'no-voice' | 'unsupported';
+/**
+ * Read an answer aloud with the system voice for the answer's language. When the device has no voice for it (common for
+ * Malayalam and Urdu) nothing is spoken — never the wrong accent — and 'no-voice' is returned so the panel can say so.
+ */
+export function speak(text: string, locale: string, onEnd?: () => void): SpeakResult {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return 'unsupported';
+  const voice = voiceFor(locale);
+  if (!voice) return 'no-voice';
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text.replace(/[*_#`>|]/g, ''));
-  u.lang = locale;
-  const voices = window.speechSynthesis.getVoices();
-  const base = locale.split('-')[0];
-  u.voice = voices.find((v) => v.lang === locale) ?? voices.find((v) => v.lang.startsWith(base)) ?? null;
+  u.lang = voice.lang || locale;
+  u.voice = voice;
   u.rate = 1;
   if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
   window.speechSynthesis.speak(u);
-  return true;
+  return 'ok';
 }
 export const stopSpeaking = () => { if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel(); };
+/** Language label for a speech locale or Sana code (for "No voice for ‹language› on this device"). */
+export const languageLabel = (codeOrLocale: string) => {
+  const c = codeOrLocale.split('-')[0];
+  return SANA_LANGUAGES.find((l) => l.code === c || l.speech === codeOrLocale || l.speech.split('-')[0] === c)?.label ?? codeOrLocale;
+};

@@ -121,3 +121,9 @@
   .paper { box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; }
   .paper tr { break-inside: avoid; }
 }
+
+/* U0+S1 · Sana panel opens with a short slide/fade (skipped when reduced motion is asked for: motion-safe in the class). */
+@keyframes sana-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}

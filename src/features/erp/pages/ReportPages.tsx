@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { ArrowLeft, BarChart3, Download, Lock, Play, Printer, Sparkles } from 'lucide-react';
+import { ArrowLeft, BarChart3, Download, Lock, Play, Printer } from 'lucide-react';
+import { SanaMark } from '@/features/sana/SanaMark';
+import { useSana } from '@/features/sana/SanaProvider';
 import { useAuth } from '@/auth/AuthProvider';
 import { useCompany } from '@/layout/CompanyContext';
 import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, PageLoading, SkeletonRows } from '@/components/States';
 import { LiveBadge, PageTitle, SectionCard } from '../components/ui';
 import { RequireModule } from '../components/Guard';
-import { useAskAi } from '../components/AskAi';
 import { useOptions } from '../api';
 import { moduleByKey } from '../modules';
 import {
@@ -30,10 +31,10 @@ export function ReportsLibraryPage() {
   const { t } = useTranslation();
   const mods = useMods();
   const [sp, setSp] = useSearchParams();
-  const { open } = useAskAi();
+  const { openWith } = useSana();
   const cat = sp.get('cat') ?? '';
   const rep = moduleByKey('reports')!;
-  useEffect(() => { if (sp.get('ask') === '1') open({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (sp.get('ask') === '1') openWith(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const cats = REPORT_CATS.filter((c) => !cat || c.key === cat);
 
   return (
@@ -41,7 +42,7 @@ export function ReportsLibraryPage() {
       <PageTitle crumbs={[[t('nav.home'), '/'], [`${rep.num} ${rep.title}`, '/m/reports'], [t('rpt.library'), undefined]]}
         eyebrow={`${t('erp.module')} ${rep.num}`} title={<span className="inline-flex items-center gap-3">{t('rpt.library')} <LiveBadge live /></span>}
         desc={t('rpt.libraryDesc')}
-        actions={<Button variant="secondary" id="rpt-ask" icon={<Sparkles className="h-4 w-4" aria-hidden />} onClick={() => open({})}>{t('rpt.askAi')}</Button>} />
+        actions={<Button variant="secondary" id="rpt-ask" icon={<SanaMark className="h-5 w-5" />} onClick={() => openWith()}>{t('rpt.askAi')}</Button>} />
       <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label={t('rpt.categories')}>
         {[{ key: '', label: t('rpt.all') }, ...REPORT_CATS.map((c) => ({ key: c.key, label: t(`rpt.cat.${c.key}`) }))].map((c) => (
           <button key={c.key || 'all'} type="button" aria-pressed={cat === c.key} onClick={() => setSp(c.key ? { cat: c.key } : {}, { replace: true })}
@@ -99,7 +100,7 @@ function ReportView({ def }: { def: ReportDef }) {
   const { profile } = useAuth();
   const { company: top } = useCompany();
   const [sp, setSp] = useSearchParams();
-  const { open } = useAskAi();
+  const { openWith } = useSana();
   const companies = profile?.companies ?? [];
   const fallback = top !== 'GRP' ? top : companies[0]?.company_code ?? '';
   const applied = defaultParams(sp, fallback);
@@ -190,10 +191,10 @@ function ReportView({ def }: { def: ReportDef }) {
               </SectionCard>
               <div className="space-y-5">
                 <SectionCard title={t('rpt.chart')}>{rows.length ? <ReportChart def={def} rows={rows} /> : <p className="p-5 text-sm text-muted">{t('rpt.empty')}</p>}</SectionCard>
-                <SectionCard title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4" aria-hidden />{t('rpt.askAboutTitle')}</span>}>
+                <SectionCard title={<span className="inline-flex items-center gap-2"><SanaMark className="h-5 w-5" />{t('rpt.askAboutTitle')}</span>}>
                   <div className="space-y-3 p-5">
                     <p className="text-sm text-muted">{t('rpt.askAboutBody')}</p>
-                    <Button variant="secondary" id="rpt-ask-about" className="w-full" onClick={() => open({ company: applied.company, question: t(`rpt.askQ.${def.code}`) })}>{t('rpt.askAi')}</Button>
+                    <Button variant="secondary" id="rpt-ask-about" className="w-full" onClick={() => openWith({ context: { type: 'report', company: applied.company, code: def.code, label: t(`rpt.name.${def.code}`) }, question: t(`rpt.askQ.${def.code}`) })}>{t('rpt.askAi')}</Button>
                   </div>
                 </SectionCard>
               </div>

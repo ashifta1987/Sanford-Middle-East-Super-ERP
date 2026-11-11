@@ -18,7 +18,7 @@ import { SeriesPicker } from '../components/SeriesPicker';
 import { Dialog } from '../components/Dialog';
 import { moduleByKey } from '../modules';
 import { DocFlow } from '../components/DocFlow';
-import { AskAiDocCard } from '../components/AskAi';
+import { AskSanaAbout } from '@/features/sana/SanaPanel';
 import { copySource } from '../salesCycle';
 import {
   SALES_OBJ, itemPrice, itemStock, lineTotal, round2, searchCustomers, searchItems, soCancel, soChecks, soDecide, soSave, soSubmit, useSoInfo, useSoSetup,
@@ -118,9 +118,10 @@ function checkText(c: SoCheck, info: SoInfo | null | undefined) {
   return i18n.t('so.checkDiscountOther', { line: c.line, value: fmtQty(c.value), limit: fmtQty(c.limit), name: info.submitted_by_name ?? '—' });
 }
 
-function AskAiCard({ kind = 'sales_order', company, obj, entry, label }: { kind?: SalesKind; company: string; obj: number; entry?: number | null; label: string }) {
-  const { t } = useTranslation();
-  return <AskAiDocCard company={company} obj={obj} entry={entry} title={t(tk(kind, 'askAi'))} label={label} />;
+/** "Ask Sana about this order" (U0 document pattern). Shown once the document has a number. */
+function AskSanaCard({ kind = 'sales_order', company, number }: { kind?: SalesKind; company: string; number?: string | null }) {
+  if (!number) return null;
+  return <AskSanaAbout variant="card" context={{ type: 'document', company, kind, number }} />;
 }
 
 // ---------- Form (new / edit) ----------
@@ -618,7 +619,7 @@ function SalesOrderForm({ company: fixedCompany, initial, kind = 'sales_order' }
               </dl>
             </SectionCard>
           )}
-          <AskAiCard kind={kind} company={company} obj={obj} entry={entry} label={t(`erp.doc.${kind}`)} />
+          <AskSanaCard kind={kind} company={company} number={entry ? docNo : null} />
         </aside>
       </div>
     </div>
@@ -752,7 +753,7 @@ export function SalesOrderDetailPage({ kind = 'sales_order' }: { kind?: SalesKin
             <SectionCard title={t('so.sourceTitle')}><p className="p-5 text-sm text-muted">{d!.source === 'sap' ? t(tk(kind, 'sapReadOnly')) : t('so.sampleReadOnly')}</p></SectionCard>
           )}
           {I?.workflow && <ActivityCard kind={kind} info={I} />}
-          <AskAiCard kind={kind} company={company} obj={obj} entry={id} label={title} />
+          <AskSanaCard kind={kind} company={company} number={docNo} />
         </aside>
       </div>
     </RequireModule>

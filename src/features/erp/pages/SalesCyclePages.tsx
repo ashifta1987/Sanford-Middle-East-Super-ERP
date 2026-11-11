@@ -16,7 +16,7 @@ import { RequireModule, useModuleLevel } from '../components/Guard';
 import { Combobox, type ComboOption } from '../components/Combobox';
 import { DocFlow } from '../components/DocFlow';
 import { SeriesPicker } from '../components/SeriesPicker';
-import { AskAiDocCard } from '../components/AskAi';
+import { AskSanaAbout } from '@/features/sana/SanaPanel';
 import { DOC_KINDS, moduleByKey, type DocKind } from '../modules';
 import { searchCustomers, useSoSetup, type CustomerHit } from '../salesOrder';
 import {
@@ -650,7 +650,7 @@ export function SalesDocPage({ kind }: { kind: CycleKind }) {
               </ol>
             </SectionCard>
           )}
-          <AskAiDocCard company={company} obj={obj} entry={id} title={t('ai.docTitle')} label={t(`erp.doc.${kind}`)} />
+          <AskSanaAbout variant="card" context={{ type: 'document', company, kind, number: docNo }} />
         </aside>
       </div>
     </RequireModule>

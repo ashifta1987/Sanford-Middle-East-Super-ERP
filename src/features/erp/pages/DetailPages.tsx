@@ -11,7 +11,7 @@ import { useJournalInfo } from '../journal';
 import { ReverseAction } from './JournalPages';
 import { ItemHistoryCard } from './InventoryPages';
 import { BpDetailExtras, BpEditAction, ItemChangesCard, ItemEditAction } from './MasterDataPages';
-import { AskAiDocCard } from '../components/AskAi';
+import { AskSanaAbout } from '@/features/sana/SanaPanel';
 import { Flash, useFlash } from './BankingPages';
 
 type R = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -80,7 +80,7 @@ export function BusinessPartnerDetail() {
   const [flash, setFlash] = useFlash();
   return (
     <Shell module="bp" parent={[t('erp.page.bp'), '/bp']} title={bp ? `${bp.card_code} · ${bp.name}` : code} q={q}
-      actions={<BpEditAction company={company} code={code} />}>
+      actions={<span className="flex flex-wrap gap-2"><AskSanaAbout context={{ type: 'partner', company, code, label: bp ? `${bp.card_code} · ${bp.name}` : code }} /><BpEditAction company={company} code={code} /></span>}>
       {bp && (
         <div className="space-y-5">
           <Flash text={flash} />
@@ -135,7 +135,7 @@ export function ItemDetail() {
   const [flash] = useFlash();
   return (
     <Shell module="inventory" parent={[t('erp.page.items'), '/items']} title={it ? `${it.item_code} · ${it.name}` : code} q={q}
-      actions={<ItemEditAction company={company} code={code} />}>
+      actions={<span className="flex flex-wrap gap-2"><AskSanaAbout context={{ type: 'item', company, code, label: it ? `${it.item_code} · ${it.name}` : code }} /><ItemEditAction company={company} code={code} /></span>}>
       {it && (
         <div className="space-y-5">
           <Flash text={flash} />
@@ -232,7 +232,7 @@ export function DocumentDetail() {
               {kind.endsWith('invoice') && <><dt className="text-muted">{t('erp.col.paid')}</dt><dd className="text-end">{fmtMoney(d.paid)}</dd></>}
             </dl>
           </SectionCard>
-          <AskAiDocCard company={company} obj={def.obj} entry={Number(entry)} title={t('ai.docTitle')} label={`${title} ${d.doc_num}`} />
+          <AskSanaAbout variant="card" context={{ type: 'document', company, kind, number: String(d.doc_num), label: `${title} ${d.doc_num}` }} />
         </div>
       )}
     </Shell>

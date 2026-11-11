@@ -18,6 +18,7 @@ import {
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
 import { ApprovalStageNote } from '../components/ApprovalStageNote';
+import { SystemCurrencyCard } from './ConversionPages';
 
 const OBJ_LABEL: Record<number, string> = {
   17: 'Sales Order', 22: 'Purchase Order', 46: 'Outgoing Payment', 30: 'Journal Entry', 59: 'Goods Receipt', 60: 'Goods Issue',
@@ -333,7 +334,8 @@ export function CompanyDetailsPage() {
                   onClick={() => run(() => adminSettingSave(company, { owner_position: owner ?? info.setting.owner_position, fx_currencies: (curText ?? info.setting.fx_currencies.join(',')).split(/[\s,;]+/).filter(Boolean) }), t('adm.co.settingsSaved'))}>{t('adm.co.saveSettings')}</Button>}
               </div>
             </SectionCard>
-            <AuditCard objects={['company_details', 'admin_setting']} />
+            <SystemCurrencyCard company={company} />
+            <AuditCard objects={['company_details', 'admin_setting', 'company']} />
           </aside>
         </div>
       )}

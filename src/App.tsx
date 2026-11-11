@@ -72,7 +72,9 @@ const { ApprovalStagesPage, ApprovalStatusReportPage, ApprovalTemplateFormPage, 
 const P_SubstitutePages = from(() => import('@/features/erp/pages/SubstitutePages'));
 const { SubstitutesPage } = P_SubstitutePages('SubstitutesPage');
 const P_RevaluationPages = from(() => import('@/features/erp/pages/RevaluationPages'));
+const P_ConversionPages = from(() => import('@/features/erp/pages/ConversionPages'));
 const { FxRevaluationDetailPage, FxRevaluationPage } = P_RevaluationPages('FxRevaluationDetailPage', 'FxRevaluationPage');
+const { ConversionDiffDetailPage, ConversionDiffPage } = P_ConversionPages('ConversionDiffDetailPage', 'ConversionDiffPage');
 const P_NumberingPages = from(() => import('@/features/erp/pages/NumberingPages'));
 const { CompaniesPage, CompanyFormPage, DocNumberingPage } = P_NumberingPages('CompaniesPage', 'CompanyFormPage', 'DocNumberingPage');
 const P_SalesRequestPages = from(() => import('@/features/erp/pages/SalesRequestPages'));
@@ -218,6 +220,9 @@ export default function App() {
         {/* B5 · Financials › Exchange Rate Differences (period-end revaluation) */}
         <Route path="financials/fx-revaluation" element={<FxRevaluationPage />} />
         <Route path="financials/fx-revaluation/:company/:id" element={<FxRevaluationDetailPage />} />
+        {/* B6 · Financials › Conversion Differences (system currency) */}
+        <Route path="financials/conversion-differences" element={<ConversionDiffPage />} />
+        <Route path="financials/conversion-differences/:company/:id" element={<ConversionDiffDetailPage />} />
         <Route path="financials/periods" element={<PostingPeriodsPage />} />
         <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
         <Route path="banking/payments/:dir" element={<PaymentsPage />} />

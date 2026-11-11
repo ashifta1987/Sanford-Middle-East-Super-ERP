@@ -1483,8 +1483,9 @@ export function LandedCostsPage() {
 
 interface LcRow { key: string; grpo_entry: number; grpo_line: number; grpo_no: string; item_code: string; description: string | null; qty: number; value: number; cbm: string; weight: string; sel: boolean }
 let chgSeq = 0;
-interface LcChargeForm { key: string; code: string; amount: string; currency: string; fx_rate: string; ap: string }
-const newCharge = (code: string, currency: string): LcChargeForm => ({ key: `c${++chgSeq}`, code, amount: '', currency, fx_rate: '', ap: '' });
+/** B6: + the cost line's vendor (SAP B1: Vendor on the Costs tab; the header's broker is separate). */
+interface LcChargeForm { key: string; code: string; amount: string; currency: string; fx_rate: string; ap: string; vendor: string; vendorText: string }
+const newCharge = (code: string, currency: string): LcChargeForm => ({ key: `c${++chgSeq}`, code, amount: '', currency, fx_rate: '', ap: '', vendor: '', vendorText: '' });
 export function LandedCostNewPage() {
   const { t } = useTranslation();
   const nav = useNavigate();
@@ -1511,7 +1512,8 @@ export function LandedCostNewPage() {
   const [pick, setPick] = useState('');
   // B5: a charge may be in a foreign currency (rate of the landed cost date) and name the broker's A/P invoice that bills it.
   const [charges, setCharges] = useState<LcChargeForm[]>([]);
-  const [h, setH] = useState({ doc_date: today(), reference: '', comments: '' });
+  const [h, setH] = useState({ doc_date: today(), reference: '', comments: '', card_code: '' });
+  const [brokerText, setBrokerText] = useState('');
   const [series, setSeries] = useState<number | null>(null);
   const [preview, setPreview] = useState<LcEval | null>(null);
   const [pErr, setPErr] = useState<string | null>(null);
@@ -1542,10 +1544,10 @@ export function LandedCostNewPage() {
   const setCharge = (k: string, p: Partial<LcChargeForm>) => setCharges((cs) => cs.map((x) => (x.key === k ? { ...x, ...p } : x)));
   const sel = rows.filter((r) => r.sel);
   const payload = () => ({
-    header: { doc_date: h.doc_date, reference: h.reference, comments: h.comments },
+    header: { doc_date: h.doc_date, reference: h.reference, comments: h.comments, ...(h.card_code ? { card_code: h.card_code } : {}) },
     lines: sel.map((r) => ({ grpo_entry: r.grpo_entry, grpo_line: r.grpo_line, cbm: r.cbm || null, weight: r.weight || null })),
     charges: charges.filter((c) => c.code && c.amount).map((c) => ({
-      code: c.code, amount: c.amount,
+      code: c.code, amount: c.amount, ...(c.vendor ? { card_code: c.vendor } : {}),
       ...(c.currency && c.currency !== local ? { currency: c.currency, ...(c.fx_rate ? { fx_rate: c.fx_rate } : {}) } : {}),
       ...(c.ap ? { ap_invoice_entry: Number(c.ap) } : {}),
     })),
@@ -1561,6 +1563,9 @@ export function LandedCostNewPage() {
   }, [key, company]);
   const setRow = (k: string, p: Partial<LcRow>) => setRows((rs) => rs.map((r) => (r.key === k ? { ...r, ...p } : r)));
   const method = (code: string) => S?.landed_cost_codes.find((c) => c.code === code)?.split_method;
+  const supOpts = async (s: string): Promise<Array<ComboOption<SupplierHit>>> => (await searchSuppliers(company, s)).map((c) => ({
+    value: c.card_code, label: `${c.card_code} · ${c.name}`, data: c, meta: [c.city, c.currency].filter(Boolean).join(' · '),
+  }));
   /** The previewed charge for form row i (rows without a code or an amount are not sent). */
   const pc = (i: number) => {
     const c = charges[i];
@@ -1587,6 +1592,10 @@ export function LandedCostNewPage() {
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('erp.section.header')}>
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
+              <Combobox<SupplierHit> id="lc-broker" label={t('pu.lc.broker')} text={brokerText}
+                onText={(v) => { setBrokerText(v); if (h.card_code) setH({ ...h, card_code: '' }); }}
+                search={supOpts} placeholder={t('pu.lc.brokerPh')} noMatch={t('pu.noSupplier')}
+                onSelect={(o) => { setH({ ...h, card_code: o.value }); setBrokerText(o.label); }} />
               <label className="block text-xs font-medium text-muted">{t('erp.col.postingDate')} <span className="text-crit-fg">*</span><input id="lc-date" type="date" className="input num mt-1 text-[15px] text-ink" value={h.doc_date} onChange={(e) => setH({ ...h, doc_date: e.target.value })} /></label>
               <label className="block text-xs font-medium text-muted">{t('pu.lc.reference')}<input id="lc-ref" className="input mt-1 text-[15px] text-ink" value={h.reference} onChange={(e) => setH({ ...h, reference: e.target.value })} /></label>
               <label className="block text-xs font-medium text-muted">{t('erp.col.remarks')}<input id="lc-comments" className="input mt-1 text-[15px] text-ink" dir="auto" value={h.comments} onChange={(e) => setH({ ...h, comments: e.target.value })} /></label>
@@ -1647,6 +1656,10 @@ export function LandedCostNewPage() {
                     <button type="button" onClick={() => setCharges((cs) => cs.filter((x) => x.key !== c.key))} aria-label={t('pu.lc.removeCharge', { n: i + 1 })} className="grid h-10 w-10 place-items-center rounded-btn text-muted hover:bg-crit-bg hover:text-crit-fg"><Trash2 className="h-4 w-4" aria-hidden /></button>
                   </div>
                   <div className="col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-4">
+                    <Combobox<SupplierHit> id={`lc-charge-${i}-vendor`} label={t('pu.lc.vendor')} text={c.vendorText}
+                      onText={(v) => setCharge(c.key, { vendorText: v, ...(c.vendor ? { vendor: '', ap: '' } : {}) })}
+                      search={supOpts} placeholder={t('pu.lc.vendorPh')} noMatch={t('pu.noSupplier')}
+                      onSelect={(o) => setCharge(c.key, { vendor: o.value, vendorText: o.label, ap: '' })} />
                     {(c.currency || local) !== local && (
                       <label className="block text-xs font-medium text-muted">{t('pu.lc.rate', { cur: c.currency, local })}
                         <input id={`lc-charge-${i}-rate`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" readOnly={!canRate}
@@ -1657,7 +1670,7 @@ export function LandedCostNewPage() {
                     <label className="block text-xs font-medium text-muted">{t('pu.lc.apInvoice')}
                       <select id={`lc-charge-${i}-ap`} className="input mt-1 text-[15px] text-ink" value={c.ap} onChange={(e) => setCharge(c.key, { ap: e.target.value })}>
                         <option value="">{t('pu.lc.apNone')}</option>
-                        {(apInvoices.data ?? []).filter((a) => (a.currency || local) === (c.currency || local)).map((a) => (
+                        {(apInvoices.data ?? []).filter((a) => (a.currency || local) === (c.currency || local) && (!(c.vendor || h.card_code) || a.card_code === (c.vendor || h.card_code))).map((a) => (
                           <option key={a.doc_entry} value={a.doc_entry}>{a.doc_no} · {a.card_code} · {fmtMoney(a.total_fc ?? a.total, a.currency || local)}</option>
                         ))}
                       </select>
@@ -1751,16 +1764,17 @@ export function LandedCostPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('erp.section.header')}>
-            <Fields items={[[t('erp.col.postingDate'), fmtDay(L.doc_date)], [t('pu.lc.reference'), L.reference], [t('erp.col.remarks'), L.comments],
+            <Fields items={[[t('erp.col.postingDate'), fmtDay(L.doc_date)], [t('pu.lc.broker'), L.card_code ? `${L.card_code} · ${L.card_name ?? ''}` : null], [t('pu.lc.reference'), L.reference], [t('erp.col.remarks'), L.comments],
               [t('pu.lc.toInventory'), fmtMoney(L.to_inventory, L.currency)], [t('pu.lc.toCogs'), fmtMoney(L.to_cogs, L.currency)], [t('erp.col.total'), fmtMoney(L.total, L.currency)]]} />
           </SectionCard>
           <LcSplitTable lines={L.lines} charges={L.charges} currency={L.currency} />
-          {L.charges.some((c) => c.amount_fc != null || c.ap_invoice_entry) && (
+          {L.charges.some((c) => c.amount_fc != null || c.ap_invoice_entry || c.card_code) && (
             <SectionCard title={t('pu.lc.chargesFx')}>
               <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px] sm:min-w-[560px]" data-testid="lc-charges-fx">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('pu.lc.code')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-start">{t('pu.lc.vendor')}</th>
                     <th scope="col" className="px-4 py-2.5 text-end">{t('cur.amountFc')}</th>
                     <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{t('cur.rateShort')}</th>
                     <th scope="col" className="px-4 py-2.5 text-start">{t('pu.lc.apInvoice')}</th>
@@ -1770,6 +1784,7 @@ export function LandedCostPage() {
                     {L.charges.map((c) => (
                       <tr key={c.charge_no} className="border-t border-line">
                         <td className="px-4 py-2.5" dir="auto">{c.name}</td>
+                        <td className="px-4 py-2.5" data-testid="lc-charge-vendor">{c.card_code ? <><span className="font-mono text-[13px]">{c.card_code}</span> <span className="text-muted" dir="auto">{c.card_name}</span></> : '—'}</td>
                         <td className="num px-4 py-2.5 text-end">{c.amount_fc != null ? fmtMoney(c.amount_fc, c.currency) : fmtMoney(c.amount, L.currency)}</td>
                         <td className="num px-4 py-2.5 text-end max-sm:hidden">{c.fx_rate != null ? fmtRate(c.fx_rate) : '—'}</td>
                         <td className="px-4 py-2.5">{c.ap_invoice_entry ? <Link className="font-mono text-primary hover:underline" to={`/docs/ap_invoice/${company}/${c.ap_invoice_entry}`}>{c.ap_invoice_no}</Link> : '—'}</td>

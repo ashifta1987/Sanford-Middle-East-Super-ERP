@@ -2225,7 +2225,10 @@
       "clearing": "Clearing (invoice rate)",
       "fxDiff": "Rate difference",
       "chargesFx": "Costs in other currencies",
-      "fxNote": "Costs are split and posted in the company currency. A cost linked to the broker's A/P invoice clears the accrual at that invoice's rate; the difference is posted as an exchange rate gain or loss."
+      "fxNote": "Costs are split and posted in the company currency. A cost linked to the broker's A/P invoice clears the accrual at that invoice's rate; the difference is posted as an exchange rate gain or loss.",
+      "vendor": "Vendor",
+      "vendorPh": "Supplier who bills this cost",
+      "brokerPh": "Customs broker / forwarder"
     },
     "setup": {
       "title": "Purchasing Setup",
@@ -3128,7 +3131,8 @@
         "company_details_rejected": "Change rejected",
         "company_details_cancel": "Change withdrawn",
         "admin_setting_save": "Settings changed",
-        "ai_setting_save": "AI settings changed"
+        "ai_setting_save": "AI settings changed",
+        "system_currency_set": "System currency set"
       }
     },
     "users": {
@@ -3346,7 +3350,21 @@
       "currencies": "Currencies in the daily rates table",
       "saveSettings": "Save settings",
       "settingsSaved": "Settings saved.",
-      "requestN": "Company change {{n}}"
+      "requestN": "Company change {{n}}",
+      "sys": {
+        "title": "System currency",
+        "desc": "Optional, as in SAP Business One. When it differs from the local currency ({{lc}}), every Super ERP journal line also carries its amount in the system currency at that day's rate. Reports stay in {{lc}}.",
+        "label": "System currency",
+        "local": "{{cur}} (local currency – off)",
+        "active": "Active: {{cur}}",
+        "inactive": "Off (local currency)",
+        "rateToday": "Today: 1 {{cur}} = {{rate}} {{lc}}",
+        "noRateToday": "No {{cur}} rate for today yet — postings need one.",
+        "locked": "Fixed: {{n}} journal entries already carry system currency amounts.",
+        "save": "Save system currency",
+        "saved": "System currency set to {{cur}}.",
+        "off": "System currency switched off."
+      }
     },
     "fx": {
       "title": "Exchange Rates",
@@ -4880,6 +4898,81 @@
     "side": {
       "receivable": "Receivable",
       "payable": "Payable"
+    }
+  },
+  "cvd": {
+    "title": "Conversion Differences",
+    "titleN": "Conversion differences {{no}}",
+    "desc": "Clear small rounding differences between the local currency and the system currency. The correcting journal is in the system currency only and changes no local currency balance.",
+    "detailDesc": "System currency correction ({{cur}}) on {{date}}.",
+    "readOnly": "Posting conversion differences needs full access to Financials.",
+    "inactiveTitle": "No system currency",
+    "inactiveBody": "{{company}} uses its local currency {{cur}} as the system currency, so there is nothing to convert. An administrator can choose a system currency in Administration › Company Details.",
+    "toCompany": "Open Company Details",
+    "selection": "Selection",
+    "date": "Posting date",
+    "dateHint": "Journal lines dated on or before this date are checked.",
+    "include": "Check",
+    "inc": {
+      "accounts": "G/L accounts",
+      "partners": "Business partners"
+    },
+    "memo": "Remarks",
+    "preview": "Differences found",
+    "emptyTitle": "No conversion differences",
+    "emptyBody": "Every account and partner that nets to 0 in the local currency also nets to 0 in {{cur}} up to {{date}}.",
+    "summary": "Summary",
+    "localCur": "Local currency",
+    "sysCur": "System currency",
+    "debit": "Debit",
+    "credit": "Credit",
+    "net": "Net to the conversion account",
+    "what": "Posts one journal in {{cur}} only: each row is cleared, the net goes to the conversion difference account ({{acct}}). No {{lc}} amounts are posted and reports stay in {{lc}}.",
+    "notSet": "not set",
+    "post": "Post adjustment",
+    "history": "Runs",
+    "noHistory": "No runs yet.",
+    "nLines": "{{n}} row(s)",
+    "account": "Conversion difference account",
+    "state": {
+      "posted": "Posted",
+      "cancelled": "Cancelled"
+    },
+    "confirmTitle": "Post the conversion differences?",
+    "confirmBody": "Clear {{n}} row(s) on {{date}} with a journal in {{cur}} only (no {{lc}} effect).",
+    "flash": {
+      "posted": "Conversion differences {{no}} posted.",
+      "cancelled": "Run cancelled. Its journal is reversed."
+    },
+    "cancel": "Cancel run",
+    "cancelTitle": "Cancel this run?",
+    "cancelBody": "The journal is reversed on the run's date in the system currency only. The period must be open.",
+    "cancelReason": "Reason",
+    "lines": "Rows",
+    "journalN": "Journal {{n}} · {{date}}",
+    "noLc": "Local currency amounts: 0.00 ({{lc}} balances are not changed).",
+    "journals": "{{n}} journal(s)",
+    "onAccount": "Control account {{acct}}",
+    "kind": {
+      "account": "G/L account",
+      "partner": "Business partner"
+    },
+    "cr": "Cr {{n}}",
+    "dr": "Dr {{n}}",
+    "action": {
+      "conversion_diff_post": "Run posted",
+      "conversion_diff_cancel": "Run cancelled"
+    },
+    "col": {
+      "who": "Account / partner",
+      "kind": "Type",
+      "lc": "Balance ({{cur}})",
+      "sc": "Balance ({{cur}})",
+      "correction": "Correction",
+      "account": "Account",
+      "lcDrCr": "{{cur}}",
+      "scDebit": "Debit ({{cur}})",
+      "scCredit": "Credit ({{cur}})"
     }
   }
 }

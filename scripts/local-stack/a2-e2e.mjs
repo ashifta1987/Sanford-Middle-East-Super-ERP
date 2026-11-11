@@ -131,9 +131,15 @@ ok('approval card: "Your approval is needed" with the reason', (await pb.locator
   && (await pb.locator('[data-testid=so-approval-card]', { hasText: 'Launch promotion agreed with the buyer' }).count()) === 1);
 ok('"Approve at 10%" offered', (await pb.locator('#so-approve-at').innerText().catch(() => '')).includes('10%'));
 await pb.screenshot({ path: `${OUT}/a2-order-approval-card-mgr-en-light-1440.png`, fullPage: true });
+// B6: deterministic — wait for the decide call to answer, then for the page to show the decided state (the card renders
+// after the order info is fetched again, which can come after the flash), instead of checking right after the flash.
+const decided = pb.waitForResponse((r) => r.url().includes('/rpc/sales_doc_decide') && r.request().method() === 'POST', { timeout: 15000 });
 await pb.click('#so-approve-at');
-await pb.locator('[role=status]', { hasText: 'Approved. The order is open.' }).waitFor({ timeout: 10000 }).catch(() => {});
-ok('approved at 10 %: flash and green card', (await pb.locator('[data-testid=so-decided-card]', { hasText: 'Approved by you' }).count()) === 1);
+const decideRes = await decided.catch(() => null);
+await pb.locator('[data-testid=so-decided-card]', { hasText: 'Approved by you' }).waitFor({ timeout: 15000 }).catch(() => {});
+ok('approved at 10 %: flash and green card', decideRes?.ok() === true
+  && (await pb.locator('[role=status]', { hasText: 'Approved. The order is open.' }).count()) === 1
+  && (await pb.locator('[data-testid=so-decided-card]', { hasText: 'Approved by you' }).count()) === 1, decideRes ? `decide ${decideRes.status()}` : 'no decide response');
 await pb.screenshot({ path: `${OUT}/a2-order-approved-mgr-en-light-1440.png`, fullPage: true });
 
 // ---------- 4. qa.sales sees Approved, updated totals, Open in the list ----------

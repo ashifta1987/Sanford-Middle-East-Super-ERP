@@ -195,6 +195,8 @@ export interface LcCharge {
   /** B5: the charge's currency, FC amount and rate; the linked broker A/P invoice; LC credited to clearing; rate difference (clearing − amount). */
   currency?: string; amount_fc?: number | null; fx_rate?: number | null; ap_invoice_entry?: number | null; ap_invoice_no?: string | null;
   clear_amount?: number; fx_diff?: number;
+  /** B6: the cost line's vendor (supplier). */
+  card_code?: string | null; card_name?: string | null;
 }
 export interface LcEval {
   header: Record<string, unknown>; lines: LcLine[]; charges: LcCharge[]; allocs: Array<{ charge_no: number; line_num: number; basis: number; amount: number }>;

@@ -130,6 +130,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
     // B5 · period-end revaluation of open foreign-currency items
     'Exchange Rate Differences': '/financials/fx-revaluation',
+    // B6 · rounding differences in the system currency
+    'Conversion Differences': '/financials/conversion-differences',
     // A11 · reports
     'Financial Reports': '/reports?cat=financials',
   },
@@ -239,6 +241,8 @@ const LIVE_ITEMS: Record<string, string> = {
   // B5 · substitute authorizers, revaluation
   'Substitute Authorizer for Approval Templates': '/admin/approvals/substitutes', 'Currency revaluation': '/financials/fx-revaluation',
   'Select partners and accounts': '/financials/fx-revaluation', 'Preview gain or loss': '/financials/fx-revaluation', 'Post differences': '/financials/fx-revaluation',
+  // B6 · Conversion Differences
+  'Select period': '/financials/conversion-differences', 'Preview differences': '/financials/conversion-differences', 'Post adjustment': '/financials/conversion-differences',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
   // A14 · go-live checklist and system health
   'Implementation Center ›': '/admin/go-live',

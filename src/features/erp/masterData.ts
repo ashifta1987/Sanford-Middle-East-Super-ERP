@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { erp } from '@/lib/supabase';
-import { ApiError } from '@/lib/format';
+import { ApiError, brand } from '@/lib/format';
 import { rpc } from './api';
 
 /** Types and calls for A8 master data (supabase/sql/23_master_data.sql). The database checks every write. */
@@ -62,7 +62,7 @@ export interface BpInfo {
 export function useBpInfo(company: string, code: string) {
   return useQuery({
     queryKey: ['bp-info', company, code], enabled: Boolean(company && code),
-    queryFn: () => rpc<BpInfo | null>('bp_info', { p_company: company, p_card: code }),
+    queryFn: () => rpc<BpInfo | null>('bp_info', { p_company: company, p_card: code }).then((r) => (r && r.edit_reason ? { ...r, edit_reason: brand(r.edit_reason) } : r)),
   });
 }
 
@@ -77,7 +77,7 @@ export interface ItemInfo {
 export function useItemInfo(company: string, code: string) {
   return useQuery({
     queryKey: ['item-info', company, code], enabled: Boolean(company && code),
-    queryFn: () => rpc<ItemInfo | null>('item_info', { p_company: company, p_item: code }),
+    queryFn: () => rpc<ItemInfo | null>('item_info', { p_company: company, p_item: code }).then((r) => (r && r.edit_reason ? { ...r, edit_reason: brand(r.edit_reason) } : r)),
   });
 }
 

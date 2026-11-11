@@ -2,8 +2,8 @@
 // Usage: NODE_PATH=<dir with playwright + pg> node scripts/local-stack/a11-e2e.mjs [outDir]
 // Report library → trial balance = journal sums, CSV = screen, chart, Print / PDF → P&L and balance sheet totals → a sales user is
 // refused finance reports (screen + API) but runs customer aging → sales analysis by item → inventory by warehouse →
-// Control Tower 10 rules with record links, rights per user → Ask AI: "AI not configured", then on: a labelled local test answer
-// with sources, no finance data for a sales user, logged as ai:assistant; Ask AI about this order → screenshots 1440 / 390,
+// Control Tower 10 rules with record links, rights per user → Ask Sana (U0+S1 replaced Ask AI): switched off, then on: a basic-mode answer
+// with sources, no finance data for a sales user, logged as ai:sana; Ask Sana about this order → screenshots 1440 / 390,
 // light / dark, EN / AR.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -62,6 +62,8 @@ const y0 = `${today.slice(0, 4)}-01-01`;
 // ---------- fixtures (sample company only; they stay on the running DB, see HANDOFF) ----------
 await db.query(`DELETE FROM erp.ai_setting WHERE company_code = 'ZZ99'`);
 await db.query(`DELETE FROM erp.ai_usage WHERE company_code = 'ZZ99'`);
+await db.query(`DELETE FROM erp.sana_settings WHERE company_code = 'ZZ99'`);   // U0+S1: Sana on (no row)
+await db.query(`DELETE FROM erp.sana_usage WHERE company_code = 'ZZ99'`);
 // same supplier invoice twice (closed and paid, so payments and aging are not affected)
 await db.query(`INSERT INTO erp.document (company_code, obj_type, doc_entry, doc_num, doc_kind, status, doc_date, due_date, card_code, card_name, customer_ref, currency, total, paid, source)
   VALUES ('ZZ99', 18, 990001, 990001, 'ap_invoice', 'closed', current_date - 3, current_date + 27, 'S0001', 'E2E duplicate supplier invoice', 'INV-E2E-A11', 'AED', 1000, 1000, 'erp'),
@@ -214,68 +216,69 @@ async function downloadCsv(p) {
   await C.close();
 }
 
-// ---------- 5. Ask AI ----------
+// ---------- 5. Ask Sana (U0+S1: Sana replaced A11's "Ask AI"; same intents, checked through Sana) ----------
 {
   const C = await context(browser);
   const p = await C.newPage(); watch(p, 'ai-sales');
   await login(p, 'sales'); await settle(p);
-  await p.click('#top-ask-ai');
-  ok('AI off: the panel shows "AI not configured"', await seen(p.locator('[data-testid=ai-not-configured]')) && (await txt(p.locator('[data-testid=ai-not-configured]'))).includes('AI not configured'));
+  // admin switches Sana off for ZZ99 (Administration › Add-Ons › AI Assistant (Sana)); the provider key is a Supabase secret, never in the database
+  const off = await api('admin', 'sana_settings_save', { p_company: 'ZZ99', p: { enabled: false } });
+  ok('admin switches Sana off for ZZ99', off.status === 200, JSON.stringify(off.body));
+  await p.click('#top-ask-sana');
+  ok('Sana off: the panel says it is switched off', await seen(p.locator('[data-testid=sana-off]')) && (await txt(p.locator('[data-testid=sana-off]'))).includes('switched off'));
   await p.keyboard.press('Escape');
-  // admin switches the assistant on (A10 settings; the provider key would be a Supabase secret, never in the database)
-  const on = await api('admin', 'ai_setting_save', { p_company: 'ZZ99', p: { enabled: true, chat_provider: 'google', chat_model: 'gemini-2.5-flash', monthly_limit: 500,
-    allowed_modules: ['finance', 'sales', 'purchase', 'inventory'], allowed_tables: ['account', 'journal_entry', 'journal_line', 'document', 'document_line', 'stock_balance', 'item'] } });
-  ok('admin switches the assistant on', on.status === 200, JSON.stringify(on.body));
+  const on = await api('admin', 'sana_settings_save', { p_company: 'ZZ99', p: { enabled: true } });
+  ok('admin switches Sana on', on.status === 200, JSON.stringify(on.body));
   await p.reload(); await settle(p);
-  await p.click('#top-ask-ai');
-  await seen(p.locator('[data-testid=ai-question]'));
-  const before = Number((await one(`SELECT count(*) AS n FROM erp.audit_log WHERE actor = 'ai:assistant'`)).n);
-  await p.fill('[data-testid=ai-question]', 'Show me the trial balance, the profit and loss and who owes us the most');
-  await p.click('#ai-ask');
-  await seen(p.locator('[data-testid=ai-answer]'), 15000);
-  const resp = await txt(p.locator('[data-testid=ai-responder]'));
-  ok('answer labelled "Local test responder — not AI" (never shown as real AI)', resp.includes('Local test responder') && resp.includes('not AI') && await seen(p.locator('[data-testid=ai-test-note]')), resp);
-  const ans = await txt(p.locator('[data-testid=ai-answer-text]'));
-  ok('sales user: receivables answered', ans.includes('Customer receivables aging:') && /C00\d\d/.test(ans), ans.slice(0, 120));
-  ok('sales user: the answer contains no finance data', !/debit|credit|net profit|revenue|assets/i.test(ans.replace(/not used\..*$/gim, '')) && ans.includes('Trial balance: not used'), ans.split('\n')[1]);
-  ok('finance tools shown as not used', (await p.locator('[data-testid=ai-tools] [data-tool=trial_balance][data-status=not_allowed]').count()) === 1
-    && (await p.locator('[data-testid=ai-tools] [data-tool=ar_aging][data-status=ok]').count()) === 1);
-  const srcs = await p.locator('[data-testid=ai-sources] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-  ok('sources are record links (report + customers)', srcs.some((h) => h.startsWith('/reports/ar-aging')) && srcs.some((h) => h.startsWith('/bp/ZZ99/')) && !srcs.some((h) => h.includes('financials')), srcs.join(' '));
-  const log = await one(`SELECT detail FROM erp.audit_log WHERE actor = 'ai:assistant' AND action = 'ai_question' ORDER BY audit_id DESC LIMIT 1`);
-  const logA = await one(`SELECT detail FROM erp.audit_log WHERE actor = 'ai:assistant' AND action = 'ai_answer' ORDER BY audit_id DESC LIMIT 1`);
-  ok('question and tools logged as ai:assistant (user, tools, statuses), answer logged as local-test',
-    Number((await one(`SELECT count(*) AS n FROM erp.audit_log WHERE actor = 'ai:assistant'`)).n) === before + 2 && log.detail.user_id === SALES_ID
-    && log.detail.tools.some((x) => x.tool === 'trial_balance' && x.status === 'not_allowed') && logA.detail.responder === 'local-test');
+  await p.click('#top-ask-sana');
+  const ask = async (page, q) => {
+    const n = await page.locator('aside[role=dialog] [data-testid=sana-answer], aside[role=dialog] [data-testid=sana-refusal]').count();
+    await page.fill('#sana-input', q); await page.keyboard.press('Enter');
+    await page.waitForFunction((k) => document.querySelectorAll('aside[role=dialog] [data-testid=sana-answer], aside[role=dialog] [data-testid=sana-refusal]').length > k, n, { timeout: 15000 }).catch(() => {});
+    return txt(page.locator('aside[role=dialog] [data-testid=sana-answer], aside[role=dialog] [data-testid=sana-refusal]').last());
+  };
+  const before = Number((await one(`SELECT count(*) AS n FROM erp.audit_log WHERE actor = 'ai:sana'`)).n);
+  const a1 = await ask(p, 'Show me the trial balance and the profit and loss');
+  ok('sales user: finance data refused (no numbers)', /isn.t available for your role/.test(a1) && !/\d/.test(a1), a1);
+  const a2 = await ask(p, 'Who owes us the most? overdue receivables');
+  ok('sales user: receivables answered', /Open receivables are/.test(a2) && /AED/.test(a2), a2.slice(0, 120));
+  ok('answer labelled basic mode (never shown as a real AI model)', await seen(p.locator('[data-testid=sana-basic]')));
+  const srcs = await p.locator('aside[role=dialog] [data-testid=sana-answer] a').evaluateAll((as) => as.map((x) => x.getAttribute('href')));
+  ok('sources are record links (open receivables list)', srcs.some((h) => h.startsWith('/docs/ar_invoice')) && !srcs.some((h) => h.includes('financials')), srcs.join(' '));
+  const log = await one(`SELECT detail FROM erp.audit_log WHERE actor = 'ai:sana' AND action = 'sana.ask' ORDER BY audit_id DESC LIMIT 1`);
+  ok('questions logged as ai:sana (user, tools, mode) without the question text',
+    Number((await one(`SELECT count(*) AS n FROM erp.audit_log WHERE actor = 'ai:sana'`)).n) === before + 2 && log.detail.user_id === SALES_ID
+    && log.detail.tools.includes('sana_receivables') && log.detail.mode === 'basic' && !JSON.stringify(log.detail).includes('owes us'));
   await p.screenshot({ path: `${OUT}/a11-ai-sales-en-light-1440.png`, fullPage: true });
-  const bpHref = srcs.find((h) => h.startsWith('/bp/ZZ99/'));
-  await p.click(`[data-testid=ai-sources] a[href="${bpHref}"]`); await settle(p);
-  ok('a source opens the record', new URL(p.url()).pathname === bpHref);
-  // Ask AI about this order
-  const so = await one(`SELECT doc_entry FROM erp.document WHERE company_code = 'ZZ99' AND obj_type = 17 ORDER BY doc_entry LIMIT 1`);
+  const href = srcs.find((h) => h.startsWith('/docs/ar_invoice'));
+  await p.click(`aside[role=dialog] a[href="${href}"]`); await settle(p);
+  ok('a source opens the record list', new URL(p.url()).pathname === '/docs/ar_invoice');
+  await p.keyboard.press('Escape');
+  // Ask Sana about this order
+  const so = await one(`SELECT d.doc_entry, coalesce(w.doc_no, d.doc_num::text) AS no FROM erp.document d LEFT JOIN erp.doc_workflow w USING (company_code, obj_type, doc_entry)
+                         WHERE d.company_code = 'ZZ99' AND d.obj_type = 17 ORDER BY d.doc_entry LIMIT 1`);
   await p.goto(`${BASE}/docs/sales_order/ZZ99/${so.doc_entry}`); await settle(p);
-  await p.click('#ai-doc-ask');
-  ok('Ask AI about this order: question filled in', (await p.locator('[data-testid=ai-question]').inputValue()).length > 10);
-  await p.click('#ai-ask');
-  await seen(p.locator('[data-testid=ai-answer]'), 15000);
-  ok('order answer uses the order and the customer history', (await p.locator('[data-testid=ai-tools] [data-tool=document][data-status=ok]').count()) === 1
-    && (await p.locator(`[data-testid=ai-sources] a[href="/docs/sales_order/ZZ99/${so.doc_entry}"]`).count()) === 1
-    && (await txt(p.locator('[data-testid=ai-answer-text]'))).includes('other documents of this kind'));
-  ok('document question logged with its reference', Boolean(await one(`SELECT 1 AS x FROM erp.audit_log WHERE actor = 'ai:assistant' AND object_ref = $1`, [`17:${so.doc_entry}`])));
+  await p.click('[data-testid=ask-sana-about]');
+  ok('Ask Sana about this order: the panel shows the order as context', (await txt(p.locator('[data-testid=sana-context]'))).includes(so.no));
+  await p.locator('aside[role=dialog] button', { hasText: 'Summarize this document' }).click();
+  await p.locator('aside[role=dialog] [data-testid=sana-answer]').last().waitFor({ timeout: 15000 }).catch(() => {});
+  ok('order answer uses the order', (await p.locator(`aside[role=dialog] a[href="/docs/sales_order/ZZ99/${so.doc_entry}"]`).count()) === 1
+    && (await txt(p.locator('aside[role=dialog] [data-testid=sana-answer]').last())).includes(so.no));
+  ok('document question logged with its context type', (await one(`SELECT detail FROM erp.audit_log WHERE actor = 'ai:sana' ORDER BY audit_id DESC LIMIT 1`)).detail.context === 'document');
   await C.close();
-  // finance user gets the P&L
+  // finance user asks about the P&L report
   const C2 = await context(browser);
   const f = await C2.newPage(); watch(f, 'ai-fin');
   await login(f, 'fin'); await settle(f);
   await f.goto(`${BASE}/reports/profit-loss`); await settle(f);
   await f.click('#rpt-ask-about');
-  await seen(f.locator('[data-testid=ai-question]'));
-  await f.click('#ai-ask');
-  await seen(f.locator('[data-testid=ai-answer]'), 15000);
-  ok('finance user: P&L answered from the report', /net profit/i.test(await txt(f.locator('[data-testid=ai-answer-text]'))) && (await f.locator('[data-testid=ai-tools] [data-tool=profit_loss][data-status=ok]').count()) === 1);
+  await f.locator('aside[role=dialog] [data-testid=sana-answer]').last().waitFor({ timeout: 15000 }).catch(() => {});
+  ok('finance user: P&L question answered from the accounts', /revenue/i.test(await txt(f.locator('aside[role=dialog] [data-testid=sana-answer]').last())));
   await C2.close();
-  const r = await fetch(`${GW}/functions/v1/ai-assistant`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ company: 'ZZ99', question: 'stock' }) });
+  const r = await fetch(`${GW}/functions/v1/sana`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ company: 'ZZ99', message: 'stock' }) });
   ok('server function refuses a request without a session', r.status === 401);
+  const old = await fetch(`${GW}/functions/v1/ai-assistant`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ company: 'ZZ99', question: 'stock' }) });
+  ok('the old ai-assistant function is gone (Sana is the single assistant)', old.status === 404);
 }
 
 // ---------- 6. Screenshots: 1440 / 390, light / dark, EN / AR ----------
@@ -295,12 +298,11 @@ for (const [lang, theme, width] of [['en', 'light', 1440], ['en', 'dark', 1440],
     if (width < 640 && !(await noHScroll(page))) { scrollOk = false; console.log(`  h-scroll: ${nm}`); }
     await page.screenshot({ path: `${OUT}/a11-${nm}-${lang}-${theme}-${width}.png`, fullPage: true });
   }
-  // the Ask AI panel with an answer
+  // the Sana panel with an answer about the report
   await page.goto(`${BASE}/reports/ar-aging?company=ZZ99&as_of=${today}`); await settle(page);
   await page.locator('[data-testid=rpt-row]').first().waitFor({ timeout: 10000 }).catch(() => {});
   await page.locator('#rpt-ask-about').click();
-  await page.locator('#ai-ask').click().catch(() => {});
-  await page.locator('[data-testid=ai-answer]').waitFor({ timeout: 15000 }).catch(() => {});
+  await page.locator('aside[role=dialog] [data-testid=sana-answer]').last().waitFor({ timeout: 15000 }).catch(() => {});
   if (width < 640 && !(await noHScroll(page))) { scrollOk = false; console.log('  h-scroll: ai panel'); }
   await page.screenshot({ path: `${OUT}/a11-ai-panel-${lang}-${theme}-${width}.png` });
   if (width < 640) ok(`no horizontal page scroll at 390 px (${lang}, ${theme})`, scrollOk);

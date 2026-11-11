@@ -975,7 +975,7 @@ export function LotsPage({ kind }: { kind: 'B' | 'S' }) {
     searchCols: ['number', 'item_code', 'item_name'], searchLabel: t('inv.lots.search'), fixed: { kind },
     filters: [
       { key: 'status', label: t('erp.col.status'), options: [['in_stock', t('inv.lots.inStock')], ['out', t('inv.lots.out')]] },
-      { key: 'source', label: t('so.filter.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP']] },
+      { key: 'source', label: t('so.filter.source'), options: [['erp', 'Southfield'], ['sap', 'SAP']] },
     ],
     defaultSort: { col: 'number', asc: true },
     rowKey: (r) => `${r.company_code}|${r.lot_key}`,
@@ -986,7 +986,7 @@ export function LotsPage({ kind }: { kind: 'B' | 'S' }) {
       { key: 'whs_codes', header: t('erp.col.warehouse'), sortable: false, cell: (r) => r.whs_codes ?? '—' },
       { key: 'qty', header: t('erp.col.qty'), align: 'end', cell: (r) => (r.qty == null ? '—' : fmtQty(r.qty)) },
       { key: 'expires_on', header: t('inv.lots.expires'), hideBelow: 'md', cell: (r) => fmtDay(r.expires_on), csv: (r) => r.expires_on },
-      { key: 'source', header: t('erp.col.source'), hideBelow: 'lg', cell: (r) => (r.source === 'sap' ? 'SAP' : 'Super ERP') },
+      { key: 'source', header: t('erp.col.source'), hideBelow: 'lg', cell: (r) => (r.source === 'sap' ? 'SAP' : 'Southfield') },
     ],
   }), [t, kind]);
   return (

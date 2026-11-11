@@ -4,7 +4,7 @@
 // the invited user follows the email link, sets a password, signs in again → admin deactivates them (gone on the next request) →
 // Authorizations matrix with review and save (takes effect on the next sign-in) → approval templates → numbering →
 // company details changed by admin, approved by the owner from the inbox → exchange rates (finance, CSV import) →
-// AI Assistant settings (no key field) → screenshots 1440 / 390, light / dark, EN / AR.
+// AI Assistant (Sana) settings (no key field) → screenshots 1440 / 390, light / dark, EN / AR.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const require = createRequire(import.meta.url);
@@ -57,6 +57,7 @@ await db.query(`UPDATE erp.company_change_request SET state = 'cancelled' WHERE 
 await db.query(`INSERT INTO erp.position_module (position_code, module, level) VALUES ('QA_SALES_READ', 'sales', 'read') ON CONFLICT (position_code, module) DO UPDATE SET level = 'read'`);
 await db.query(`DELETE FROM erp.approval_rule WHERE company_code = 'ZZ99' AND rule_code = 'payment_amount' AND position_code = 'QA_SALES_READ'`);
 await db.query(`DELETE FROM erp.ai_setting WHERE company_code = 'ZZ99'`);
+await db.query(`DELETE FROM erp.sana_settings WHERE company_code = 'ZZ99'`);
 
 const browser = await chromium.launch();
 const errors = [];
@@ -283,7 +284,7 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
   await C.close();
 }
 
-// ---------- 8. AI Assistant ----------
+// ---------- 8. AI Assistant (U0+S1: the screen now edits Sana's settings; A10's provider / tables form is gone) ----------
 {
   const C = await context(browser);
   const p = await C.newPage(); watch(p, 'admin-ai');
@@ -291,17 +292,19 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
   await p.goto(`${BASE}/admin/ai-assistant`); await settle(p);
   await seen(p.locator('#adm-ai-enabled'));
   ok('no field for an API key on the page', (await p.locator('main input[type=password], main input[name*=key i], main input[id*=key i]').count()) === 0 && (await txt(p.locator('[data-testid=adm-ai-key]'))).includes('never saved in the database'));
-  await p.check('#adm-ai-enabled');
+  await p.fill('#adm-ai-limit', '6000');
   await p.click('#adm-ai-save'); await settle(p);
-  ok('cannot switch on without provider and limit', (await errText(p)).includes('Choose a chat provider and a monthly limit'));
-  await p.selectOption('#adm-ai-chat', 'google'); await p.fill('#adm-ai-model', 'gemini-2.5-flash'); await p.fill('#adm-ai-limit', '500');
-  await p.check('input[data-module=sales]'); await p.check('input[data-table=item]');
+  ok('daily limit above 5,000 refused with the reason', (await errText(p)).includes('Enter a daily limit from 0 to 5,000'));
+  await p.fill('#adm-ai-limit', '150'); await p.uncheck('input[data-lang=ru]');
   await p.click('#adm-ai-save'); await settle(p);
-  ok('assistant switched on', (await flash(p)).includes('assistant is on') && (await txt(p.locator('[data-testid=adm-ai-state]'))) === 'On');
-  ok('salary tables never offered', (await p.locator('input[data-table=employee_pay], input[data-table=hr_pay]').count()) === 0);
+  ok('Sana settings saved (on, limit 150, Russian off)', (await flash(p)).includes('Sana is on') && (await txt(p.locator('[data-testid=adm-ai-state]'))) === 'On'
+    && !(await p.isChecked('input[data-lang=ru]')));
+  ok('usage shown as counts only', await seen(p.locator('[data-testid=adm-ai-usage]')));
   await p.uncheck('#adm-ai-enabled');
   await p.click('#adm-ai-save'); await settle(p);
-  ok('assistant switched off again', await flashHas(p, 'assistant is off'));
+  ok('Sana switched off again', await flashHas(p, 'Sana is off'));
+  await p.check('#adm-ai-enabled'); await p.check('input[data-lang=ru]'); await p.fill('#adm-ai-limit', '200');
+  await p.click('#adm-ai-save'); await settle(p);
   await C.close();
 }
 

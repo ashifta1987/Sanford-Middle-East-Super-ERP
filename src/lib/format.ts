@@ -1,11 +1,14 @@
 import i18n from './i18n';
 
 /** Postgres / PostgREST error → message for the user (P0 › Error mapping). */
+/** U0: the product is Southfield. Server messages written before the rebrand (SQL 14–35) still say "Super ERP"; shown as Southfield. */
+export const brand = (s: string) => s.replace(/Sanford Super ERP|Super ERP/g, 'Southfield');
+
 export function errorMessage(err: unknown): string {
   if (!err) return i18n.t('errors.generic');
   const e = err as { code?: string; message?: string };
   if (e.code === '42501') return i18n.t('errors.denied');
-  return e.message || i18n.t('errors.generic');
+  return e.message ? brand(e.message) : i18n.t('errors.generic');
 }
 
 export class ApiError extends Error {

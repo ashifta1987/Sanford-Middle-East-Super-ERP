@@ -36,7 +36,7 @@ export function todayIso() {
 }
 export const fmtWhen = (iso: string | null | undefined) =>
   !iso ? '—' : new Intl.DateTimeFormat(i18n.language === 'ar' ? 'ar-AE' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-export const sourceName = (s: string | null | undefined) => (s === 'sap' ? 'SAP Business One' : s === 'erp' ? 'Super ERP' : i18n.t('erp.sampleData'));
+export const sourceName = (s: string | null | undefined) => (s === 'sap' ? 'SAP Business One' : s === 'erp' ? 'Southfield' : i18n.t('erp.sampleData'));
 export const docLabel = (obj: number) => i18n.t(`bk.obj.${obj}`, { defaultValue: String(obj) });
 export const docLink = (obj: number, company: string, entry: number) => {
   const kind = ({ 13: 'ar_invoice', 14: 'ar_credit_note', 18: 'ap_invoice', 19: 'ap_credit_note', 204: 'ap_down_payment' } as Record<number, string>)[obj];
@@ -138,7 +138,7 @@ export function PaymentsList({ dir }: { dir: Dir }) {
     fixed: { direction: dir },
     filters: [
       { key: 'cancelled', label: t('erp.col.status'), options: [['false', t('erp.status.posted')], ['true', t('erp.status.cancelled')]], type: 'boolean' },
-      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
+      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Southfield'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
     ],
     defaultSort: { col: 'doc_date', asc: false },
     rowKey: (r) => `${r.company_code}|${r.direction}|${r.doc_entry}`,
@@ -317,7 +317,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
   return (
     <div>
       <BkHeader title={incoming ? t('bk.titleNewIn') : t('bk.titleNewOut')} back={[listName, listPath]} onBack={back}
-        pills={<span className="pill pill-info">Super ERP</span>} sub={incoming ? t('bk.subNewIn') : t('bk.subNewOut')} />
+        pills={<span className="pill pill-info">Southfield</span>} sub={incoming ? t('bk.subNewIn') : t('bk.subNewOut')} />
       <FormError message={serverError} />
       {shown.length > 0 && !serverError && (
         <div role="alert" className="mb-5 rounded-card border border-crit-fg/30 bg-crit-bg p-4 text-sm text-crit-fg" data-testid="bk-problems">
@@ -716,7 +716,7 @@ export function PaymentDraftPage() {
   return (
     <RequireModule module="banking">
       <BkHeader title={t('bk.draftN', { n: d.draft_id })} back={back}
-        pills={<><DraftStatePill state={d.state} /><span className="pill pill-info">Super ERP</span><LiveBadge live /></>}
+        pills={<><DraftStatePill state={d.state} /><span className="pill pill-info">Southfield</span><LiveBadge live /></>}
         sub={[`${d.card_code} · ${d.card_name ?? ''}`, fmtMoney(d.total, cur), d.created_by_name, fmtWhen(d.created_at)].filter(Boolean).join(' · ')}
         actions={<>
           {d.doc_entry && <Link to={`/banking/payments/${dirPath(d.direction)}/${d.company_code}/${d.doc_entry}`} id="bk-open-posted" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-medium text-white hover:bg-primary-hover"><FileText className="h-4 w-4" aria-hidden />{t('bk.openPosted', { no: d.doc_no })}</Link>}

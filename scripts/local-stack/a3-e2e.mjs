@@ -117,7 +117,7 @@ await pa.waitForURL(/\/financials\/journals\/ZZ99\/\d+$/, { timeout: 15000 }); a
 const t1 = lastId(pa.url());
 ok('posted: lands on the journal page with trans_id ≥ 900000000', t1 >= 900000000, String(t1));
 ok('flash "Posted as journal …"', await has(pa.locator('[role=status]', { hasText: `Posted as journal ${t1}.` })));
-ok('journal shows "Debit = credit" and source Super ERP', (await has(pa.locator('text=Debit = credit'))) && (await has(pa.locator('dd', { hasText: 'Super ERP' }))));
+ok('journal shows "Debit = credit" and source Southfield', (await has(pa.locator('text=Debit = credit'))) && (await has(pa.locator('dd', { hasText: 'Southfield' }))));
 await pa.screenshot({ path: `${OUT}/a3-journal-posted-en-light-1440.png`, fullPage: true });
 
 // ---------- 2. Reverse ----------

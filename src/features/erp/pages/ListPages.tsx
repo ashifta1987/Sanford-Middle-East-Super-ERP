@@ -47,7 +47,7 @@ export function BusinessPartnersPage() {
       { key: 'kind', label: t('erp.col.type'), options: [['customer', t('erp.kind.customer')], ['supplier', t('erp.kind.supplier')], ['lead', t('erp.kind.lead')]] },
       { key: 'group_code', label: t('erp.col.group'), from: { table: 'bp_group', value: 'group_code', label: 'name' }, type: 'number' },
       { key: 'active', label: t('erp.col.status'), options: [['true', t('erp.status.active')], ['false', t('erp.status.inactive')]], type: 'boolean' },
-      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
+      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Southfield'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
     ],
     defaultSort: { col: 'card_code', asc: true },
     rowKey: (r) => `${r.company_code}|${r.card_code}`,
@@ -82,7 +82,7 @@ export function ItemsPage() {
       { key: 'group_code', label: t('erp.col.itemGroup'), from: { table: 'item_group', value: 'group_code', label: 'name' }, type: 'number' },
       { key: 'is_stock', label: t('erp.col.inventoryItem'), options: [['true', t('erp.yes')], ['false', t('erp.no')]], type: 'boolean' },
       { key: 'active', label: t('erp.col.status'), options: [['true', t('erp.status.active')], ['false', t('erp.status.inactive')]], type: 'boolean' },
-      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Super ERP'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
+      { key: 'source', label: t('erp.col.source'), options: [['erp', 'Southfield'], ['sap', 'SAP Business One'], ['sample', t('erp.sampleData')]] },
     ],
     defaultSort: { col: 'item_code', asc: true },
     rowKey: (r) => `${r.company_code}|${r.item_code}`,
@@ -134,7 +134,7 @@ export function DocumentsPage() {
         ...(so ? [['draft', t('erp.status.draft')] as [string, string]] : []),
         ['open', t('erp.status.open')], ['closed', t('erp.status.closed')], ['cancelled', t('erp.status.cancelled')]] },
       ...(so ? [
-        { key: 'source', label: t('so.filter.source'), options: [['sap', 'SAP'], ['erp', 'Super ERP'], ['sample', t('erp.sampleData')]] as Array<[string, string]> },
+        { key: 'source', label: t('so.filter.source'), options: [['sap', 'SAP'], ['erp', 'Southfield'], ['sample', t('erp.sampleData')]] as Array<[string, string]> },
       ] : []),
       ...(kind === 'sales_order' || kind === 'sales_quotation' || kind === 'purchase_order' || kind === 'goods_receipt' || kind === 'goods_issue' ? [
         { key: 'state', label: t('so.filter.approval'), options: [['pending_approval', t('so.state.pending_approval')], ['rejected', t('so.state.rejected')], ['draft', t('so.state.draft')]] as Array<[string, string]> },
@@ -156,7 +156,7 @@ export function DocumentsPage() {
         cell: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? <StatePill state={r.state} /> : <StatusTag value={r.status} />),
         csv: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? r.state : r.status) },
       ...(pu ? [{ key: 'china_office', header: t('pu.office'), hideBelow: 'lg' as const, cell: (r: R) => r.china_office ?? '—' }] : []),
-      ...(so ? [{ key: 'source', header: t('erp.col.source'), hideBelow: 'lg' as const, cell: (r: R) => (r.source === 'erp' ? 'Super ERP' : r.source === 'sap' ? 'SAP' : t('erp.sampleData')) }] : []),
+      ...(so ? [{ key: 'source', header: t('erp.col.source'), hideBelow: 'lg' as const, cell: (r: R) => (r.source === 'erp' ? 'Southfield' : r.source === 'sap' ? 'SAP' : t('erp.sampleData')) }] : []),
       ...(kind === 'sales_order' || cycle || pu ? [
         { key: 'currency', header: t('cur.currency'), hideBelow: 'md' as const, cell: (r: R) => <span className="font-mono text-[13px]">{r.currency || localOf(r.company_code)}</span> },
         { key: 'total_fc', header: t('cur.amountFc'), align: 'end' as const, hideBelow: 'sm' as const,

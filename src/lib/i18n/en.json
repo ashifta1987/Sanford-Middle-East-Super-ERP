@@ -425,7 +425,7 @@
         "opening": "Opening balances",
         "duplicates": "Duplicates",
         "custom_fields": "Custom fields",
-        "coexistence": "Super ERP records",
+        "coexistence": "Southfield records",
         "worker": "Worker",
         "load": "Load"
       },
@@ -567,7 +567,7 @@
       "open": "Custom fields",
       "crumb": "Custom fields",
       "title": "Custom-field register · {{code}}",
-      "subtitle": "Every SAP user field (U_) and user table (@): mapped to a Super ERP column, kept in the SAP copy only, or dropped. Dropping needs the owner's approval.",
+      "subtitle": "Every SAP user field (U_) and user table (@): mapped to a Southfield column, kept in the SAP copy only, or dropped. Dropping needs the owner's approval.",
       "noCompany": "No company in your list",
       "kTotal": "On the register",
       "kTotalNote": "{{fields}} fields · {{tables}} user tables",
@@ -616,7 +616,7 @@
       "actApprove": "Approve drop ({{n}})",
       "actReject": "Reject drop",
       "dlg": {
-        "mapped": "Map this field to a Super ERP column?",
+        "mapped": "Map this field to a Southfield column?",
         "raw_only": "Keep {{n}} field(s) in the SAP copy only?",
         "drop": "Propose dropping {{n}} field(s)?",
         "approve": "Approve dropping {{n}} field(s)?",
@@ -644,7 +644,7 @@
       "page": "Page {{a}} of {{b}} · {{n}} lines",
       "prev": "Previous",
       "next": "Next",
-      "footnote": "Nothing is deleted from the SAP copy. \"Drop\" means the field is not carried into Super ERP; the raw copy keeps it."
+      "footnote": "Nothing is deleted from the SAP copy. \"Drop\" means the field is not carried into Southfield; the raw copy keeps it."
     }
   },
   "stepNames": {
@@ -1204,7 +1204,7 @@
     "thisOrder": "This order",
     "createdAt": "created {{when}}",
     "sourceTitle": "Source",
-    "sapReadOnly": "This order came from SAP Business One. It is read-only in Super ERP.",
+    "sapReadOnly": "This order came from SAP Business One. It is read-only in Southfield.",
     "sampleReadOnly": "Sample test data. Read-only.",
     "editDraft": "Edit draft",
     "editResubmit": "Edit and resubmit",
@@ -1382,7 +1382,7 @@
     "cancel": "Cancel",
     "gl": {
       "title": "G/L Account Determination",
-      "desc": "Which account each kind of posting uses. Documents made in Super ERP post with these accounts; a missing one stops the posting and says so.",
+      "desc": "Which account each kind of posting uses. Documents made in Southfield post with these accounts; a missing one stops the posting and says so.",
       "saved": "Saved: {{label}} → {{acct}}.",
       "cleared": "Cleared: {{label}}. Postings that need it will be refused until it is set.",
       "missing_one": "{{count}} posting key is not set for {{company}}. Documents that need it can't post until Finance sets it.",
@@ -1403,7 +1403,7 @@
     },
     "per": {
       "title": "Posting Periods",
-      "desc": "Months open for posting. Journals and Super ERP documents dated in a closed or locked period are refused.",
+      "desc": "Months open for posting. Journals and Southfield documents dated in a closed or locked period are refused.",
       "periods": "Periods",
       "year": "Year",
       "period": "Period",
@@ -1453,7 +1453,7 @@
     },
     "noNumbering": "Numbering for sales quotations is not set up for {{company}}. Ask the system admin.",
     "reasonPh": "Why this quotation needs an exception",
-    "sapReadOnly": "This quotation came from SAP Business One. It is read-only in Super ERP.",
+    "sapReadOnly": "This quotation came from SAP Business One. It is read-only in Southfield.",
     "cancelOrder": "Cancel quotation",
     "cancelTitle": "Cancel sales quotation {{no}}?",
     "cancelBody": "The quotation is closed for good. It can’t be reopened.",
@@ -1475,12 +1475,12 @@
     "copyToInvoice": "Copy to A/R invoice",
     "copyToCreditMemo": "Copy to credit memo",
     "copyAfterApproval": "Available after approval",
-    "copyErpOnly": "Copy to works on Super ERP documents only.",
+    "copyErpOnly": "Copy to works on Southfield documents only.",
     "copyBlock": {
       "not_approved": "Available after approval",
       "closed": "Nothing is left to copy.",
       "read_only": "You have read-only access to Sales.",
-      "source": "Copy to works on Super ERP documents only."
+      "source": "Copy to works on Southfield documents only."
     },
     "copiedFrom": "copied from {{no}}",
     "fromBase": "from {{no}}, line {{line}}",
@@ -1552,7 +1552,7 @@
       "returned": "Goods back in stock (COGS → inventory)."
     },
     "noJournal": "No journal: nothing came from stock.",
-    "sapPosted": "SAP Business One posted this document. Nothing is posted in Super ERP.",
+    "sapPosted": "SAP Business One posted this document. Nothing is posted in Southfield.",
     "activity": {
       "delivery_create": "added the delivery",
       "ar_invoice_create": "added the invoice",
@@ -1624,7 +1624,7 @@
       "counts": "Counts as available",
       "none": "No ATP rules yet",
       "noneBody": "Without a rule, sales orders show no Available-to-Promise. Add the default rule first.",
-      "note": "Available-to-Promise is switched on in Super ERP (it was off in SAP). Rules are never deleted; make them inactive instead. Every change is logged."
+      "note": "Available-to-Promise is switched on in Southfield (it was off in SAP). Rules are never deleted; make them inactive instead. Every change is logged."
     }
   },
   "print": {
@@ -1661,7 +1661,7 @@
     "remarks": "Remarks",
     "deliveredBy": "Delivered by",
     "receivedBy": "Received by (name, signature, date)",
-    "footer": "Printed from Super ERP",
+    "footer": "Printed from Southfield",
     "sapCopy": "Copy of a SAP Business One document, for reference.",
     "sampleCopy": "Sample test data — not a real document.",
     "rate": "Exchange rate",
@@ -1699,8 +1699,8 @@
     "applyAll": "Apply in due-date order",
     "pickCustomerFirst": "Choose a customer to see their open invoices.",
     "pickSupplierFirst": "Choose a supplier to see their open invoices.",
-    "noOpenDocs": "Nothing open in Super ERP. The whole payment goes on account.",
-    "otherOpen": "{{n}} more open document(s) are not Super ERP documents (SAP Business One or sample data). During the soft switch their payments are recorded in SAP.",
+    "noOpenDocs": "Nothing open in Southfield. The whole payment goes on account.",
+    "otherOpen": "{{n}} more open document(s) are not Southfield documents (SAP Business One or sample data). During the soft switch their payments are recorded in SAP.",
     "open": "Open",
     "apply": "Apply",
     "applyTo": "Amount to apply to {{no}}",
@@ -1897,7 +1897,7 @@
     "chequesDue": "Cheques due (can be deposited)",
     "chequesPdc": "Post-dated cheques",
     "cardReceipts": "Card receipts to be settled",
-    "cashNote": "Balances are SAP Business One's balance at the last sync plus every Super ERP posting since. Checks run with your own access rights.",
+    "cashNote": "Balances are SAP Business One's balance at the last sync plus every Southfield posting since. Checks run with your own access rights.",
     "bpBank": "BP bank accounts",
     "bpBankDesc": "Bank details of customers and suppliers. A change sends the supplier's payments of the next {{n}} days to two-step approval.",
     "searchBpBank": "Search code, name, bank or IBAN",
@@ -1977,7 +1977,7 @@
     "submitOpen": "Submit",
     "needsApproval": "Needs approval from {{who}}",
     "myLimit": "Your purchase order limit: {{n}}",
-    "sapReadOnly": "This document came from SAP Business One. It is read-only in Super ERP.",
+    "sapReadOnly": "This document came from SAP Business One. It is read-only in Southfield.",
     "requesterSees": "{{name}} sees your decision on the purchase order.",
     "youCantApprove": "You can’t approve your own purchase order.",
     "rejectNoteNeeded": "Add a note saying why you are rejecting this purchase order.",
@@ -2102,7 +2102,7 @@
       "not_approved": "Approve it first.",
       "closed": "Nothing is left to copy.",
       "read_only": "You have read-only access.",
-      "source": "Only Super ERP documents can be copied."
+      "source": "Only Southfield documents can be copied."
     },
     "posted": {
       "goods_receipt_po": "Stock received and posted.",
@@ -2481,7 +2481,7 @@
     "lots": {
       "serials": "Item Serial Numbers",
       "batches": "Batches",
-      "desc": "Super ERP batches and serial numbers with their stock per warehouse, and the SAP copy (no quantities).",
+      "desc": "Southfield batches and serial numbers with their stock per warehouse, and the SAP copy (no quantities).",
       "search": "Number, item code or name",
       "inStock": "In stock",
       "out": "Not in stock",
@@ -2606,7 +2606,7 @@
     "bp": {
       "newTitle": "New {{kind}}",
       "editTitle": "Edit {{code}}",
-      "newSub": "Super ERP partner. The code comes from the company’s series when you save.",
+      "newSub": "Southfield partner. The code comes from the company’s series when you save.",
       "terms": "Terms and credit",
       "contacts": "Contact persons",
       "addresses": "Addresses",
@@ -2700,7 +2700,7 @@
     "item": {
       "newTitle": "New item",
       "editTitle": "Edit {{code}}",
-      "newSub": "Super ERP item. SAP items stay read-only until go-live.",
+      "newSub": "Southfield item. SAP items stay read-only until go-live.",
       "units": "Units and packing",
       "sourcing": "Sourcing",
       "flags": "Use and tracking",
@@ -2962,7 +2962,7 @@
       "created": "Employee {{code}} created.",
       "edit": "Edit",
       "editTitle": "Edit employee {{code}}",
-      "sapNote": "This employee comes from SAP. Change it in SAP until {{company}} goes live on Super ERP.",
+      "sapNote": "This employee comes from SAP. Change it in SAP until {{company}} goes live on Southfield.",
       "hrDetails": "HR details",
       "pay": "Pay",
       "changePay": "Change pay",
@@ -3195,7 +3195,7 @@
       "cancelBody": "The person can no longer accept it. You can invite them again later.",
       "inviteCancelled": "Invitation to {{email}} cancelled.",
       "howTitle": "How invitations work",
-      "howBody": "Super ERP asks a server function to create the sign-in and email the person a link. The secret key that does this never reaches the browser. The person opens the link, sets a password and lands on their home page with the access of their position.",
+      "howBody": "Southfield asks a server function to create the sign-in and email the person a link. The secret key that does this never reaches the browser. The person opens the link, sets a password and lands on their home page with the access of their position.",
       "inviteTitle": "Invite user",
       "inviteDesc": "They get an email with a link to set their password. Their access comes from the position you choose.",
       "editDesc": "Change position, companies, employee link, language, or switch the user off.",
@@ -3325,7 +3325,7 @@
       "setUp": "Set up",
       "saved": "{{doc}} numbering saved. Next number: {{ex}}.",
       "rulesTitle": "Rules",
-      "rule1": "A document type without numbering can’t be created in Super ERP.",
+      "rule1": "A document type without numbering can’t be created in Southfield.",
       "rule2": "With the same prefix, the next number can only go up.",
       "rule3": "Each prefix belongs to one document type.",
       "rule4": "SAP documents keep their SAP numbers."
@@ -3384,7 +3384,7 @@
       "requestN": "Company change {{n}}",
       "sys": {
         "title": "System currency",
-        "desc": "Optional, as in SAP Business One. When it differs from the local currency ({{lc}}), every Super ERP journal line also carries its amount in the system currency at that day's rate. Reports stay in {{lc}}.",
+        "desc": "Optional, as in SAP Business One. When it differs from the local currency ({{lc}}), every Southfield journal line also carries its amount in the system currency at that day's rate. Reports stay in {{lc}}.",
         "label": "System currency",
         "local": "{{cur}} (local currency – off)",
         "active": "Active: {{cur}}",
@@ -3399,7 +3399,7 @@
     },
     "fx": {
       "title": "Exchange Rates",
-      "desc": "Daily rates in {{cur}} per 1 unit of each currency. SAP’s rates show beside Super ERP’s; SAP rates are changed in SAP.",
+      "desc": "Daily rates in {{cur}} per 1 unit of each currency. SAP’s rates show beside Southfield’s; SAP rates are changed in SAP.",
       "table": "Daily rates table",
       "date": "Date",
       "by": "Entered by",
@@ -3604,7 +3604,7 @@
     "backToReport": "Back to the report",
     "printNow": "Print / save as PDF",
     "printedBy": "Printed by {{name}}, {{at}}",
-    "printFoot": "Super ERP report. Read with the printing user’s access rights."
+    "printFoot": "Southfield report. Read with the printing user’s access rights."
   },
   "ps": {
     "save": "Save",
@@ -3917,7 +3917,7 @@
       "open": "Open the equipment card",
       "search": "Search by serial, item or customer",
       "calls": "Calls",
-      "newSub": "For units sold before Super ERP or without an invoice. Cards are also created from service calls.",
+      "newSub": "For units sold before Southfield or without an invoice. Cards are also created from service calls.",
       "soldOn": "Sold on",
       "endOverride": "Warranty end (only to override)",
       "endHelp": "Empty = sale date + the item’s warranty months.",
@@ -4046,7 +4046,7 @@
       },
       "6": {
         "title": "Go-live date recorded",
-        "desc": "The CFO takes the company live. The SAP sync stops for this company and Super ERP documents become the source of truth."
+        "desc": "The CFO takes the company live. The SAP sync stops for this company and Southfield documents become the source of truth."
       },
       "7": {
         "title": "Hypercare finished",
@@ -4100,7 +4100,7 @@
     "goLive": "Go live",
     "goLiveWait": "Finish steps 1 to 5 first.",
     "goLiveTitle": "Take {{company}} live?",
-    "goLiveBody": "This records today as the go-live date for {{company}}. The SAP sync stops for this company and Super ERP documents become the source of truth. It can't be undone from the app.",
+    "goLiveBody": "This records today as the go-live date for {{company}}. The SAP sync stops for this company and Southfield documents become the source of truth. It can't be undone from the app.",
     "goLiveConfirm": "Take the company live",
     "facts": "Summary",
     "f": {
@@ -4181,7 +4181,7 @@
     "types": "Document types",
     "objType": "object {{n}}",
     "new": "New series",
-    "notUsedNote": "Super ERP doesn't create this document yet. Its series are ready for when it does.",
+    "notUsedNote": "Southfield doesn't create this document yet. Its series are ready for when it does.",
     "noSeries": "No series yet",
     "noSeriesBody": "Add a series so this document can be created in this company.",
     "f": {
@@ -4211,7 +4211,7 @@
     "nSeries_other": "{{count}} series",
     "nSeries_zero": "No series",
     "notSet": "Not set up",
-    "notUsed": "Not created in Super ERP yet",
+    "notUsed": "Not created in Southfield yet",
     "editTitle": "Change series {{name}}",
     "newTitle": "New series for {{doc}}",
     "any": "Any",
@@ -4233,7 +4233,7 @@
       "companyDefault": "Company default"
     },
     "rulesTitle": "Rules",
-    "rule1": "A document type without a series can't be created in Super ERP.",
+    "rule1": "A document type without a series can't be created in Southfield.",
     "rule2": "Next numbers only go up. Once a series has numbered documents its prefix and first number are fixed.",
     "rule3": "Each prefix belongs to one series in the company.",
     "rule4": "A series with a last number stops there: add a new series before it is used up.",
@@ -4286,7 +4286,7 @@
       "foreign": "Foreign",
       "tbc": "To be confirmed"
     },
-    "live": "Live on Super ERP",
+    "live": "Live on Southfield",
     "notLive": "Before go-live",
     "noRegister": "Not in the migration register",
     "note": "A new company starts empty: no numbering, accounts, limits or users. Sanford enters them in the setup screens before the first document.",
@@ -4600,7 +4600,7 @@
       "key": "Posting key",
       "levels": "Item group / warehouse",
       "usedIn": "Posted by: {{where}}",
-      "notUsed": "Not posted by Super ERP yet (kept for the SAP window)",
+      "notUsed": "Not posted by Southfield yet (kept for the SAP window)",
       "companyOnly": "Company only",
       "ctxNone": "None – company default",
       "overrides_one": "{{count}} override",
@@ -4642,7 +4642,7 @@
       "title": "Warehouses",
       "desc": "General data, accounts, bin locations and default numbering per warehouse.",
       "new": "New warehouse",
-      "newDesc": "A warehouse created here belongs to Super ERP; its general data can be changed here.",
+      "newDesc": "A warehouse created here belongs to Southfield; its general data can be changed here.",
       "code": "Warehouse code",
       "city": "City",
       "country": "Country",
@@ -4659,7 +4659,7 @@
       "create": "Create warehouse",
       "created": "Warehouse {{code}} created.",
       "saved": "Warehouse {{code}} saved.",
-      "sapNote": "This warehouse comes from SAP Business One. Its general data is changed in SAP until {{company}} goes live on Super ERP; accounts, bins and numbering can be set here.",
+      "sapNote": "This warehouse comes from SAP Business One. Its general data is changed in SAP until {{company}} goes live on Southfield; accounts, bins and numbering can be set here.",
       "tab": {
         "general": "General",
         "accounting": "Accounting",
@@ -4707,8 +4707,8 @@
       "create": "Create item group",
       "created": "Item group {{name}} created.",
       "saved": "Item group saved.",
-      "sapNote": "This item group comes from SAP Business One. Its name is changed in SAP until {{company}} goes live on Super ERP.",
-      "methodBody": "New Super ERP items in this group start with this management method. Existing items keep theirs. Service calls use the warranty months.",
+      "sapNote": "This item group comes from SAP Business One. Its name is changed in SAP until {{company}} goes live on Southfield.",
+      "methodBody": "New Southfield items in this group start with this management method. Existing items keep theirs. Service calls use the warranty months.",
       "acctBody": "Accounts items of this group use instead of the company default. A warehouse account still wins. Empty = the company default."
     },
     "rs": {

@@ -115,7 +115,7 @@ function Tabs<T extends string>({ id, tabs, value, onChange, label }: { id: stri
   );
 }
 
-const sourceLabel = (s: string | null | undefined, t: (k: string) => string) => (s === 'sap' ? 'SAP Business One' : s === 'sample' ? t('erp.sampleData') : s ? 'Super ERP' : '');
+const sourceLabel = (s: string | null | undefined, t: (k: string) => string) => (s === 'sap' ? 'SAP Business One' : s === 'sample' ? t('erp.sampleData') : s ? 'Southfield' : '');
 
 // ---------------------------------------------------------------- C2 · G/L Account Determination
 export function GlAccountDeterminationPage() {
@@ -331,7 +331,7 @@ export function WarehousesPage() {
               {q.data!.warehouses.map((w) => (
                 <tr key={w.whs_code} className="border-t border-line hover:bg-surface-2" data-whs={w.whs_code}>
                   <td className="px-4 py-2.5"><Link className="font-mono text-[13px] text-primary hover:underline" to={`/inventory/warehouses/${sc.company}/${w.whs_code}`}>{w.whs_code}</Link></td>
-                  <td dir="auto" className="px-4 py-2.5">{w.name}<div className="text-xs text-muted">{w.origin === 'erp' ? 'Super ERP' : t('stp.fromSap')}</div></td>
+                  <td dir="auto" className="px-4 py-2.5">{w.name}<div className="text-xs text-muted">{w.origin === 'erp' ? 'Southfield' : t('stp.fromSap')}</div></td>
                   <td dir="auto" className="px-4 py-2.5 max-sm:hidden">{w.city ?? '—'}</td>
                   <td className="px-4 py-2.5 max-md:hidden">{w.bins_enabled ? t('stp.whs.binsOn', { count: w.bins.length }) : t('erp.no')}</td>
                   <td className="px-4 py-2.5"><span className={clsx('pill', !w.active ? 'pill-neutral' : w.locked ? 'pill-warning' : 'pill-ok')}>{!w.active ? t('stp.inactive') : w.locked ? t('stp.locked') : t('stp.active')}</span></td>
@@ -539,7 +539,7 @@ export function ItemGroupsPage() {
             <tbody>{q.data!.groups.map((g) => (
               <tr key={g.group_code} className="border-t border-line hover:bg-surface-2" data-group={g.group_code}>
                 <td className="px-4 py-2.5"><Link className="font-mono text-[13px] text-primary hover:underline" to={`/inventory/item-groups/${sc.company}/${g.group_code}`}>{g.group_code}</Link></td>
-                <td dir="auto" className="px-4 py-2.5">{g.name}<div className="text-xs text-muted">{g.origin === 'erp' ? 'Super ERP' : t('stp.fromSap')}</div></td>
+                <td dir="auto" className="px-4 py-2.5">{g.name}<div className="text-xs text-muted">{g.origin === 'erp' ? 'Southfield' : t('stp.fromSap')}</div></td>
                 <td className="px-4 py-2.5"><span className={clsx('pill', g.manage_method === 'none' ? 'pill-neutral' : 'pill-info')}>{t(`stp.ig.m.${g.manage_method}`)}</span></td>
                 <td className="num px-4 py-2.5 text-end max-sm:hidden">{g.warranty_months ? t('stp.ig.months', { count: g.warranty_months }) : '—'}</td>
                 <td className="num px-4 py-2.5 text-end max-md:hidden">{g.items}</td>

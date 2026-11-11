@@ -39,7 +39,7 @@ export function StatePill({ state }: { state: WorkflowState }) {
   return <span className={clsx('pill', STATE_TONE[state])}>{t(`so.state.${state}`)}</span>;
 }
 export function sourceLabel(source: string) {
-  return source === 'erp' ? 'Super ERP' : source === 'sap' ? 'SAP Business One' : i18n.t('erp.sampleData');
+  return source === 'erp' ? 'Southfield' : source === 'sap' ? 'SAP Business One' : i18n.t('erp.sampleData');
 }
 export function SourcePill({ source }: { source: string }) {
   return <span className={clsx('pill', source === 'erp' ? 'pill-info' : 'pill-neutral')}>{sourceLabel(source)}</span>;

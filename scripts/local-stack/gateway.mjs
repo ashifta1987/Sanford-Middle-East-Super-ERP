@@ -95,7 +95,7 @@ http.createServer(async (req, res) => {
     users.push(u); store.users.push(u);
     const s = session(u);
     const origin = req.headers.origin ?? 'http://127.0.0.1:5173';
-    store.inbox.push({ to: j1.email, at: new Date().toISOString(), subject: 'You have been invited to Sanford Super ERP',
+    store.inbox.push({ to: j1.email, at: new Date().toISOString(), subject: 'You have been invited to Southfield',
       link: `${origin}/#access_token=${s.access_token}&expires_at=${s.expires_at}&expires_in=3600&refresh_token=${s.refresh_token}&token_type=bearer&type=invite` });
     persist();
     // 3. as the service role

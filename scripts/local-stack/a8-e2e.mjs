@@ -145,7 +145,7 @@ ok('bank details sent for approval, not used yet', (await txt(pb.locator('[data-
 await pb.goto(`${BASE}/bp/ZZ99/C0001`); await settle(pb);
 await pb.locator('#bp-edit').waitFor({ timeout: 10000 }).catch(() => {});
 ok('SAP partner: Edit disabled with the cut-over explanation', await pb.locator('#bp-edit').isDisabled().catch(() => false)
-  && (await txt(pb.locator('#bp-edit-reason'))) === 'This partner comes from SAP. Change it in SAP until ZZ99 goes live on Super ERP.');
+  && (await txt(pb.locator('#bp-edit-reason'))) === 'This partner comes from SAP. Change it in SAP until ZZ99 goes live on Southfield.');
 await pb.goto(`${BASE}/bp/ZZ99/C0001/edit`); await settle(pb);
 ok('SAP partner: edit URL shows the same explanation', (await txt(pb.locator('[data-testid=md-readonly]'))).includes('This partner comes from SAP.'));
 await C.close();
@@ -218,7 +218,7 @@ const itemCode = `E2E-${uniq}`;
   await pi.goto(`${BASE}/items/ZZ99/SMP-1010`); await settle(pi);
   await pi.locator('#item-edit').waitFor({ timeout: 10000 }).catch(() => {});
   ok('SAP item: Edit disabled with the explanation', await pi.locator('#item-edit').isDisabled().catch(() => false)
-    && (await txt(pi.locator('#item-edit-reason'))) === 'This item comes from SAP. Change it in SAP until ZZ99 goes live on Super ERP.');
+    && (await txt(pi.locator('#item-edit-reason'))) === 'This item comes from SAP. Change it in SAP until ZZ99 goes live on Southfield.');
   await C3.close();
 }
 {
@@ -246,7 +246,7 @@ const itemCode = `E2E-${uniq}`;
   await pa.goto(`${BASE}/m/bp?fn=0`); await settle(pa);
   ok('module page: Trademark Master opens the read-only list', await seen(pa.locator('main a[href="/bp/trademarks"]')));
   await pa.goto(`${BASE}/bp?f_source=erp`); await settle(pa);
-  ok('BP list: source filter finds Super ERP partners', (await txt(pa.locator('main table'))).includes(code));
+  ok('BP list: source filter finds Southfield partners', (await txt(pa.locator('main table'))).includes(code));
   await C5.close();
 }
 

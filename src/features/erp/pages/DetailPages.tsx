@@ -147,7 +147,7 @@ export function ItemDetail() {
               [t('erp.col.avgCost'), <span className="num">{fmtMoney(it.avg_cost)}</span>], [t('erp.col.preferredSupplier'), it.preferred_supplier],
               [t('erp.col.moq'), fmtQty(it.moq)], [t('md.f.sourcing_type'), it.sourcing_type], [t('md.f.supplier_part_no'), it.supplier_part_no],
               [t('md.f.tax_code'), it.tax_code], [t('md.f.tracking'), it.serial_managed ? t('md.tracking.serial') : it.batch_managed ? t('md.tracking.batch') : t('md.tracking.none')],
-              [t('erp.col.source'), it.source === 'sap' ? 'SAP Business One' : it.source === 'sample' ? t('erp.sampleData') : 'Super ERP'], [t('erp.col.container'), [it.pcs_20gp, it.pcs_40gp, it.pcs_40hq].some(Boolean) ? `20GP ${fmtQty(it.pcs_20gp)} · 40GP ${fmtQty(it.pcs_40gp)} · 40HQ ${fmtQty(it.pcs_40hq)}` : null],
+              [t('erp.col.source'), it.source === 'sap' ? 'SAP Business One' : it.source === 'sample' ? t('erp.sampleData') : 'Southfield'], [t('erp.col.container'), [it.pcs_20gp, it.pcs_40gp, it.pcs_40hq].some(Boolean) ? `20GP ${fmtQty(it.pcs_20gp)} · 40GP ${fmtQty(it.pcs_40gp)} · 40HQ ${fmtQty(it.pcs_40hq)}` : null],
             ]} />
           </SectionCard>
           <div className="grid gap-5 lg:grid-cols-2">

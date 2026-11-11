@@ -228,7 +228,7 @@ function JournalForm({ company: fixedCompany, initial, info }: { company?: strin
 
   return (
     <div>
-      <JeHeader title={title} onBack={back} pills={<><JeStatePill state={info?.state === 'rejected' ? 'rejected' : 'draft'} /><span className="pill pill-info">Super ERP</span></>}
+      <JeHeader title={title} onBack={back} pills={<><JeStatePill state={info?.state === 'rejected' ? 'rejected' : 'draft'} /><span className="pill pill-info">Southfield</span></>}
         sub={t('je.subNew')} />
 
       {(serverError || problems.length > 0) && (
@@ -410,7 +410,7 @@ function JournalDraftView({ info, onChanged }: { info: JeDraftInfo; onChanged: (
   }
   return (
     <div>
-      <JeHeader title={t('je.titleDraft', { n: info.draft_id })} pills={<><JeStatePill state={info.state} /><span className="pill pill-info">Super ERP</span><LiveBadge live /></>}
+      <JeHeader title={t('je.titleDraft', { n: info.draft_id })} pills={<><JeStatePill state={info.state} /><span className="pill pill-info">Southfield</span><LiveBadge live /></>}
         sub={[info.memo, info.created_by_name, t('je.createdAt', { when: fmtWhen(info.created_at) })].filter(Boolean).join(' · ')}
         actions={<>
           {info.trans_id && <Link to={`/financials/journals/${info.company_code}/${info.trans_id}`} id="je-open-posted" className="inline-flex min-h-[44px] items-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-medium text-white hover:bg-primary-hover"><FileText className="h-4 w-4" aria-hidden />{t('je.openPosted', { n: info.trans_id })}</Link>}
@@ -428,7 +428,7 @@ function JournalDraftView({ info, onChanged }: { info: JeDraftInfo; onChanged: (
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('erp.section.header')}>
             <Fields items={[[t('erp.col.postingDate'), fmtDay(info.ref_date)], [t('erp.col.dueDate'), fmtDay(info.due_date)], [t('erp.col.ref'), info.ref1],
-              [t('erp.col.remarks'), info.memo], [t('erp.col.total'), fmtMoney(info.total, cur)], [t('erp.col.source'), 'Super ERP']]} />
+              [t('erp.col.remarks'), info.memo], [t('erp.col.total'), fmtMoney(info.total, cur)], [t('erp.col.source'), 'Southfield']]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
             <div className="overflow-x-auto">

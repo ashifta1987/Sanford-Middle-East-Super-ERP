@@ -114,7 +114,7 @@ export function DepositNewPage() {
   const why = !canWrite ? readOnlyReason : total <= 0 ? t('bk.depositEmpty') : undefined;
   return (
     <RequireModule module="banking">
-      <BkHeader title={t('bk.newDeposit')} back={[t('bk.deposits'), '/banking/deposits']} pills={<span className="pill pill-info">Super ERP</span>} sub={t('bk.depositSub')} />
+      <BkHeader title={t('bk.newDeposit')} back={[t('bk.deposits'), '/banking/deposits']} pills={<span className="pill pill-info">Southfield</span>} sub={t('bk.depositSub')} />
       {company === '' ? <NeedCompany /> : s.isLoading ? <PageLoading /> : s.error ? <div className="card"><ErrorState error={s.error} onRetry={() => s.refetch()} /></div> : (
         <>
           <FormError message={err} />

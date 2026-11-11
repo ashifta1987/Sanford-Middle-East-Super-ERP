@@ -109,7 +109,7 @@ await pa.waitForURL(/\/docs\/sales_order\/ZZ99\/\d+$/, { timeout: 15000 }); awai
 const entry = entryFromUrl(pa.url());
 ok('2. submitted: "Waiting approval" on the order page', (await pa.locator('h1 .pill', { hasText: 'Waiting approval' }).count()) === 1, `entry ${entry}`);
 ok('flash: "Submitted for approval"', (await pa.locator('[role=status]', { hasText: 'Submitted for approval' }).count()) === 1);
-ok('source pill "Super ERP"', (await pa.locator('h1 .pill', { hasText: 'Super ERP' }).count()) === 1);
+ok('source pill "Southfield"', (await pa.locator('h1 .pill', { hasText: 'Southfield' }).count()) === 1);
 const docNo = (await pa.locator('h1').innerText()).match(/SO-26-\d+/)?.[0];
 ok('order number from the series (SO-26-…)', Boolean(docNo), docNo);
 ok('submitter sees "You can’t approve your own order." and no approve button', (await pa.locator('text=You can’t approve your own order.').count()) === 1 && (await pa.locator('#so-approve').count()) === 0);
@@ -153,7 +153,7 @@ ok('Copy to delivery enabled once approved (A4)', (await pa.locator('a#so-copy',
 await pa.screenshot({ path: `${OUT}/a2-order-approved-sales-en-light-1440.png`, fullPage: true });
 await pa.goto(`${BASE}/docs/sales_order?f_source=erp`); await settle(pa);
 const listRow = pa.locator('main table tbody tr', { hasText: docNo ?? 'SO-26-' });
-ok('order in the list as Open (source filter Super ERP)', (await listRow.locator('.pill', { hasText: 'Open' }).count()) === 1);
+ok('order in the list as Open (source filter Southfield)', (await listRow.locator('.pill', { hasText: 'Open' }).count()) === 1);
 await pa.screenshot({ path: `${OUT}/a2-list-source-erp-en-light-1440.png`, fullPage: true });
 
 // ---------- Reject path ----------

@@ -54,18 +54,27 @@ const browser = await chromium.launch();
   ok('sales orders list', all > 0, countText);
   await page.selectOption('select >> nth=1', 'open').catch(() => {});
   await page.locator('main select').first().selectOption('open'); await settle(page);
+  // Wait until the list has finished refreshing for the new filter before reading the count (no timing guess).
+  const listSettled = async () => {
+    await page.waitForURL((u) => u.search.includes('f_status=open'), { timeout: 10000 });
+    await page.locator('text=updating…').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await settle(page);
+  };
+  await listSettled();
   const openCount = await page.locator('text=/\\d+ results/').first().innerText();
   ok('status filter changes result count', openCount !== countText, `${countText} → ${openCount}`);
   ok('filter is kept in the URL', page.url().includes('f_status=open'));
   await page.click('th button:has-text("Total")'); await settle(page);
   ok('sort by total in URL', page.url().includes('sort=total'));
+  await listSettled();
+  const exportCount = await page.locator('text=/\\d+ results/').first().innerText();
   await page.screenshot({ path: `${OUT}/04-sales-orders.png`, fullPage: true });
   const dl = page.waitForEvent('download', { timeout: 10000 });
   await page.click('button:has-text("Export CSV")');
   const file = await dl;
   const csvPath = `${OUT}/${file.suggestedFilename()}`; await file.saveAs(csvPath);
   const csv = fs.readFileSync(csvPath, 'utf8').trim().split(/\r?\n/);
-  ok('CSV export matches filtered count', csv.length - 1 === Number(openCount.match(/\d+/)[0]), `${csv.length - 1} rows`);
+  ok('CSV export matches filtered count', csv.length - 1 === Number(exportCount.match(/\d+/)[0]), `${csv.length - 1} rows, screen ${exportCount}`);
   await page.locator('main table tbody tr a').first().click();
   ok('document detail shows lines', await page.locator('main a[href^="/items/"]').first().waitFor({ timeout: 10000 }).then(() => true, () => false));
   await page.screenshot({ path: `${OUT}/05-sales-order-detail.png`, fullPage: true });

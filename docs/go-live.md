@@ -65,9 +65,10 @@ The list is also in `scripts/local-stack/sql-order-supabase.txt`.
 | 17 | `31_approvals.sql` | B2: Approval Process (Approval Stages, Approval Templates, Approval Status Report). Migrates the existing `approval_rule` rows into templates; incoming payments can need approval. No templates are seeded for AE01–AE05 |
 | 18 | `32_gl_setup.sql` | B3: G/L Account Determination by tab with item group and warehouse accounts, Warehouses, Item Groups, Landed Cost types, Resources, standard goods receipt / issue reasons (seeded for AE01–AE05 without accounts), bank statement formats and the matching rule. No accounts are seeded for AE01–AE05 |
 | 19 | `33_multicurrency.sql` | B4: documents and payments in the business partner's currency (rates from Exchange Rates), foreign-currency amounts on journals, realised FX gain/loss at payment, soft-switch stock (SAP on-hand + Super ERP movements; the sync no longer wipes Super ERP stock). Generated from `supabase/sql/src/33_multicurrency/` |
+| 20 | `34_open_items.sql` | B5: Substitute Authorizer (Approval Process), landed cost charges in a foreign currency (with the broker's A/P invoice), credit memos copying invoices with other rates, foreign-currency totals on the document and payment lists (new `*_list_fc` views), Financials › Exchange Rate Differences (period-end revaluation with automatic reversal; new G/L keys `general/fx_reval_gain` and `fx_reval_loss`, no accounts seeded for AE01–AE05). Generated from `supabase/sql/src/34_open_items/` |
 
 - **Never** run `15_sample_company.sql` or `scripts/local-stack/test-users.sql` on live. They are a fictional company and fictional users. On a throwaway branch they are fine for running the test suites (3.3).
-- Files 15–33 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
+- Files 15–34 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
 - **How to run each file:** in the SQL editor, paste the whole file and run it once. Or use `psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/sql/<file>`. Stop at the first error and don't carry on with later files.
 
 ### 3.3 Tests on the branch
@@ -109,7 +110,7 @@ select erp.schema_release_record(f, 'live', 'Ashif', 'A14 go-live apply')
   from unnest(array['15_stage1_overview.sql','16_module_access.sql','17_sales_order.sql','18_posting.sql','19_sales_cycle.sql','20_banking.sql',
                     '21_purchasing.sql','22_inventory.sql','23_master_data.sql','24_hr.sql','25_admin.sql','26_reports.sql',
                     '27_migration_more.sql','28_production_service.sql','29_go_live.sql','30_numbering_company.sql','31_approvals.sql',
-                    '32_gl_setup.sql','33_multicurrency.sql']) f;
+                    '32_gl_setup.sql','33_multicurrency.sql','34_open_items.sql']) f;
 ```
 Do the same on the branch with `'branch'`. `schema_release_record` can only be run from the SQL editor (postgres) or with the service role. Signed-in users can only read the log, on the System health page.
 

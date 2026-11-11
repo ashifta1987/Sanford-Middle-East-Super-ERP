@@ -285,12 +285,20 @@ BEGIN
   PERFORM pg_temp.expect(pg_temp.call(sales, format($q$SELECT erp.sales_invoice_create('ZZ99', '{"doc_date":"2026-11-20"}', '[{"base_doc_entry":%s,"base_line":0,"qty":3},{"base_doc_entry":%s,"base_line":0,"qty":1}]')$q$, dl2, (r->>'doc_entry')::integer)),
     'The lines you copy are in more than one currency (AED, USD). Copy the documents of one currency at a time.', 'one invoice can''t mix AED and USD deliveries');
   inv2 := (pg_temp.call(sales, format($q$SELECT erp.sales_invoice_create('ZZ99', '{"doc_date":"2026-11-20"}', '[{"base_doc_entry":%s,"base_line":0,"qty":3}]')$q$, dl2))->>'doc_entry')::integer;
-  PERFORM pg_temp.expect(pg_temp.call(sales, format($q$SELECT erp.sales_credit_memo_create('ZZ99', '{"doc_date":"2026-11-20","fx_rate":3.5}', '[{"base_doc_entry":%s,"base_line":0,"qty":3}]')$q$, inv2)),
-    'This credit memo keeps the exchange rate of the document it is copied from (3.7).', 'credit memo can''t change the invoice rate');
-  r := pg_temp.call(sales, format($q$SELECT erp.sales_credit_memo_create('ZZ99', '{"doc_date":"2026-11-20"}', '[{"base_doc_entry":%s,"base_line":0,"qty":3}]')$q$, inv2));
+  -- B5 (34_open_items.sql): a typed rate is no longer refused on a credit memo; the copied line keeps the invoice's rate (SAP B1).
+  r := pg_temp.call(sales, format($q$SELECT erp.sales_credit_memo_create('ZZ99', '{"doc_date":"2026-11-20","fx_rate":3.5}', '[{"base_doc_entry":%s,"base_line":0,"qty":1}]')$q$, inv2));
+  IF to_regclass('erp.fx_revaluation') IS NOT NULL THEN
+    PERFORM pg_temp.check((pg_temp.doc(14, (r->>'doc_entry')::integer)).fx_rate = 3.70 AND (pg_temp.doc(14, (r->>'doc_entry')::integer)).total = 155.40,
+      'credit memo with a typed rate keeps the invoice rate (3.7): 42 USD = 155.40 AED', left(r::text, 200));
+  ELSE
+    PERFORM pg_temp.expect(r, 'This credit memo keeps the exchange rate of the document it is copied from (3.7).', 'credit memo can''t change the invoice rate');
+  END IF;
+  r := pg_temp.call(sales, format($q$SELECT erp.sales_credit_memo_create('ZZ99', '{"doc_date":"2026-11-20"}', '[{"base_doc_entry":%s,"base_line":0,"qty":%s}]')$q$, inv2,
+                                  CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 2 ELSE 3 END));
   cm := (r->>'doc_entry')::integer;
   d := pg_temp.doc(14, cm);
-  PERFORM pg_temp.check(d.currency = 'USD' AND d.fx_rate = 3.70 AND d.total_fc = 126 AND erp._bk_doc_open_fc('ZZ99', 13, inv2) = 0 AND erp._bk_doc_open('ZZ99', 13, inv2) = 0,
+  PERFORM pg_temp.check(d.currency = 'USD' AND d.fx_rate = 3.70 AND d.total_fc = CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 84 ELSE 126 END
+                        AND erp._bk_doc_open_fc('ZZ99', 13, inv2) = 0 AND erp._bk_doc_open('ZZ99', 13, inv2) = 0,
     'credit memo at the invoice rate nets the invoice to 0 in USD and AED', format('%s %s %s', d.currency, d.fx_rate, d.total_fc));
 
   -- ================= 4. Payments: currency rules =================
@@ -398,7 +406,7 @@ BEGIN
     'manual candidates: the payment whose reference fits comes first (ref_match)', left(r::text, 400));
 
   -- ================= 7. Health =================
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = 21 AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '33_multicurrency.sql' AND object = 'currency_rate'),
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 22 ELSE 21 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '33_multicurrency.sql' AND object = 'currency_rate'),
     'system health lists 33_multicurrency.sql (21 files)');
 END $$;
 

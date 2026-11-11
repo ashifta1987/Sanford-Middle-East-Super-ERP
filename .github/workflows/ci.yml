@@ -58,6 +58,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Generated SQL files match their sources (32, 33, 34)
+        run: |
+          for b in supabase/sql/src/*/build.py; do python3 "$b" --check; done
       - name: Start Postgres 17
         run: |
           docker run -d --name pg -p 5433:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17 \

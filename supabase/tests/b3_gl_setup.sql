@@ -69,7 +69,8 @@ DECLARE
   no_fin text := 'Your position does not include Financials. Ask the system admin if you need it.';
 BEGIN
   -- ================= 1. Posting keys (the inventory of 18–31) =================
-  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_posting_key) = 36, '36 posting keys (23 from A3/A6 + 13 new)', (SELECT count(*) FROM erp.gl_posting_key)::text);
+  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_posting_key) = CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 38 ELSE 36 END,
+                        '36 posting keys (23 from A3/A6 + 13 new; 38 with B5''s revaluation keys)', (SELECT count(*) FROM erp.gl_posting_key)::text);
   PERFORM pg_temp.check((SELECT count(DISTINCT tab) FROM erp.gl_posting_key) = 9 AND NOT EXISTS (SELECT 1 FROM erp.gl_posting_key WHERE tab IS NULL),
                         'every key is on one of the 9 SAP tabs (sales, purchasing, inventory, banking, production, service, payroll, landed costs, general)');
   PERFORM pg_temp.check((SELECT string_agg(area || '/' || posting_key, ',' ORDER BY sort) FROM erp.gl_posting_key WHERE tab = 'landed_costs')
@@ -79,13 +80,13 @@ BEGIN
                         'six keys live in their setting columns (cash, cheques, card, WIP, variance, salaries payable) and have no gl_determination row');
   PERFORM pg_temp.check((SELECT bool_and(ctx) FROM erp.gl_posting_key WHERE area = 'inventory') AND NOT (SELECT ctx FROM erp.gl_posting_key WHERE posting_key = 'domestic_ar'),
                         'inventory keys may be set per item group / warehouse; receivables only per company');
-  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_determination WHERE company_code = 'ZZ99') = 19 AND NOT EXISTS (SELECT 1 FROM erp.gl_determination WHERE company_code = 'AE05')
+  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_determination WHERE company_code = 'ZZ99') = CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 21 ELSE 19 END AND NOT EXISTS (SELECT 1 FROM erp.gl_determination WHERE company_code = 'AE05')
                         AND NOT EXISTS (SELECT 1 FROM erp.gl_determination_group) AND NOT EXISTS (SELECT 1 FROM erp.gl_determination_whs),
-                        'ZZ99 keeps its 19 SAMPLE rows; AE05 and the override tables start empty');
+                        'ZZ99 keeps its 19 SAMPLE rows (21 with B5); AE05 and the override tables start empty');
 
   -- ================= 2. gl_setup =================
   r := pg_temp.call(fin, $q$SELECT erp.gl_setup('ZZ99')$q$);
-  PERFORM pg_temp.check(jsonb_array_length(r->'keys') = 36 AND (r->>'can_write')::boolean
+  PERFORM pg_temp.check(jsonb_array_length(r->'keys') = CASE WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 38 ELSE 36 END AND (r->>'can_write')::boolean
                         AND (SELECT k->>'acct_code' FROM jsonb_array_elements(r->'keys') k WHERE k->>'posting_key' = 'revenue') = '4100'
                         AND (SELECT k->>'acct_code' FROM jsonb_array_elements(r->'keys') k WHERE k->>'area' = 'banking' AND k->>'posting_key' = 'cash') = '1105'
                         AND (SELECT k->>'acct_code' FROM jsonb_array_elements(r->'keys') k WHERE k->>'area' = 'production' AND k->>'posting_key' = 'wip') = '1360',

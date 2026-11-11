@@ -140,7 +140,7 @@ for (const v of VARIANTS) {
       const de = document.documentElement;
       const body = document.body.innerText;
       const h1 = document.querySelector('main h1');
-      const raw = (body.match(/\b(?:sana|erp|adm|so|sc|pu|bk|inv|md|hr|rpt|apr|stp|cur|fxr|cvd|gl|je|fs|nav|top|app|login|errors)\.[a-zA-Z]+(?:\.[a-zA-Z0-9_]+)+\b/g) || []).filter((x) => !/\.(sql|json|csv|ts|tsx|png|svg|test)$/.test(x));
+      const raw = (body.match(/\b(?:sana|erp|adm|so|sc|pu|bk|inv|md|hr|rpt|apr|stp|cur|fxr|cvd|gl|je|fs|nav|top|app|login|errors)\.[a-zA-Z]+(?:\.[a-zA-Z0-9_]+)+\b/g) || []).filter((x) => !/\.(sql|json|csv|ts|tsx|png|svg|test)$/.test(x) && !/^erp\.(item|business_partner|document|document_line|employee|account)\.[a-z_]+$/.test(x)); // erp.<table>.<column> = data (custom-field register targets)
       return {
         hscroll: de.scrollWidth > de.clientWidth + 1 ? de.scrollWidth - de.clientWidth : 0,
         superErp: /Super ERP/.test(body),

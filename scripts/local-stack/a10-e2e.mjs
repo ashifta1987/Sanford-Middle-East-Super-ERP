@@ -142,8 +142,9 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
   ok('admin cannot switch themselves off (checkbox disabled)', await a.locator('#adm-u-active').isDisabled());
   await A.close();
   const rr = await q.evaluate(async () => {
-    const k = Object.keys(localStorage).find((x) => x.includes('auth-token'));
-    const tok = JSON.parse(localStorage.getItem(k)).access_token;
+    // U0: without "Remember me" the session lives in sessionStorage
+    const k = Object.keys(sessionStorage).concat(Object.keys(localStorage)).find((x) => x.includes('auth-token'));
+    const tok = JSON.parse(sessionStorage.getItem(k) ?? localStorage.getItem(k)).access_token;
     const r = await fetch('http://127.0.0.1:54321/rest/v1/item?select=item_code&limit=1', { headers: { authorization: `Bearer ${tok}`, apikey: 'local', 'accept-profile': 'erp' } });
     return (await r.json()).length;
   });

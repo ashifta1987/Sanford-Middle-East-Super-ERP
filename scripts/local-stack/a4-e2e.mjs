@@ -52,7 +52,7 @@ async function get(tok, path) {
 }
 async function context(browser, { width = 1440, height = 900, lang = 'en', theme = 'light' } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, ...(width < 640 ? { isMobile: true, hasTouch: true } : {}) });
-  await ctx.addInitScript(([l, t]) => { localStorage.setItem('lang', l); localStorage.setItem('theme', t); localStorage.setItem('company', 'ZZ99'); }, [lang, theme]);
+  await ctx.addInitScript(([l, t]) => { localStorage.setItem('lang', l); localStorage.setItem('theme', t); localStorage.setItem('company', 'ZZ99'); localStorage.setItem('sf-remember', '1'); }, [lang, theme]);  // U0: "Remember me" so a second tab of the same context shares the session
   return ctx;
 }
 async function pickCombo(page, input, text, optionText) {

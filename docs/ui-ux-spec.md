@@ -176,9 +176,7 @@ The full design is in `docs/sana-assistant.md`.
 - **Tables** with no sample values show "No sample values. Filled from your SAP during migration."
 
 ### 4.8 Home
-- **Greeting and description.**
-- **KPI cards** (2–4 per row): open sales orders, open POs, overdue A/R, below minimum stock, A/P due in 7 days, open quotations, customers, items. Each card links to the filtered list. A card appears only when the user has that module.
-- **Module cards:** number, title, description, "n SAP functions · m with working screens".
+The home page is Sana-powered. See §4.9, with the hero, Needs attention, Today at a glance and Modules.
 
 ## 5. Components and states
 | Component | Rules |

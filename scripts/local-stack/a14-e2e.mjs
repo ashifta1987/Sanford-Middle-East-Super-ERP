@@ -175,8 +175,8 @@ try {
   await ap.goto(`${BASE}/admin/health`); await settle(ap);
   ok('system health loads with an overall status', await seen(ap.locator('[data-testid=gl-health-status]')), await ap.locator('[data-testid=gl-health-status]').getAttribute('data-status').catch(() => ''));
   // B1 adds 30_numbering_company.sql (18 files).
-  // B5 adds 34_open_items.sql (22 files).
-  ok('every SQL file 14–34 is in place', (await ap.locator('[data-testid=gl-health-files] tbody tr').count()) === 22 && !/Missing/.test(await txt(ap.locator('[data-testid=gl-health-files]'))));
+  // B5 adds 34_open_items.sql (22 files), B6 35_final_items.sql (23 files).
+  ok('every SQL file 14–35 is in place', (await ap.locator('[data-testid=gl-health-files] tbody tr').count()) === 23 && !/Missing/.test(await txt(ap.locator('[data-testid=gl-health-files]'))));
   ok('files, RLS, search_path and anon checks pass', (await ap.locator('[data-testid=gl-health-checks] li[data-status=ok]').count()) === 4);
   ok('direct write grants shown as a warning with the explanation', (await ap.locator('[data-testid=gl-health-checks] li[data-key=direct_write_grants][data-status=warn]').count()) === 1);
   ok('companies table shows ZZ99 at 6 of 7', /ZZ99[\s\S]*6 \/ 7/.test(await txt(ap.locator('[data-testid=gl-health-companies]'))));

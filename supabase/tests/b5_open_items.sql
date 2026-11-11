@@ -455,12 +455,12 @@ BEGIN
   -- setup, keys, health
   r := pg_temp.call(fin, $q$SELECT erp.fx_revaluation_setup('ZZ99')$q$);
   PERFORM pg_temp.check(r->>'gain_acct' = '7110' AND r->>'loss_acct' IS NULL AND (r->>'can_write')::boolean AND r->'open_currencies' ? 'USD' IS NOT NULL, 'setup: accounts, rights, currencies', left(r::text, 300));
-  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_posting_key) = 38 AND (SELECT count(*) FROM erp.gl_posting_key WHERE posting_key IN ('fx_reval_gain', 'fx_reval_loss') AND tab = 'general') = 2,
-    'G/L Account Determination › General has the two revaluation keys (38 keys)');
+  PERFORM pg_temp.check((SELECT count(*) FROM erp.gl_posting_key) = CASE WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 39 ELSE 38 END AND (SELECT count(*) FROM erp.gl_posting_key WHERE posting_key IN ('fx_reval_gain', 'fx_reval_loss') AND tab = 'general') = 2,
+    'G/L Account Determination › General has the two revaluation keys (38 keys, 39 with B6)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM erp.gl_determination g JOIN erp.company c USING (company_code) WHERE g.posting_key IN ('fx_reval_gain', 'fx_reval_loss') AND c.company_code <> 'ZZ99'),
     'no revaluation accounts for real companies (empty until Finance enters them)');
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = 22 AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '34_open_items.sql' AND object = 'fx_revaluation_post'),
-    'system health lists 34_open_items.sql (22 files)');
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 23 ELSE 22 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '34_open_items.sql' AND object = 'fx_revaluation_post'),
+    'system health lists 34_open_items.sql (22 files, 23 with B6)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                                      WHERE n.nspname = 'erp' AND p.prosecdef AND (p.proname LIKE 'fx_revaluation%' OR p.proname LIKE 'approval_substitute%' OR p.proname LIKE '\_fxr%' OR p.proname LIKE '\_apr\_sub%')
                                        AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR NOT coalesce(array_to_string(p.proconfig, ',') LIKE '%search_path=erp, pg_temp%', false))),

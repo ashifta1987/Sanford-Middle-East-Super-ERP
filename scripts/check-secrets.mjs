@@ -33,3 +33,4 @@ for (const l of diff.split('\n')) {
 }
 if (hits.length) { console.error(`check-secrets: key-like text in the diff — remove it before committing:\n  ${hits.join('\n  ')}`); process.exit(1); }
 console.log(`check-secrets: ok (no key-like text in ${ref ? `git diff ${ref}` : 'the staged diff'})`);
+

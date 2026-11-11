@@ -292,7 +292,7 @@ ok('test inbox received the invitation email', inbox.length === 1 && inbox[0].li
   await login(p, 'admin'); await settle(p);
   await p.goto(`${BASE}/admin/ai-assistant`); await settle(p);
   await seen(p.locator('#adm-ai-enabled'));
-  ok('no field for an API key on the page', (await p.locator('main input[type=password], main input[name*=key i], main input[id*=key i]').count()) === 0 && (await txt(p.locator('[data-testid=adm-ai-key]'))).includes('never saved in the database'));
+  ok('no field for an API key on the page', (await p.locator('main input[type=password], main input[name*=key i], main input[id*=key i]').count()) === 0 && (await txt(p.locator('[data-testid=adm-ai-key]'))).includes('never stored in the database'));   // S2 wording: provider card (no key field)
   await p.fill('#adm-ai-limit', '6000');
   await p.click('#adm-ai-save'); await settle(p);
   ok('daily limit above 5,000 refused with the reason', (await errText(p)).includes('Enter a daily limit from 0 to 5,000'));

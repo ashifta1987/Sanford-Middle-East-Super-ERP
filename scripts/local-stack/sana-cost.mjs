@@ -90,3 +90,4 @@ out('');
 out(`Assumptions: output ${A.callOut} tokens per tool-call turn and ${A.answerOut} per answer; Gemini thinking off (thinkingBudget 0 on Flash; thinking tokens would be billed as output). Daily limit 200 questions per person caps the worst case.`);
 const md = process.argv.indexOf('--md');
 if (md > 0) fs.writeFileSync(process.argv[md + 1], lines.join('\n') + '\n');
+

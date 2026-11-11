@@ -132,6 +132,9 @@ export function SanaProvider({ children }: { children: ReactNode }) {
   const pending = useRef<{ text: string; via: 'text' | 'voice' } | null>(null);
   const co = company === 'GRP' ? null : company;
   const status = useSanaStatusQuery(open);
+  // the home hero shares this cache: re-read the settings whenever the panel opens (an admin may have just changed them)
+  const refetchStatus = status.refetch;
+  useEffect(() => { if (open) void refetchStatus(); }, [open, refetchStatus]);
 
   const setConv = (id: string | null) => { conversation.current = id; setConversationId(id); };
 

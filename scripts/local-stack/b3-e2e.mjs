@@ -268,7 +268,9 @@ try {
 
   // ---------- 6. Bank statement: saved mapping, decimal comma, reference rule ----------
   {
-    const today = new Date(); const iso = today.toISOString().slice(0, 10);
+    // Local calendar date for both the payment and the CSV (toISOString is UTC: it is "yesterday" here between 00:00 and 05:30).
+    const localIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = new Date(); const iso = localIso(today);
     const dd = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
     const cents = String(Math.floor(Math.random() * 90) + 10);
     const A = `3${RND}.${cents}`; const B = `4${RND}.${cents}`;
@@ -318,7 +320,7 @@ try {
     await as(ID.admin, `SELECT erp.approval_template_save('ZZ99', $1::jsonb)`, [JSON.stringify({ name: 'E2E B3 incoming', kind: 'incoming_payment', stages: [stageId],
       originators: [{ user_id: ID.fin }], conditions: [{ field: 'amount', op: 'gt', value1: 5000 }] })]);
     const pay = await as(ID.fin, `SELECT erp.payment_submit('ZZ99', 'I', $1::jsonb, '[]'::jsonb, 'E2E B3 partial rejection') AS r`,
-      [JSON.stringify({ card_code: 'C0011', doc_date: new Date().toISOString().slice(0, 10), transfer: `7${RND}.11`, transfer_bank: 'BNK-AED' })]);
+      [JSON.stringify({ card_code: 'C0011', doc_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(), transfer: `7${RND}.11`, transfer_bank: 'BNK-AED' })]);
     const draft = pay.r.draft_id;
     ok('fixture: the payment waits for the two-rejection stage', pay.r.state === 'pending_approval' && Boolean(draft), JSON.stringify(pay.r));
     const C = await context(browser);

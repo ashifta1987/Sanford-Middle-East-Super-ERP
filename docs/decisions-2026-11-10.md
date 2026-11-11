@@ -52,3 +52,10 @@ Principle: **anything company-specific is entered by Sanford in the front end la
 ## 4. Entered later in the front end, no build needed
 Real users and positions, owner position, approval limits, currencies, number prefixes, leave/weekend/holidays, overtime/unpaid leave, WPS routing/MOHRE/SIF, attendance sites, gratuity/air tickets, payroll accounts, bank accounts, PI statuses, China offices, required fields, bins/batches per warehouse/group, warranty months, opening date/clearing account/VAT period, attachments folder, opening balances, which reports come next.
 
+
+## 5. Added 11 Nov 2026
+| Area | Decision |
+|---|---|
+| Sana languages | **English and Malayalam are the priority languages.** They are listed first in the Sana panel and admin screen. Basic mode understands and answers Malayalam on every topic. The other 9 languages stay available. |
+| Sana AI mode | No provider key yet: Sana runs in basic mode. Set `ANTHROPIC_API_KEY` as a Supabase secret to switch on AI answers. |
+| Sana live | `36_sana.sql` applied on live (5 tables, 29 functions). Edge Function `sana` deployed (v1). `main` = 449ac5f on Vercel production. |

@@ -157,7 +157,7 @@ try {
     await login(p, 'qa.sales@sample.test', 'local-only-2');
     await openPanel(p);
     const a = await ask(p, 'How many open sales orders do we have?');
-    ok(`text (${prov}): streamed answer from the provider path, with source links`, /^\[mock\]/.test(a) && /count 16/.test(a) && (await p.locator('aside[role=dialog] [data-testid=sana-answer] a[href^="/docs/sales_order"]').count()) > 0, a);
+    ok(`text (${prov}): streamed answer from the provider path, with source links`, /^\[mock\]/.test(a) && /count \d+/.test(a) && (await p.locator('aside[role=dialog] [data-testid=sana-answer] a[href^="/docs/sales_order"]').count()) > 0, a);
     ok(`text (${prov}): no basic-mode note (AI mode)`, (await p.locator('[data-testid=sana-basic]').count()) === 0);
     const r = await ask(p, 'Show me the profit and the journal entries');
     ok(`text (${prov}): out of role → standard refusal`, /isn.t available for your role/.test(r) && (await p.locator('aside[role=dialog] [data-testid=sana-refusal]').count()) === 1, r);

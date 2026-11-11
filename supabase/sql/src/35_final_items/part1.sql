@@ -26,8 +26,9 @@ ALTER TABLE erp.landed_cost_charge ADD COLUMN IF NOT EXISTS card_code varchar(15
 
 -- ============ 2. System currency per company ============
 -- SAP Business One keeps a system currency next to the local currency. Here it is optional: no row (or the local currency)
--- means inactive, and journals carry no system currency amounts. It can be changed until Super ERP journal lines carry
--- amounts in it. Read = Administration (admin / IT / owner); write = Administration full; audited.
+-- means inactive, and journals carry no system currency amounts. An active system currency is fixed once Super ERP journal
+-- lines carry amounts in it (SAP B1 does the same). Read = Administration (admin / IT / owner); write = Administration full;
+-- audited.
 CREATE TABLE IF NOT EXISTS erp.system_currency_setting (
     company_code   varchar(8) PRIMARY KEY REFERENCES erp.company ON DELETE CASCADE,
     currency       varchar(3) NOT NULL,
@@ -66,7 +67,7 @@ BEGIN
   SELECT * INTO s FROM erp.system_currency_setting WHERE company_code = p_company;
   RETURN jsonb_build_object(
     'company_code', p_company, 'local_currency', c.currency, 'system_currency', coalesce(v_sc, c.currency), 'active', v_sc IS NOT NULL,
-    'currencies', to_jsonb(erp._cur_list(p_company)), 'can_write', erp.can_write('admin'), 'locked', v_used > 0, 'journals', v_used,
+    'currencies', to_jsonb(erp._cur_list(p_company)), 'can_write', erp.can_write('admin'), 'locked', v_sc IS NOT NULL AND v_used > 0, 'journals', v_used,
     'rate_today', CASE WHEN v_sc IS NOT NULL THEN erp._cur_rate(p_company, v_sc, current_date) END,
     'updated_by_name', erp._adm_name(s.updated_by), 'updated_at', s.updated_at);
 END $$;
@@ -92,7 +93,7 @@ BEGIN
   END IF;
   PERFORM 1 FROM erp.company WHERE company_code = p_company FOR UPDATE;
   v_used := erp._sys_cur_used(p_company);
-  IF v_used > 0 THEN
+  IF v_old <> c.currency AND v_used > 0 THEN
     RAISE EXCEPTION 'The system currency of % can''t be changed: % journal entries already carry amounts in %.', p_company, v_used, v_old USING ERRCODE = 'P0001';
   END IF;
   IF v_new = c.currency THEN

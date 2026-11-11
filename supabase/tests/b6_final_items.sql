@@ -226,6 +226,11 @@ BEGIN
     format('The system currency of ZZ99 can''t be changed: %s journal entries already carry amounts in USD.', erp._sys_cur_used('ZZ99')), 'the system currency is fixed once journals carry it');
   r := pg_temp.call(admin, $q$SELECT erp.system_currency_info('ZZ99')$q$);
   PERFORM pg_temp.check((r->>'locked')::boolean AND (r->>'active')::boolean AND r->>'system_currency' = 'USD', 'info: active and locked', left(r::text, 200));
+  -- switched off outside the app (e.g. a test cleanup): it may be set again
+  DELETE FROM erp.system_currency_setting WHERE company_code = 'ZZ99';
+  PERFORM pg_temp.check(erp._sys_cur('ZZ99') IS NULL AND NOT (pg_temp.call(admin, $q$SELECT erp.system_currency_info('ZZ99')$q$)->>'locked')::boolean,
+    'an inactive system currency is not locked (only an active one is fixed)');
+  PERFORM pg_temp.ok(pg_temp.call(admin, $q$SELECT erp.system_currency_save('ZZ99', 'USD')$q$), 'an inactive system currency may be set again');
 END $$;
 
 -- ======================================================================= 4. Conversion Differences

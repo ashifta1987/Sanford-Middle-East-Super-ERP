@@ -1,10 +1,13 @@
 // Local stand-in for the Supabase API, for development and browser tests only.
 // /rest/v1/* is proxied to a local PostgREST (real Postgres, real RLS from supabase/sql/10-15).
-// /functions/v1/sana runs the Sana assistant (basic mode unless ANTHROPIC_API_KEY is set).
+// /functions/v1/sana and /functions/v1/sana-voice run the Sana Edge Function code (basic mode unless a provider is configured).
+// S2: POST /local/sana-provider {provider: 'basic' | 'gemini-mock' | 'anthropic-mock'} points Sana at the LOCAL-ONLY provider
+// mock (provider-mock.mjs, mounted under /local/mock/*; NOT AI). Default: basic mode, as before.
 // /auth/v1/* issues HS256 JWTs for the test users in users.json (never real users or passwords).
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { mockHandler } from './provider-mock.mjs';
 
 const PORT = Number(process.env.GATEWAY_PORT ?? 54321);
 const PGRST = process.env.PGRST_URL ?? 'http://127.0.0.1:3000';
@@ -43,6 +46,19 @@ const cors = {
   'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
   'access-control-expose-headers': 'content-range, content-profile',
 };
+// S2 · which provider Sana uses in the local stack. 'gemini-mock' / 'anthropic-mock' = the LOCAL-ONLY mock with a placeholder
+// key ('local-mock'; the mock only checks that a key header is present). A real key in this process's environment is passed
+// through as before (none on the build machine). The base-URL variables exist only here, never in the Edge Functions.
+const MOCK = `http://127.0.0.1:${PORT}/local/mock`;
+const sanaLocal = { provider: 'basic', timeout_ms: undefined };
+function sanaEnv() {
+  const env = { SUPABASE_URL: `http://127.0.0.1:${PORT}`, SUPABASE_ANON_KEY: 'local', SANA_PROVIDER: process.env.SANA_PROVIDER, SANA_MODEL: process.env.SANA_MODEL,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, SANA_TIMEOUT_MS: sanaLocal.timeout_ms };
+  if (sanaLocal.provider === 'gemini-mock') Object.assign(env, { SANA_PROVIDER: 'gemini', SANA_MODEL: undefined, GEMINI_API_KEY: 'local-mock', SANA_GEMINI_BASE_URL: `${MOCK}/gemini/v1beta` });
+  if (sanaLocal.provider === 'anthropic-mock') Object.assign(env, { SANA_PROVIDER: 'anthropic', SANA_MODEL: undefined, ANTHROPIC_API_KEY: 'local-mock', SANA_ANTHROPIC_BASE_URL: `${MOCK}/anthropic`,
+    GEMINI_API_KEY: 'local-mock', SANA_GEMINI_BASE_URL: `${MOCK}/gemini/v1beta` });   // provider voice is always Gemini
+  return env;
+}
 const send = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', ...cors }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
 const readBody = (req) => new Promise((r) => { let d = ''; req.on('data', (c) => (d += c)); req.on('end', () => r(d)); });
 
@@ -106,16 +122,33 @@ http.createServer(async (req, res) => {
     return send(res, 200, { invite_id: j1.invite_id, user_id: u.id, email: j1.email, state: 'sent' });
   }
   if (url.pathname === '/auth/v1/logout') return send(res, 204);
+  // S2 · LOCAL-ONLY provider mock (not AI) and the switch that points Sana at it.
+  if (url.pathname.startsWith('/local/mock/')) { await mockHandler(req, res, url); return; }
+  if (url.pathname === '/local/sana-provider') {
+    if (req.method === 'POST') {
+      const b = JSON.parse((await readBody(req)) || '{}');
+      if (!['basic', 'gemini-mock', 'anthropic-mock'].includes(b.provider)) return send(res, 400, { error: 'provider: basic | gemini-mock | anthropic-mock' });
+      sanaLocal.provider = b.provider;
+      sanaLocal.timeout_ms = b.timeout_ms ? String(Number(b.timeout_ms)) : undefined;
+    }
+    return send(res, 200, { ...sanaLocal, note: sanaLocal.provider.endsWith('-mock') ? 'LOCAL-ONLY provider mock — not AI' : undefined });
+  }
+  if (url.pathname === '/functions/v1/sana-voice' && req.method === 'POST') {
+    const { handleVoice } = await import('../../supabase/functions/sana-voice/core.ts');
+    let body = null;
+    try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON → 400 */ }
+    const r = await handleVoice(req.headers.authorization ?? null, body, sanaEnv());
+    if (r.audio) { res.writeHead(r.status, { ...cors, 'access-control-expose-headers': 'x-sana-provider, x-sana-model, x-sana-language, x-sana-seconds', ...r.headers }); return res.end(Buffer.from(r.audio)); }
+    return send(res, r.status, r.json);
+  }
   // Sana: the same code as the Supabase Edge Function (supabase/functions/sana/core.ts), run by Node. U0+S1 replaced A11's
   // ai-assistant stand-in. Accept: text/event-stream → Server-Sent Events, like the Edge Function; otherwise one JSON reply.
   if (url.pathname === '/functions/v1/sana' && req.method === 'POST') {
-    const { handleAsk } = await import('../../supabase/functions/sana/core.ts');
+    const { handleAsk, handleConfig } = await import('../../supabase/functions/sana/core.ts');
     let body = null;
     try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON → 400 from handleAsk */ }
-    const env = {
-      SUPABASE_URL: `http://127.0.0.1:${PORT}`, SUPABASE_ANON_KEY: 'local',
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, SANA_MODEL: process.env.SANA_MODEL, SANA_PROVIDER: process.env.SANA_PROVIDER,
-    };
+    const env = sanaEnv();
+    if (body && body.action === 'config') { const r = await handleConfig(req.headers.authorization ?? null, body, env); return send(res, r.status, r.json); }
     if ((req.headers.accept ?? '').includes('text/event-stream')) {
       res.writeHead(200, { ...cors, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
       await handleAsk(req.headers.authorization ?? null, body, env, (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));

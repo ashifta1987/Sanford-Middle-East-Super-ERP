@@ -1,21 +1,32 @@
 // Supabase Edge Function "sana": POST { message, conversation_id?, company?, language?, via?, context? } with the user's session token.
 // Accept: text/event-stream → the answer streams as Server-Sent Events (meta, delta, reset, done, error); otherwise one JSON reply.
+// POST { action: 'config', company } → admin-only provider config for the settings screen (names and yes/no, never a key).
 // Deploy:  supabase functions deploy sana
-// Secrets: supabase secrets set ANTHROPIC_API_KEY=... SANA_MODEL=claude-sonnet-5-5   (without a key Sana runs in basic mode)
+// Secrets (S2, decision 11 Nov 2026 — Gemini is the provider; the key values are set by IT and never written anywhere else):
+//   supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-2.5-flash      (GEMINI_API_KEY is already a secret on live)
+//   Fallback: SANA_PROVIDER=anthropic with ANTHROPIC_API_KEY (SANA_MODEL=claude-…). Without a key for the chosen provider Sana
+//   runs in basic mode. Optional: SANA_THINKING_BUDGET (default 0 on Flash).
 // SUPABASE_URL and SUPABASE_ANON_KEY are provided by Supabase automatically. The service role key is NOT used.
-import { handleAsk, type Env } from './core.ts';
+// The test-only base-URL variables of the local provider mock are deliberately NOT read here.
+import { handleAsk, handleConfig, type Env } from './core.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+const get = (k: string) => Deno.env.get(k) || undefined;
 const env = (): Env => ({
   SUPABASE_URL: Deno.env.get('SUPABASE_URL') ?? '',
   SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-  ANTHROPIC_API_KEY: Deno.env.get('ANTHROPIC_API_KEY') ?? undefined,
-  SANA_MODEL: Deno.env.get('SANA_MODEL') ?? undefined,
-  SANA_PROVIDER: Deno.env.get('SANA_PROVIDER') ?? undefined,
+  SANA_PROVIDER: get('SANA_PROVIDER'),
+  SANA_MODEL: get('SANA_MODEL'),
+  GEMINI_API_KEY: get('GEMINI_API_KEY'),
+  ANTHROPIC_API_KEY: get('ANTHROPIC_API_KEY'),
+  SANA_THINKING_BUDGET: get('SANA_THINKING_BUDGET'),
+  SANA_STT_MODEL: get('SANA_STT_MODEL'),
+  SANA_VOICE_MODEL: get('SANA_VOICE_MODEL'),
+  SANA_TTS_VOICE: get('SANA_TTS_VOICE'),
 });
 
 Deno.serve(async (req: Request) => {
@@ -23,6 +34,10 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return Response.json({ error: 'Use POST.' }, { status: 405, headers: cors });
   const body = await req.json().catch(() => null);
   const auth = req.headers.get('Authorization');
+  if (body && typeof body === 'object' && (body as { action?: unknown }).action === 'config') {
+    const { status, json } = await handleConfig(auth, body, env());
+    return Response.json(json, { status, headers: cors });
+  }
   if ((req.headers.get('Accept') ?? '').includes('text/event-stream')) {
     const enc = new TextEncoder();
     const stream = new ReadableStream({

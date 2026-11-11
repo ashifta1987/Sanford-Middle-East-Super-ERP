@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 6 363 367" role="img" aria-label="Southfield">
+  <defs><clipPath id="sf-r"><rect x="6" y="6" width="363" height="367" rx="62"/></clipPath></defs>
+  <g clip-path="url(#sf-r)">
+    <rect x="0" y="0" width="380" height="380" fill="#08BBA9"/>
+    <path d="M120 0H380V45L287 138L270 112Z" fill="#F7B646"/>
+    <path d="M0 0H132L262 88Q287 105 287 135V380H0Z" fill="#226AD9"/>
+    <path d="M287 196V380H186V279Z" fill="#F4745B"/>
+    <path d="M94 380V215Q94 155 154 155H185V106L287 195L185 279V380Z" fill="#FFFFFF"/>
+  </g>
+</svg>

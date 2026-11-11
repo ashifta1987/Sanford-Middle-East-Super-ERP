@@ -59,9 +59,9 @@ Out of scope (A4): copy to delivery, invoicing and stock movement. The "Copy to 
   - `/docs/sales_order/:company/:entry/edit` (drafts only)
 - **Form:** the document form pattern in `docs/ui-ux-spec.md` §4.4: header fields, customer and item comboboxes, lines, live totals, Save draft / Submit, the document flow strip, the approval card for approvers, and the activity timeline from `audit_log` + `approval`.
 - **Detail for ERP vs SAP orders:**
-  - For ERP orders, show the workflow state pill (Draft, Waiting approval, Approved, Rejected, Cancelled) and the source pill "Super ERP".
+  - For ERP orders, show the workflow state pill (Draft, Waiting approval, Approved, Rejected, Cancelled) and the source pill "Southfield".
   - SAP orders stay read-only with the source "SAP Business One".
-- **Sales Orders list:** enable "+ New sales order"; add a filter "Source: SAP / Super ERP" and a "Waiting approval" filter.
+- **Sales Orders list:** enable "+ New sales order"; add a filter "Source: SAP / Southfield" and a "Waiting approval" filter.
 - **`/approvals`:** add a "Documents" tab using `approval_inbox()`. Keep the migration sign-off list as it is.
 - **Home:** add a KPI "Waiting for my approval" (shown to approvers only).
 

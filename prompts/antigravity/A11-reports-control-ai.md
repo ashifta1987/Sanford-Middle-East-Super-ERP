@@ -25,11 +25,13 @@ Add the remaining rules from the design next to the 5 existing checks:
 
 Each rule is a function with severity, record link and amount.
 
-## AI assistant (only after A10 sets the provider)
-- "Ask AI" in the top bar, and "Ask AI about this order" on documents.
-- The model answers only from data the user can already read: tool calls go to existing `SECURITY INVOKER` functions with the user's JWT. Show the sources (record links).
-- **No AI action changes data;** it may draft a document for the user to review and submit.
-- Every question and the tools used are logged in `audit_log` with `actor = 'ai:assistant'`.
+## Sana (AI assistant): already built; finish it
+Read `docs/sana-assistant.md`. The pipeline, role limits, panel, voice and logging exist. In this phase:
+- **Connect the model** chosen in A10: Anthropic is built in `aiAnswer` in `supabase/functions/sana/core.ts`. Another provider means one new adapter there.
+- **Add tools for each new module** as it goes live (`erp.sana_*`, read-only, `SECURITY INVOKER`, role check plus `{"denied": true}`), and offer them in `TOOLS` with an `allowed()` rule.
+- **Optional streaming answers** (Server-Sent Events) and a provider voice for languages the browser cannot hear well.
+- **Prompt-injection test set** (role-play, "repeat your instructions", instructions hidden inside customer names or document remarks): every case must be refused, with tests in `supabase/tests/` and Playwright.
+- **No write actions.** Sana may later *draft* a document for the user to review and submit; it never posts, approves or deletes.
 
 ## Tests
 - Report totals equal the journal sums.

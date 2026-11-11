@@ -1,4 +1,4 @@
-# Building Super ERP with Google Antigravity
+# Building Southfield (AI-Powered ERP) with Google Antigravity
 
 This folder holds the prompts that build the rest of the ERP, one phase at a time, on top of this repo. The stack is React + TypeScript + Vite, with Supabase and Vercel.
 
@@ -16,7 +16,7 @@ This folder holds the prompts that build the rest of the ERP, one phase at a tim
 
 ## How to run a phase
 1. Start a new Agent Manager conversation for each phase.
-2. Either paste **`A0-context.md` first, then the phase file** (for example `A2-sales-order-approval.md`), in the same message, or type:
+2. Either paste **`A0-context.md` first, then the phase file** (for example `A2-sales-order-approval.md`) in the same message. For phases with screens, add `U0-ui-ux-sana-powered.md` too. Or type:
    `Read prompts/antigravity/A0-context.md and prompts/antigravity/A2-sales-order-approval.md, then follow them. Start with the Implementation Plan.`
 3. The agent writes an **Implementation Plan** artifact. Read it, comment on anything wrong, then approve.
 4. When it finishes, check its **Walkthrough** artifact for:
@@ -25,10 +25,15 @@ This folder holds the prompts that build the rest of the ERP, one phase at a tim
    - the list of what it couldn't do
 5. Open a pull request, review, merge. Then start the next phase.
 
+## Suggested order
+U0 (design audit) → A1 (security) → S1 (Sana, can run any time after A1) → A2 … A14. Each module phase that adds data also adds a read-only Sana tool for it (see S1 › role matrix).
+
 ## Phase order
 | File | Phase | Writes data? |
 |---|---|---|
 | A0-context.md | Read first, every time | — |
+| **U0-ui-ux-sana-powered.md** | **Design brief: Southfield brand, navy shell, sign-in, Sana-powered home, Sana panel, list/detail/form patterns. Run once as an audit and fix pass, then keep it open as the checklist for every phase** | No |
+| **S1-sana-assistant.md** | **SANA, the AI voice and text assistant:** verify what is built, connect the AI model (streaming), "Ask Sana about this", history and feedback, voice in 11 languages, admin settings, evaluation set with injection tests | Logs and settings only |
 | A1-security-module-access.md | Module-level read rules; Full / Read / None per position | Policies only |
 | A2-sales-order-approval.md | **First complete workflow:** sales order with approval | Yes |
 | A3-posting-engine.md | Journal posting from documents, G/L determination, VAT, period lock | Yes |
@@ -49,5 +54,5 @@ This folder holds the prompts that build the rest of the ERP, one phase at a tim
 - The list of real users, their positions and companies.
 - The go-live date for each company.
 - A **sanitized** SAP backup for test runs: names, phones, emails, TRNs and bank details replaced, amounts kept.
-- The AI provider for chat and voice (for A11), with its API key stored as a server secret.
+- The AI provider and model for Sana (chat and voice), with its API key stored as a Supabase secret. Sana already works in basic mode without it.
 - Any SAP report layouts (invoices, delivery notes) to match for printing.

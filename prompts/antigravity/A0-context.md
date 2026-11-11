@@ -1,16 +1,16 @@
 # A0 · Context. Read this first, before every phase.
 
-You are working in the **Sanford Super ERP** repository. Read this file fully, then the phase prompt that follows it. Before writing any code, produce an **Implementation Plan** artifact and wait for my approval.
+You are working in the **Southfield** repository (product name: **Southfield · AI-Powered ERP**; repo name `sanford-middle-east-super-erp`). Read this file fully, then the phase prompt that follows it. Before writing any code, produce an **Implementation Plan** artifact and wait for my approval.
 
 ## Product
-Super ERP replaces SAP Business One for the Sanford Middle East DWC Group:
+Southfield (formerly "Super ERP") replaces SAP Business One for the Sanford Middle East DWC Group:
 - AE01 Sanford Middle East DWC L.L.C (parent)
 - AE02 A.T.M.M. Electronics
 - AE03 Abdulla Mohamed Home Appliances
 - AE04 Izaan General Trading
 - more group companies later
 
-The menus mirror SAP Business One: 11 modules with the same functions in the same order, so staff feel at home. During the **soft switch**, SAP stays live. Its data is copied into Supabase: schema `sap` holds the raw copy, and schema `erp` is the readable app layer, filled by `erp.sync_company`. SAP rows have `source = 'sap'` and are read-only in the app. Documents created in Super ERP get `source = 'erp'` and their own number range, and are **not** sent back to SAP.
+The menus mirror SAP Business One: 11 modules with the same functions in the same order, so staff feel at home. During the **soft switch**, SAP stays live. Its data is copied into Supabase: schema `sap` holds the raw copy, and schema `erp` is the readable app layer, filled by `erp.sync_company`. SAP rows have `source = 'sap'` and are read-only in the app. Documents created in Southfield get `source = 'erp'` and their own number range, and are **not** sent back to SAP.
 
 ## Stack (fixed: don't add frameworks)
 - React 18, TypeScript, Vite, React Router 6, TanStack Query 5, Tailwind CSS 3, i18next (en, ar), lucide-react
@@ -24,7 +24,8 @@ The menus mirror SAP Business One: 11 modules with the same functions in the sam
 ## Repo map
 | Path | What it is |
 |---|---|
-| `docs/ui-ux-spec.md` | **The UI/UX specification. Follow it exactly.** Tokens, shell, list/detail/document-form patterns, states, RTL, accessibility, words, error messages |
+| `docs/ui-ux-spec.md` | **The UI/UX specification. Follow it exactly.** Brand (Southfield logo, colours, Outfit + IBM Plex), tokens, sign-in page, shell, list/detail/document-form patterns, states, RTL, accessibility, words, error messages |
+| `src/brand/Logo.tsx`, `design/brand/` | The Southfield logo (vector) and brand files. Use `<Logo/>` / `<LogoMark/>`; never redraw it |
 | `design/reference/*.png` | Screenshots of the built Stage 1 screens (look and feel to match) |
 | `docs/design-inventory.md` | Screens, roles, workflows, gaps, decisions (including the 9 Nov answers) |
 | `docs/implementation-plan.md`, `docs/stage-1.md` | What is built and what comes next |
@@ -34,7 +35,9 @@ The menus mirror SAP Business One: 11 modules with the same functions in the sam
 | `src/features/erp/components/ListScreen.tsx`, `ui.tsx`, `Guard.tsx` | List pattern, shared UI pieces, module guard. Reuse them; don't make new versions |
 | `src/features/erp/pages/*` | Stage 1 pages (lists, details, home, Control Tower, previews, search) |
 | `src/features/migration/*` | SAP migration console (working; don't restyle or rewrite) |
-| `src/layout/*`, `src/theme/*`, `src/index.css`, `tailwind.config.js` | Shell and design tokens |
+| `src/layout/*`, `src/theme/*`, `src/index.css`, `tailwind.config.js` | Shell (navy sidebar) and design tokens |
+| `src/features/sana/*`, `supabase/functions/sana/*`, `supabase/sql/15_sana.sql`, `docs/sana-assistant.md` | **Sana**, the AI voice and text assistant (built: role-limited tools, Edge Function, panel, voice, home hero). Any new module that Sana should answer about needs a new read-only `erp.sana_*` tool with the same role checks |
+| `src/auth/LoginPage.tsx` | Sign-in, forgot password, reset password, remember me (built; reuse its `authError()` for auth messages) |
 | `src/lib/supabase.ts` | `erp()` = `supabase.schema('erp')`. Every call goes through it |
 | `src/lib/i18n/en.json`, `ar.json` | All UI words. Add keys to **both** files |
 | `supabase/sql/10`–`15_*.sql` | Existing schema, sync, security, console, Stage 1. **Never edit these** |

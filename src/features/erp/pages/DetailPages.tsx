@@ -90,7 +90,7 @@ export function BusinessPartnerDetail() {
               [t('erp.col.currency'), bp.currency], [t('erp.col.trn'), bp.trn], [t('erp.col.phone'), bp.phone ?? bp.mobile], [t('erp.col.email'), bp.email],
               [t('erp.col.city'), [bp.city, bp.country].filter(Boolean).join(', ')], [t('erp.col.balance'), <span className="num">{fmtMoney(bp.balance, bp.currency)}</span>],
               [t('erp.col.creditLimit'), <span className="num" data-testid="bp-credit-limit">{fmtMoney(bp.credit_limit, bp.currency)}</span>], [t('erp.col.created'), fmtDay(bp.created_on)],
-              [t('erp.col.source'), bp.source === 'sap' ? 'SAP Business One' : bp.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              [t('erp.col.source'), bp.source === 'sap' ? 'SAP Business One' : bp.source === 'sample' ? t('erp.sampleData') : 'Southfield'],
             ]} />
           </SectionCard>
           {/* A8 · change requests (credit limit, bank details) with approval, contacts, addresses, bank details, history */}
@@ -210,7 +210,7 @@ export function DocumentDetail() {
               [t('erp.col.date'), fmtDay(d.doc_date)], [t('erp.col.dueDate'), fmtDay(d.due_date)], [t('erp.col.customerRef'), d.customer_ref],
               ...(d.from_whs || d.to_whs ? [[t('erp.col.warehouses'), [d.from_whs, d.to_whs].filter(Boolean).join(' → ')] as [string, React.ReactNode]] : []),
               [t('erp.col.currency'), d.currency], [t('erp.col.remarks'), d.comments],
-              [t('erp.col.source'), d.source === 'sap' ? 'SAP Business One' : d.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              [t('erp.col.source'), d.source === 'sap' ? 'SAP Business One' : d.source === 'sample' ? t('erp.sampleData') : 'Southfield'],
             ]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
@@ -277,7 +277,7 @@ export function JournalDetail() {
           {flash && <p role="status" className="flex items-center gap-2 rounded-btn border border-ok-fg/30 bg-ok-bg px-4 py-3 text-sm font-medium text-ok-fg">{flash}</p>}
           <SectionCard title={t('erp.section.header')}>
             <Fields items={[[t('erp.col.postingDate'), fmtDay(je.ref_date)], [t('erp.col.remarks'), je.memo], [t('erp.col.ref'), [je.ref1, je.ref2].filter(Boolean).join(' / ')],
-              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Southfield'],
               ...(I?.reversal_of ? [[t('je.reversalOf'), <Link key="ro" className="text-primary hover:underline" to={`/financials/journals/${company}/${I.reversal_of}`}>{I.reversal_of}</Link>] as [string, React.ReactNode]] : []),
               ...(I?.reversed_by ? [[t('je.reversedBy'), <Link key="rb" id="je-reversed-by" className="text-primary hover:underline" to={`/financials/journals/${company}/${I.reversed_by}`}>{I.reversed_by}</Link>] as [string, React.ReactNode]] : []),
               ...(I?.draft_id ? [[t('je.fromDraft'), <Link key="dr" className="text-primary hover:underline" to={`/financials/journals/drafts/${company}/${I.draft_id}`}>{t('je.titleDraft', { n: I.draft_id })}</Link>] as [string, React.ReactNode]] : []),

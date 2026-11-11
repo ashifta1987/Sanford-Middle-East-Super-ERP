@@ -2,59 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens from the canvas design (Super ERP UI/UX Structure). Light is the default;
-   [data-theme='dark'] on <html> switches every colour. Channels only, see tailwind.config.js. */
+/* Southfield brand tokens (from the logo: blue #226AD9, navy #012746, teal #08BBA9, yellow #F7B646, coral #F4745B).
+   Light is the default; [data-theme='dark'] on <html> switches every colour. Channels only, see tailwind.config.js. */
 :root {
-  --c-page: 244 245 247;          /* #F4F5F7 */
+  --c-page: 246 247 251;          /* #F6F7FB */
   --c-surface: 255 255 255;       /* #FFFFFF */
-  --c-surface-2: 248 249 251;     /* #F8F9FB */
-  --c-line: 228 231 236;          /* #E4E7EC */
-  --c-line-strong: 208 213 221;   /* #D0D5DD */
-  --c-ink: 16 24 40;              /* #101828 */
-  --c-ink-2: 71 84 103;           /* #475467 */
-  --c-muted: 93 107 130;          /* #5D6B82 */
-  --c-primary: 67 56 202;         /* #4338CA */
-  --c-primary-hover: 55 48 163;   /* #3730A3 */
-  --c-primary-soft: 238 240 255;  /* #EEF0FF */
-  --c-primary-text: 55 48 163;    /* #3730A3 */
-  --c-primary-line: 199 203 250;  /* #C7CBFA */
-  --c-side: 255 255 255;
-  --c-side-text: 52 64 84;        /* #344054 */
-  --c-side-active: 238 240 255;
-  --c-side-active-text: 55 48 163;
+  --c-surface-2: 248 250 252;     /* #F8FAFC */
+  --c-line: 227 232 239;          /* #E3E8EF */
+  --c-line-strong: 203 211 225;   /* #CBD3E1 */
+  --c-ink: 1 39 70;               /* #012746 logo navy */
+  --c-ink-2: 62 85 115;           /* #3E5573 */
+  --c-muted: 95 111 134;          /* #5F6F86 */
+  --c-primary: 34 106 217;        /* #226AD9 logo blue */
+  --c-primary-hover: 27 86 179;   /* #1B56B3 */
+  --c-primary-soft: 234 242 255;  /* #EAF2FF */
+  --c-primary-text: 26 79 168;    /* #1A4FA8 */
+  --c-primary-line: 191 213 247;  /* #BFD5F7 */
+  --c-side: 1 28 69;              /* #011C45 navy sidebar */
+  --c-side-text: 199 210 229;     /* #C7D2E5 */
+  --c-side-muted: 126 143 173;    /* #7E8FAD */
+  --c-side-hover: 12 40 86;       /* #0C2856 */
+  --c-side-active: 18 56 117;     /* #123875 */
+  --c-side-active-text: 255 255 255;
+  --c-side-line: 20 48 94;        /* #14305E */
+  --c-brand-navy: 1 28 69;        /* #011C45 */
+  --c-brand-blue: 34 106 217;     /* #226AD9 */
+  --c-brand-teal: 8 187 169;      /* #08BBA9 */
+  --c-brand-yellow: 247 182 70;   /* #F7B646 */
+  --c-brand-coral: 244 116 91;    /* #F4745B */
   --c-success: 6 118 71;          /* #067647 */
   --c-ok-bg: 236 253 243;   --c-ok-fg: 6 118 71;
   --c-warn-bg: 255 250 235; --c-warn-fg: 181 71 8;
   --c-crit-bg: 254 243 242; --c-crit-fg: 180 35 24;
-  --c-info-bg: 238 240 255; --c-info-fg: 55 48 163;
-  --c-neutral-bg: 242 244 247; --c-neutral-fg: 52 64 84;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --c-info-bg: 234 242 255; --c-info-fg: 26 79 168;
+  --c-neutral-bg: 241 244 248; --c-neutral-fg: 52 64 84;
+  --shadow: 0 1px 2px rgba(1, 39, 70, 0.06);
   color-scheme: light;
 }
 [data-theme='dark'] {
-  --c-page: 11 15 23;             /* #0B0F17 */
-  --c-surface: 18 24 38;          /* #121826 */
-  --c-surface-2: 24 32 50;        /* #182032 */
-  --c-line: 37 48 73;             /* #253049 */
-  --c-line-strong: 51 64 90;      /* #33405A */
-  --c-ink: 242 244 247;           /* #F2F4F7 */
-  --c-ink-2: 192 199 212;         /* #C0C7D4 */
-  --c-muted: 152 162 179;         /* #98A2B3 */
-  --c-primary: 79 70 229;         /* #4F46E5 */
-  --c-primary-hover: 99 102 241;  /* #6366F1 */
-  --c-primary-soft: 30 32 80;     /* #1E2050 */
-  --c-primary-text: 199 210 254;  /* #C7D2FE */
-  --c-primary-line: 59 63 143;    /* #3B3F8F */
-  --c-side: 14 20 32;             /* #0E1420 */
-  --c-side-text: 192 199 212;
-  --c-side-active: 30 32 80;
-  --c-side-active-text: 224 231 255;
+  --c-page: 7 15 31;              /* #070F1F */
+  --c-surface: 14 26 46;          /* #0E1A2E */
+  --c-surface-2: 19 34 58;        /* #13223A */
+  --c-line: 31 49 80;             /* #1F3150 */
+  --c-line-strong: 43 65 102;     /* #2B4166 */
+  --c-ink: 238 243 250;           /* #EEF3FA */
+  --c-ink-2: 188 200 218;         /* #BCC8DA */
+  --c-muted: 141 155 179;         /* #8D9BB3 */
+  --c-primary: 47 118 232;        /* #2F76E8 */
+  --c-primary-hover: 84 145 240;  /* #5491F0 */
+  --c-primary-soft: 15 42 85;     /* #0F2A55 */
+  --c-primary-text: 169 200 255;  /* #A9C8FF */
+  --c-primary-line: 36 70 127;    /* #24467F */
+  --c-side: 4 12 27;              /* #040C1B */
+  --c-side-text: 188 200 218;
+  --c-side-muted: 112 128 156;
+  --c-side-hover: 12 28 54;
+  --c-side-active: 16 41 90;      /* #10295A */
+  --c-side-active-text: 255 255 255;
+  --c-side-line: 20 36 64;
+  --c-brand-navy: 1 28 69;
+  --c-brand-blue: 47 118 232;
+  --c-brand-teal: 8 187 169;
+  --c-brand-yellow: 247 182 70;
+  --c-brand-coral: 244 116 91;
   --c-success: 6 118 71;
   --c-ok-bg: 10 42 28;     --c-ok-fg: 117 224 167;
   --c-warn-bg: 46 31 6;    --c-warn-fg: 254 200 75;
   --c-crit-bg: 45 18 18;   --c-crit-fg: 253 162 155;
-  --c-info-bg: 30 32 80;   --c-info-fg: 199 210 254;
-  --c-neutral-bg: 29 38 56; --c-neutral-fg: 208 213 221;
+  --c-info-bg: 15 42 85;   --c-info-fg: 169 200 255;
+  --c-neutral-bg: 26 38 60; --c-neutral-fg: 208 213 221;
   --shadow: none;
   color-scheme: dark;
 }
@@ -66,6 +82,7 @@
   [data-theme='dark'] :focus-visible { outline-color: rgb(var(--c-primary-text)); }
   [dir='rtl'] body { font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif; }
   h1, h2, h3 { letter-spacing: -0.01em; }
+  h1 { font-family: 'Outfit', 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif; font-weight: 600; }
 }
 
 @layer components {

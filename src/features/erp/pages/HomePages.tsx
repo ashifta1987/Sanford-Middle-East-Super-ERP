@@ -15,6 +15,7 @@ import { useInbox } from '../salesOrder';
 import { Kpi, LiveBadge, PageTitle, SectionCard, StatusTag, fmtMoney } from '../components/ui';
 import { RequireModule, useModuleAccess } from '../components/Guard';
 import { ModuleIcon } from '../icons';
+import { SanaHero } from '@/features/sana/SanaHero';
 import {
   DOC_KINDS, MODULES, PREVIEW_SCREENS, canOpenModule, canWriteModule, createRouteForFunction, docKindByObj, liveRouteForFunction, liveRouteForItem, moduleByKey,
   type MenuFunction, type MenuItem, type ModuleDef,
@@ -36,13 +37,13 @@ export function HomePage() {
   const visible = MODULES.filter((m) => canOpenModule(m, mods));
   const cur = profile?.companies.find((c) => c.company_code === company)?.currency ?? 'AED';
   const k = useQuery({ queryKey: ['home-kpis', company], queryFn: () => rpc<Kpis>('home_kpis', { p_company: pc(company) }) });
-  const first = profile?.user?.display_name?.split(/\s+/)[0];
   const inbox = useInbox();
   const waitingMe = inbox.data?.waiting.length ?? 0;
 
   return (
     <div>
-      <PageTitle eyebrow={t('erp.home.eyebrow')} title={first ? t('erp.home.hello', { name: first }) : t('nav.dashboard')} desc={t('erp.home.desc')} />
+      <SanaHero />
+      {visible.length > 0 && <h2 className="eyebrow mb-3">{t('sana.home.glance')}</h2>}
       {k.error ? <div className="card mb-6"><ErrorState error={k.error} onRetry={() => k.refetch()} /></div> : (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {inbox.data?.is_approver && <Kpi label={t('erp.home.waitingMe')} value={fmtInt(waitingMe)} sub={t('erp.home.waitingMeSub')} tone={waitingMe ? 'warn' : undefined} to="/approvals" />}

@@ -1,5 +1,6 @@
 // Local stand-in for the Supabase API, for development and browser tests only.
 // /rest/v1/* is proxied to a local PostgREST (real Postgres, real RLS from supabase/sql/10-15).
+// /functions/v1/sana runs the Sana assistant (basic mode unless ANTHROPIC_API_KEY is set).
 // /auth/v1/* issues HS256 JWTs for the test users in users.json (never real users or passwords).
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -125,6 +126,17 @@ http.createServer(async (req, res) => {
     return send(res, 200, { answer, responder: LOCAL_RESPONDER, sources: ctx.sources, tools: ctx.tools, audit_id: ctx.audit_id });
   }
   if (url.pathname === '/auth/v1/logout') return send(res, 204);
+  // Sana: the same code as the Supabase Edge Function (supabase/functions/sana/core.ts), run by Node.
+  if (url.pathname === '/functions/v1/sana' && req.method === 'POST') {
+    const { handleAsk } = await import('../../supabase/functions/sana/core.ts');
+    let body = null;
+    try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON → 400 from handleAsk */ }
+    const r = await handleAsk(req.headers.authorization ?? null, body, {
+      SUPABASE_URL: `http://127.0.0.1:${PORT}`, SUPABASE_ANON_KEY: 'local',
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, SANA_MODEL: process.env.SANA_MODEL,
+    });
+    return send(res, r.status, r.json);
+  }
   if (url.pathname.startsWith('/rest/v1/')) {
     const target = PGRST + url.pathname.replace('/rest/v1', '') + url.search;
     const headers = { ...req.headers };

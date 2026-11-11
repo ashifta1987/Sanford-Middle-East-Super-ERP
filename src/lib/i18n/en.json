@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Super ERP",
+    "name": "Southfield",
     "group": "Sanford Group",
     "loading": "Loading…",
     "empty": "Nothing here yet",
@@ -8,7 +8,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
-    "skip": "Skip to content"
+    "skip": "Skip to content",
+    "tagline": "AI-Powered ERP"
   },
   "nav": {
     "group": "Group",
@@ -63,13 +64,50 @@
     "caption": "PRO, licences, IT and system"
   },
   "auth": {
-    "title": "Sign in to Super ERP",
-    "email": "Email",
+    "title": "Sign in to Southfield",
+    "email": "Work email",
     "password": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "notConfigured": "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
-    "noProfile": "Your sign-in works, but you have no Super ERP profile yet. Ask IT to add you."
+    "noProfile": "Your sign-in works, but you have no Southfield profile yet. Ask IT to add you.",
+    "welcome": "Welcome back",
+    "subtitle": "Sign in to your workspace",
+    "emailPlaceholder": "name@company.ae",
+    "remember": "Remember me",
+    "forgot": "Forgot password?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "hero1": "Your business,",
+    "hero2": "in motion.",
+    "help": "Trouble signing in? Ask IT to check your account.",
+    "forgotTitle": "Reset your password",
+    "forgotBody": "Enter your work email. We’ll send you a link to choose a new password.",
+    "sendLink": "Send reset link",
+    "sending": "Sending…",
+    "sentTitle": "Check your email",
+    "sentBody": "If {{email}} has a Southfield account, a reset link is on its way. The link works once and expires in 1 hour.",
+    "backToSignIn": "Back to sign in",
+    "newPasswordTitle": "Choose a new password",
+    "newPasswordBody": "Use at least 10 characters. A short sentence is easy to remember and hard to guess.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "savePassword": "Save and sign in",
+    "saving": "Saving…",
+    "linkExpiredTitle": "This link has expired",
+    "linkExpiredBody": "Reset links work once and expire after 1 hour. Request a new one from the sign-in page.",
+    "err": {
+      "credentials": "Email or password is wrong. Check them and try again.",
+      "unconfirmed": "Your email address isn’t confirmed yet. Open the invite email first.",
+      "rate": "Too many attempts. Wait a minute and try again.",
+      "network": "We couldn’t reach the server. Check your connection and try again.",
+      "weak": "Choose a stronger password: at least 10 characters.",
+      "emailRequired": "Enter your work email.",
+      "emailFormat": "Enter a full email address, like name@company.ae.",
+      "passwordRequired": "Enter your password.",
+      "short": "Use at least 10 characters.",
+      "mismatch": "The two passwords don’t match."
+    }
   },
   "access": {
     "title": "No access",
@@ -295,7 +333,7 @@
         "done": "Uploaded",
         "failed": "Failed"
       },
-      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Super ERP › Back Office › Upload backup, or send me the link.\n\nThank you",
+      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Southfield › Back Office › Upload backup, or send me the link.\n\nThank you",
       "loadType": "What to load",
       "kindFull": "Full history",
       "kindFullNote": "Every table and every posted journal, kept with SAP's numbers (recommended).",
@@ -4973,6 +5011,70 @@
       "lcDrCr": "{{cur}}",
       "scDebit": "Debit ({{cur}})",
       "scCredit": "Credit ({{cur}})"
+    }
+  },
+  "sana": {
+    "ask": "Ask Sana",
+    "fullName": "Southfield AI Neural Assistant",
+    "language": "Answer language",
+    "autoLang": "Auto",
+    "autoSpeak": "Read answers aloud",
+    "autoSpeakOn": "Spoken questions get spoken answers (on)",
+    "autoSpeakOff": "Answers are not read aloud (off)",
+    "newChat": "New conversation",
+    "close": "Close Sana",
+    "hello": "Hi {{name}}, how can I help?",
+    "helloNoName": "Hi, how can I help?",
+    "intro": "Ask about your work by typing or speaking, in your language. I only use information your role can see.",
+    "placeholder": "Ask Sana…",
+    "send": "Send",
+    "speak": "Speak to Sana",
+    "stopListening": "Stop listening",
+    "listening": "Listening… speak now",
+    "listen": "Listen",
+    "stop": "Stop",
+    "thinking": "Sana is thinking",
+    "byVoice": "Asked by voice",
+    "deniedLabel": "Not available for your role",
+    "sources": "Open in Southfield",
+    "openList": "Open list",
+    "basicMode": "Basic mode: no AI model is connected yet, so Sana understands only simple questions. Answers still come from live data and respect your role.",
+    "privacy": "Sana answers only from data your role can see, never shares other people’s information, and cannot change anything. Conversations are kept for audit.",
+    "mic": {
+      "denied": "Microphone access is blocked. Allow it in your browser’s site settings, then try again.",
+      "unsupported": "Voice input isn’t supported in this browser. Use Chrome, Edge or Safari, or type instead.",
+      "noSpeech": "I didn’t hear anything. Tap the microphone and try again.",
+      "failed": "Voice input stopped. Try again or type your question."
+    },
+    "err": {
+      "signin": "Sign in again to use Sana.",
+      "network": "We couldn’t reach Sana. Check your connection and try again.",
+      "generic": "Sana couldn’t answer right now. Try again in a moment."
+    },
+    "q": {
+      "openOrders": "How many open sales orders do we have?",
+      "overdue": "Which customers are overdue?",
+      "finance": "Show account totals",
+      "stock": "Stock of SMP-1010",
+      "openPOs": "Open purchase orders",
+      "headcount": "Headcount by department",
+      "alerts": "What needs my attention?",
+      "whoami": "What can you help me with?"
+    },
+    "home": {
+      "morning": "Good morning, {{name}}",
+      "afternoon": "Good afternoon, {{name}}",
+      "evening": "Good evening, {{name}}",
+      "hi": "Welcome to Southfield",
+      "lead": "Here’s your business today. Ask Sana anything about your work, by text or voice, in your language.",
+      "placeholder": "Ask Sana about orders, stock, customers…",
+      "noticed": "Needs attention",
+      "fromRules": "Control Tower rules",
+      "allClear": "Nothing needs your attention right now.",
+      "alertsError": "Couldn’t load alerts.",
+      "openControl": "Open Control Tower ({{n}})",
+      "askAbout": "Ask Sana",
+      "glance": "Today at a glance"
     }
   }
 }

@@ -1,7 +1,7 @@
 # A3 · Posting engine (Financials)
 
 ## Goal
-Documents created in Super ERP post balanced journal entries automatically, using G/L account determination and VAT. Accountants can post manual journals with approval and lock periods. Nothing posts for SAP-sourced documents.
+Documents created in Southfield post balanced journal entries automatically, using G/L account determination and VAT. Accountants can post manual journals with approval and lock periods. Nothing posts for SAP-sourced documents.
 
 ## Database: `supabase/sql/18_posting.sql`
 - **`erp.gl_determination(company_code, area, posting_key, acct_code)`:** area is sales / purchasing / general / inventory / resources; the posting keys are the rows of Setup › Financials › G/L Account Determination in `design-data.json` › `GLD`. It is filled from SAP (OACP/OGAR) during migration. Fill it for **ZZ99 only** using ZZ99's accounts. Leave real companies empty: posting must refuse with "G/L account for 'Revenue' is not set for AE01. Ask Finance to set it in Setup › Financials › G/L Account Determination."

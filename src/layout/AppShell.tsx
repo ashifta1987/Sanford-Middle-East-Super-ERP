@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ModuleTabs } from './ModuleTabs';
-import { AskAiProvider } from '@/features/erp/components/AskAi';
+import { SanaProvider } from '@/features/sana/SanaProvider';
+import { SanaFab, SanaPanel } from '@/features/sana/SanaPanel';
 import { PageLoading } from '@/components/States';
 
 export function AppShell() {
@@ -14,7 +15,7 @@ export function AppShell() {
   const inBackOffice = loc.pathname.startsWith('/backoffice');
 
   return (
-    <AskAiProvider>
+    <SanaProvider>
     <div className="flex min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-50 focus:rounded-btn focus:bg-surface focus:p-3">
         {t('app.skip')}
@@ -29,8 +30,10 @@ export function AppShell() {
           </div>
         </main>
       </div>
+      <SanaPanel />
+      <SanaFab />
     </div>
-    </AskAiProvider>
+    </SanaProvider>
   );
 }
 

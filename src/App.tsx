@@ -2,7 +2,7 @@ import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 're
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '@/layout/AppShell';
 import { CompanyProvider } from '@/layout/CompanyContext';
-import { LoginPage } from '@/auth/LoginPage';
+import { LoginPage, ResetPasswordPage } from '@/auth/LoginPage';
 import { RequireAccess } from '@/auth/RequireAccess';
 import { NoAccessPage, PlaceholderPage } from '@/pages/SystemPages';
 import { PageLoading } from '@/components/States';
@@ -115,6 +115,7 @@ export default function App() {
     <Suspense fallback={<PageLoading />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* A4 · Print / PDF: a clean A4 page without the app shell */}
       <Route path="/print/:kind/:company/:entry" element={<RequireAccess access="signedIn"><SalesPrintPage /></RequireAccess>} />
       {/* A11 · report Print / PDF sheet */}

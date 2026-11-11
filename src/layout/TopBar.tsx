@@ -1,20 +1,21 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Bell, Menu, Moon, Search, Sun, LogOut, Sparkles } from 'lucide-react';
+import { Bell, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
+import { SanaMark } from '@/features/sana/SanaMark';
+import { useSana } from '@/features/sana/SanaProvider';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCompany } from './CompanyContext';
 import { LanguageToggle } from './LanguageToggle';
 import { ChangePassword } from './ChangePassword';
-import { useAskAi } from '@/features/erp/components/AskAi';
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { t } = useTranslation();
   const { profile, signOut } = useAuth();
   const { company, setCompany } = useCompany();
   const { theme, toggle } = useTheme();
-  const { open: openAi } = useAskAi();
+  const sana = useSana();
   const nav = useNavigate();
   const loc = useLocation();
   const selectId = useId();
@@ -68,9 +69,10 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <Link to="/search" className="grid h-11 w-11 place-items-center rounded-btn border border-line md:hidden" aria-label={t('top.search')}>
           <Search className="h-5 w-5" aria-hidden />
         </Link>
-        <button type="button" onClick={() => openAi()} title={t('top.askTitle')} aria-label={t('top.askTitle')} id="top-ask-ai"
-          className="hidden min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-btn border border-line px-3 text-sm font-medium hover:bg-page sm:inline-flex">
-          <Sparkles className="h-4 w-4 text-primary" aria-hidden /> <span className="hidden xl:inline">{t('top.askAi')}</span>
+        <button type="button" onClick={() => sana.setOpen(true)} title={`${t('sana.ask')} (${isMac ? '⌘J' : 'Ctrl J'})`} aria-label={t('sana.ask')} id="top-ask-sana"
+          aria-keyshortcuts={isMac ? 'Meta+J' : 'Control+J'}
+          className="hidden min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-btn border border-primary-line bg-primary-soft px-2.5 text-sm font-semibold text-primary-text hover:border-primary sm:inline-flex">
+          <SanaMark className="h-6 w-6" /> <span className="hidden lg:inline">{t('sana.ask')}</span>
         </button>
         <Link to="/approvals" className="hidden h-11 w-11 place-items-center sm:grid rounded-btn border border-line" aria-label={t('nav.approvals')} title={t('nav.approvals')}>
           <Bell className="h-5 w-5" aria-hidden />

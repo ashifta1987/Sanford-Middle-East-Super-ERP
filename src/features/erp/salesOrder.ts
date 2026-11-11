@@ -63,6 +63,8 @@ export interface InboxRow {
   state: WorkflowState | 'posted'; approver_position_name: string; superseded: boolean; message: string | null;
   /** B2: the approval template and stage of this row (built-in = leave / rows sent before B2). */
   template_name?: string | null; stage_name?: string | null; stages?: number; need_approvals?: number; approvals?: number; built_in?: boolean;
+  /** B5: the authorizer the signed-in substitute decides for (waiting rows only). */
+  on_behalf_of_name?: string | null;
 }
 export interface Inbox { is_approver: boolean; waiting: InboxRow[]; sent: InboxRow[]; decided: InboxRow[] }
 

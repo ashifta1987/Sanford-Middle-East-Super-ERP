@@ -31,7 +31,7 @@ export interface TemplateVersion { version: number; active: boolean; action: str
 export interface TrailStep {
   approval_id: number; step: number; rule_code: string; template_name: string; template_id: number | null; template_version: number | null;
   stage_name: string | null; stage_id: number | null; who: string | null; need_approvals: number; need_rejections: number; approvals: number; rejections: number;
-  votes: Array<{ user_name: string; decision: 'approved' | 'rejected'; note: string | null; at: string }>;
+  votes: Array<{ user_name: string; decision: 'approved' | 'rejected'; note: string | null; at: string; on_behalf_of_name?: string | null }>;
   decision: 'approved' | 'rejected' | null; decided_at: string | null; decided_by_name: string | null; note: string | null; superseded: boolean; current: boolean;
 }
 export type ReportStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'all';
@@ -71,3 +71,22 @@ export function requestLink(r: { kind: string; company_code: string; doc_entry: 
     default: return `/docs/${r.kind}/${r.company_code}/${r.doc_entry}`;
   }
 }
+
+// ---------- B5 · Substitute Authorizer (supabase/sql/34_open_items.sql) ----------
+export type SubStatus = 'active' | 'planned' | 'expired' | 'ended';
+export interface Substitution {
+  sub_id: number; user_id: string; user_name: string; substitute_id: string; substitute_name: string; from_date: string; to_date: string;
+  note: string | null; active: boolean; status: SubStatus; stages: string[]; decided: number; created_by_name: string | null; created_at: string;
+  ended_by_name: string | null; ended_at: string | null; can_edit: boolean;
+}
+export interface SubstituteList {
+  company_code: string; can_admin: boolean; sees_all: boolean; today: string;
+  me: { user_id: string; display_name: string; stages: string[] };
+  users: Array<{ user_id: string; display_name: string; position_code: string | null; position_name: string | null; stages: string[] }>;
+  rows: Substitution[];
+}
+export const useSubstitutes = (company: string) =>
+  useQuery({ queryKey: ['apr-subs', company], enabled: Boolean(company), queryFn: () => rpc<SubstituteList>('approval_substitute_list', { p_company: company }) });
+export const substituteSave = (company: string, s: Record<string, unknown>) =>
+  rpc<{ sub_id: number; status: SubStatus }>('approval_substitute_save', { p_company: company, p_sub: s });
+export const substituteEnd = (company: string, id: number) => rpc<{ status: 'ended' }>('approval_substitute_end', { p_company: company, p_sub_id: id });

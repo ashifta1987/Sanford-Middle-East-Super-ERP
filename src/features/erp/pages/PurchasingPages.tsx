@@ -1483,6 +1483,8 @@ export function LandedCostsPage() {
 
 interface LcRow { key: string; grpo_entry: number; grpo_line: number; grpo_no: string; item_code: string; description: string | null; qty: number; value: number; cbm: string; weight: string; sel: boolean }
 let chgSeq = 0;
+interface LcChargeForm { key: string; code: string; amount: string; currency: string; fx_rate: string; ap: string }
+const newCharge = (code: string, currency: string): LcChargeForm => ({ key: `c${++chgSeq}`, code, amount: '', currency, fx_rate: '', ap: '' });
 export function LandedCostNewPage() {
   const { t } = useTranslation();
   const nav = useNavigate();
@@ -1507,7 +1509,8 @@ export function LandedCostNewPage() {
   });
   const [rows, setRows] = useState<LcRow[]>([]);
   const [pick, setPick] = useState('');
-  const [charges, setCharges] = useState<Array<{ key: string; code: string; amount: string }>>([]);
+  // B5: a charge may be in a foreign currency (rate of the landed cost date) and name the broker's A/P invoice that bills it.
+  const [charges, setCharges] = useState<LcChargeForm[]>([]);
   const [h, setH] = useState({ doc_date: today(), reference: '', comments: '' });
   const [series, setSeries] = useState<number | null>(null);
   const [preview, setPreview] = useState<LcEval | null>(null);
@@ -1522,12 +1525,30 @@ export function LandedCostNewPage() {
       qty: Number(l.quantity), value: Number(l.line_total), cbm: l.cbm != null ? String(Number(l.cbm)) : '', weight: '', sel: true }))]);
   }
   useEffect(() => { if (first && grpos.data && !rows.length) addGrpo(first); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [first, grpos.data]);
-  useEffect(() => { if (S && !charges.length) setCharges([{ key: `c${++chgSeq}`, code: S.landed_cost_codes[0]?.code ?? '', amount: '' }]); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [S]);
+  useEffect(() => { if (S && !charges.length) setCharges([newCharge(S.landed_cost_codes[0]?.code ?? '', S.currency)]); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [S]);
+  const local = S?.currency ?? '';
+  const rateInfo = useRate(company || null, local || null, h.doc_date);
+  const curList = [...new Set([local, ...(rateInfo.data?.currencies ?? [])].filter(Boolean))];
+  const canRate = Boolean(rateInfo.data?.can_override);
+  const apInvoices = useQuery({
+    queryKey: ['lc-ap-invoices', company], enabled: Boolean(company),
+    queryFn: async () => {
+      const { data, error } = await erp().from('purchase_doc_list_fc').select('doc_entry,doc_no,doc_date,card_code,card_name,currency,total,total_fc')
+        .match({ company_code: company, obj_type: 18 }).neq('status', 'cancelled').order('doc_entry', { ascending: false }).limit(100);
+      if (error) throw new ApiError(error);
+      return (data ?? []) as R[];
+    },
+  });
+  const setCharge = (k: string, p: Partial<LcChargeForm>) => setCharges((cs) => cs.map((x) => (x.key === k ? { ...x, ...p } : x)));
   const sel = rows.filter((r) => r.sel);
   const payload = () => ({
     header: { doc_date: h.doc_date, reference: h.reference, comments: h.comments },
     lines: sel.map((r) => ({ grpo_entry: r.grpo_entry, grpo_line: r.grpo_line, cbm: r.cbm || null, weight: r.weight || null })),
-    charges: charges.filter((c) => c.code && c.amount).map((c) => ({ code: c.code, amount: c.amount })),
+    charges: charges.filter((c) => c.code && c.amount).map((c) => ({
+      code: c.code, amount: c.amount,
+      ...(c.currency && c.currency !== local ? { currency: c.currency, ...(c.fx_rate ? { fx_rate: c.fx_rate } : {}) } : {}),
+      ...(c.ap ? { ap_invoice_entry: Number(c.ap) } : {}),
+    })),
   });
   const key = JSON.stringify(payload());
   useEffect(() => {
@@ -1540,6 +1561,13 @@ export function LandedCostNewPage() {
   }, [key, company]);
   const setRow = (k: string, p: Partial<LcRow>) => setRows((rs) => rs.map((r) => (r.key === k ? { ...r, ...p } : r)));
   const method = (code: string) => S?.landed_cost_codes.find((c) => c.code === code)?.split_method;
+  /** The previewed charge for form row i (rows without a code or an amount are not sent). */
+  const pc = (i: number) => {
+    const c = charges[i];
+    if (!P || !c?.code || !c.amount) return undefined;
+    const n = charges.slice(0, i).filter((x) => x.code && x.amount).length;
+    return P.charges.find((x) => x.charge_no === n);
+  };
   async function submit() {
     setErr(null); setBusy(true);
     try {
@@ -1599,24 +1627,53 @@ export function LandedCostNewPage() {
           <SectionCard title={t('pu.lc.charges')}>
             <ul className="divide-y divide-line">
               {charges.map((c, i) => (
-                <li key={c.key} className="grid grid-cols-2 items-end gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_160px_44px]" data-testid="lc-charge">
+                <li key={c.key} className="grid grid-cols-2 items-end gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_110px_160px_44px]" data-testid="lc-charge">
                   <label className="col-span-2 block text-xs font-medium text-muted md:col-span-1">{t('pu.lc.code')}
                     <select id={`lc-charge-${i}-code`} className="input mt-1 text-[15px] text-ink" value={c.code} onChange={(e) => setCharges((cs) => cs.map((x) => (x.key === c.key ? { ...x, code: e.target.value } : x)))}>
                       <option value="">—</option>
                       {S?.landed_cost_codes.map((x) => <option key={x.code} value={x.code}>{x.name} · {t(`pu.lc.method.${x.split_method}`)}</option>)}
                     </select>
                   </label>
-                  <label className="block text-xs font-medium text-muted">{t('pu.lc.amount', { cur: S?.currency ?? '' })}
-                    <input id={`lc-charge-${i}-amount`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" value={c.amount} onChange={(e) => setCharges((cs) => cs.map((x) => (x.key === c.key ? { ...x, amount: e.target.value } : x)))} />
+                  <label className="block text-xs font-medium text-muted">{t('cur.currency')}
+                    <select id={`lc-charge-${i}-currency`} className="input mt-1 text-[15px] text-ink" value={c.currency || local}
+                      onChange={(e) => setCharge(c.key, { currency: e.target.value, fx_rate: '', ap: '' })}>
+                      {curList.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-medium text-muted">{t('pu.lc.amount', { cur: c.currency || local })}
+                    <input id={`lc-charge-${i}-amount`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" value={c.amount} onChange={(e) => setCharge(c.key, { amount: e.target.value })} />
                   </label>
                   <div className="flex min-h-[44px] items-center justify-end">
                     <button type="button" onClick={() => setCharges((cs) => cs.filter((x) => x.key !== c.key))} aria-label={t('pu.lc.removeCharge', { n: i + 1 })} className="grid h-10 w-10 place-items-center rounded-btn text-muted hover:bg-crit-bg hover:text-crit-fg"><Trash2 className="h-4 w-4" aria-hidden /></button>
                   </div>
-                  {c.code && <p className="col-span-2 text-xs text-muted md:col-span-3">{t(`pu.lc.methodHint.${method(c.code) ?? 'qty'}`)}</p>}
+                  <div className="col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-4">
+                    {(c.currency || local) !== local && (
+                      <label className="block text-xs font-medium text-muted">{t('pu.lc.rate', { cur: c.currency, local })}
+                        <input id={`lc-charge-${i}-rate`} inputMode="decimal" className="input num mt-1 text-end text-[15px] text-ink" readOnly={!canRate}
+                          placeholder={pc(i)?.fx_rate != null ? fmtRate(pc(i)?.fx_rate) : ''} value={c.fx_rate} onChange={(e) => setCharge(c.key, { fx_rate: e.target.value })} />
+                        {!canRate && <span className="mt-1 block text-xs text-muted">{t('pu.lc.rateFinance')}</span>}
+                      </label>
+                    )}
+                    <label className="block text-xs font-medium text-muted">{t('pu.lc.apInvoice')}
+                      <select id={`lc-charge-${i}-ap`} className="input mt-1 text-[15px] text-ink" value={c.ap} onChange={(e) => setCharge(c.key, { ap: e.target.value })}>
+                        <option value="">{t('pu.lc.apNone')}</option>
+                        {(apInvoices.data ?? []).filter((a) => (a.currency || local) === (c.currency || local)).map((a) => (
+                          <option key={a.doc_entry} value={a.doc_entry}>{a.doc_no} · {a.card_code} · {fmtMoney(a.total_fc ?? a.total, a.currency || local)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {pc(i) && (pc(i)?.amount_fc != null || pc(i)?.ap_invoice_no) && (
+                    <p className="col-span-2 text-xs text-ink-2 md:col-span-4" data-testid="lc-charge-fx">
+                      {pc(i)?.amount_fc != null && t('pu.lc.fxLine', { fc: fmtMoney(pc(i)?.amount_fc, pc(i)?.currency), rate: fmtRate(pc(i)?.fx_rate), lc: fmtMoney(pc(i)?.amount, local) })}
+                      {pc(i)?.ap_invoice_no && ` ${t('pu.lc.apLine', { no: pc(i)?.ap_invoice_no, clear: fmtMoney(pc(i)?.clear_amount, local), diff: fmtMoney(pc(i)?.fx_diff, local) })}`}
+                    </p>
+                  )}
+                  {c.code && <p className="col-span-2 text-xs text-muted md:col-span-4">{t(`pu.lc.methodHint.${method(c.code) ?? 'qty'}`)}</p>}
                 </li>
               ))}
             </ul>
-            <div className="border-t border-line p-4"><Button variant="secondary" id="lc-charge-add" onClick={() => setCharges((cs) => [...cs, { key: `c${++chgSeq}`, code: '', amount: '' }])}><Plus className="h-4 w-4" aria-hidden />{t('pu.lc.addCharge')}</Button></div>
+            <div className="border-t border-line p-4"><Button variant="secondary" id="lc-charge-add" onClick={() => setCharges((cs) => [...cs, newCharge('', local)])}><Plus className="h-4 w-4" aria-hidden />{t('pu.lc.addCharge')}</Button></div>
           </SectionCard>
           {P && <LcSplitTable lines={P.lines.map((l) => ({ ...l, allocs: Object.fromEntries(P.allocs.filter((a) => a.line_num === l.line_num).map((a) => [String(a.charge_no), a.amount])) }))} charges={P.charges} currency={P.totals.currency} />}
         </div>
@@ -1628,6 +1685,10 @@ export function LandedCostNewPage() {
                   <dt className="text-muted">{t('pu.lc.toInventory')}</dt><dd className="text-end">{fmtMoney(P.totals.to_inventory)}</dd>
                   <dt className="text-muted">{t('pu.lc.toCogs')}</dt><dd className="text-end">{fmtMoney(P.totals.to_cogs)}</dd>
                   <dt className="font-semibold">{t('pu.totals.total', { cur: P.totals.currency })}</dt><dd className="text-end font-semibold" data-testid="lc-total">{fmtMoney(P.totals.total)}</dd>
+                  {Number(P.totals.fx_diff ?? 0) !== 0 && <>
+                    <dt className="text-muted">{t('pu.lc.clearing')}</dt><dd className="text-end">{fmtMoney(P.totals.clearing)}</dd>
+                    <dt className="text-muted">{t('pu.lc.fxDiff')}</dt><dd className="text-end" data-testid="lc-fx-diff">{fmtMoney(P.totals.fx_diff)}</dd>
+                  </>}
                 </dl>
               ) : <p className="text-sm text-muted">{t('pu.lc.fill')}</p>}
               <p className="text-xs text-muted">{t('pu.lc.what')}</p>
@@ -1694,6 +1755,33 @@ export function LandedCostPage() {
               [t('pu.lc.toInventory'), fmtMoney(L.to_inventory, L.currency)], [t('pu.lc.toCogs'), fmtMoney(L.to_cogs, L.currency)], [t('erp.col.total'), fmtMoney(L.total, L.currency)]]} />
           </SectionCard>
           <LcSplitTable lines={L.lines} charges={L.charges} currency={L.currency} />
+          {L.charges.some((c) => c.amount_fc != null || c.ap_invoice_entry) && (
+            <SectionCard title={t('pu.lc.chargesFx')}>
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-[14px] sm:min-w-[560px]" data-testid="lc-charges-fx">
+                  <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    <th scope="col" className="px-4 py-2.5 text-start">{t('pu.lc.code')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-end">{t('cur.amountFc')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-end max-sm:hidden">{t('cur.rateShort')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-start">{t('pu.lc.apInvoice')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-end">{t('pu.lc.fxDiff')}</th>
+                  </tr></thead>
+                  <tbody>
+                    {L.charges.map((c) => (
+                      <tr key={c.charge_no} className="border-t border-line">
+                        <td className="px-4 py-2.5" dir="auto">{c.name}</td>
+                        <td className="num px-4 py-2.5 text-end">{c.amount_fc != null ? fmtMoney(c.amount_fc, c.currency) : fmtMoney(c.amount, L.currency)}</td>
+                        <td className="num px-4 py-2.5 text-end max-sm:hidden">{c.fx_rate != null ? fmtRate(c.fx_rate) : '—'}</td>
+                        <td className="px-4 py-2.5">{c.ap_invoice_entry ? <Link className="font-mono text-primary hover:underline" to={`/docs/ap_invoice/${company}/${c.ap_invoice_entry}`}>{c.ap_invoice_no}</Link> : '—'}</td>
+                        <td className="num px-4 py-2.5 text-end">{fmtMoney(c.fx_diff ?? 0, L.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="border-t border-line px-5 py-3 text-xs text-muted">{t('pu.lc.fxNote')}</p>
+            </SectionCard>
+          )}
           <SectionCard title={t('pu.lc.avgTitle')}>
             <div className="overflow-x-auto">
               <table className="w-full text-[14px] sm:min-w-[560px]">

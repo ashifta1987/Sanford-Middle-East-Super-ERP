@@ -131,8 +131,9 @@ export function PaymentsList({ dir }: { dir: Dir }) {
   const localOf = useLocalCurrencies();
   const incoming = dir === 'I';
   const cfg = useMemo<ListConfig<R>>(() => ({
-    id: `payment-${dir}`, table: 'payment_list',
-    select: 'company_code,direction,doc_entry,doc_num,doc_no,doc_date,card_code,card_name,currency,total,cash,transfer,cheque,card,on_account,cancelled,source',
+    // B5: payment_list_fc = payment_list + the payment-currency total.
+    id: `payment-${dir}`, table: 'payment_list_fc',
+    select: 'company_code,direction,doc_entry,doc_num,doc_no,doc_date,card_code,card_name,currency,total,total_fc,cash,transfer,cheque,card,on_account,cancelled,source',
     searchCols: ['card_code', 'card_name', 'memo', 'doc_no'], numberSearchCols: ['doc_num'], searchLabel: t('erp.search.payment'),
     fixed: { direction: dir },
     filters: [
@@ -152,6 +153,9 @@ export function PaymentsList({ dir }: { dir: Dir }) {
       { key: 'source', header: t('erp.col.source'), hideBelow: 'lg', cell: (r) => sourceName(r.source) },
       { key: 'cancelled', header: t('erp.col.status'), cell: (r) => <span className={clsx('pill', r.cancelled ? 'pill-crit' : 'pill-ok')}>{r.cancelled ? t('erp.status.cancelled') : t('erp.status.posted')}</span>,
         csv: (r) => (r.cancelled ? 'cancelled' : 'posted') },
+      { key: 'currency', header: t('cur.currency'), hideBelow: 'md', cell: (r) => <span className="font-mono text-[13px]">{r.currency || localOf(r.company_code)}</span> },
+      { key: 'total_fc', header: t('cur.amountFc'), align: 'end', hideBelow: 'sm',
+        cell: (r) => (r.total_fc != null ? fmtMoney(r.total_fc, r.currency) : <span className="text-muted">—</span>), csv: (r) => r.total_fc ?? '' },
       { key: 'total', header: t('erp.col.amount'), align: 'end', cell: (r) => lcLabel(r.total, r.currency, localOf(r.company_code), fmtMoney) },
     ],
   }), [t, dir, incoming]);

@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
+import { UserRoundCheck } from 'lucide-react';
 import { erp } from '@/lib/supabase';
 import i18n from '@/lib/i18n';
 import { ApiError, fmtDate } from '@/lib/format';
@@ -72,6 +73,7 @@ function DocumentApprovals() {
   const rows: InboxRow[] = q.data?.[view] ?? [];
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <div role="tablist" aria-label={t('inbox.tabDocs')} className="flex flex-wrap gap-2">
         {(['waiting', 'sent', 'decided'] as const).map((v) => (
           <button key={v} type="button" role="tab" aria-selected={view === v} id={`view-${v}`}
@@ -81,6 +83,11 @@ function DocumentApprovals() {
             {t(`inbox.${v}`)} <span className="num text-xs">{q.data ? q.data[v].length : ''}</span>
           </button>
         ))}
+      </div>
+      {/* B5: every authorizer can name their own substitute (SAP B1 "Substitute Authorizer"). */}
+      <Link to="/approvals/substitute" id="inbox-substitute-link" className="inline-flex min-h-[40px] items-center gap-2 rounded-btn border border-line bg-surface px-4 text-sm font-medium text-ink hover:bg-page">
+        <UserRoundCheck className="h-4 w-4" aria-hidden />{t('apr.sub.mine')}
+      </Link>
       </div>
       <Card>
         {q.isLoading ? <SkeletonRows rows={3} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : rows.length === 0 ? (
@@ -148,6 +155,7 @@ function DocumentApprovals() {
                         {(r.need_approvals ?? 1) > 1 && <> · <span className="num">{t('apr.votes', { a: r.approvals ?? 0, n: r.need_approvals })}</span></>}
                       </div>
                       <div className="text-xs text-muted" dir="auto">{t(`so.rule.${r.rule_code}`)} · {r.approver_position_name}</div>
+                      {view === 'waiting' && r.on_behalf_of_name && <div className="mt-1"><span className="pill pill-info" data-testid="inbox-behalf">{t('apr.sub.onBehalf', { name: r.on_behalf_of_name })}</span></div>}
                     </td>
                     <td className="px-4 py-2.5 max-md:hidden">
                       {view === 'decided'

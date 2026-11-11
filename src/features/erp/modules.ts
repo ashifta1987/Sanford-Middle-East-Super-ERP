@@ -128,6 +128,8 @@ const LIVE_FUNCTIONS: Partial<Record<ModuleKey, Record<string, string>>> = {
   },
   financials: {
     'Chart of Accounts': '/financials/accounts', 'Journal Entry': '/financials/journals', 'Financials Setup': '/financials/gl-determination',
+    // B5 · period-end revaluation of open foreign-currency items
+    'Exchange Rate Differences': '/financials/fx-revaluation',
     // A11 · reports
     'Financial Reports': '/reports?cat=financials',
   },
@@ -234,6 +236,9 @@ const LIVE_ITEMS: Record<string, string> = {
   // B1 · Choose/Create Company, Document Numbering check
   'Create new company': '/admin/companies/new', 'Sanford Middle East DWC Group': '/admin/companies', 'Check Document Numbering': '/admin/numbering',
   'Rate history': '/admin/exchange-rates', 'Approval Templates': '/admin/approvals/templates', 'Approval Stages': '/admin/approvals/stages',
+  // B5 · substitute authorizers, revaluation
+  'Substitute Authorizer for Approval Templates': '/admin/approvals/substitutes', 'Currency revaluation': '/financials/fx-revaluation',
+  'Select partners and accounts': '/financials/fx-revaluation', 'Preview gain or loss': '/financials/fx-revaluation', 'Post differences': '/financials/fx-revaluation',
   'General ›': '/admin/users', 'License Administration': '/admin/users', 'AI Assistant (new)': '/admin/ai-assistant',
   // A14 · go-live checklist and system health
   'Implementation Center ›': '/admin/go-live',

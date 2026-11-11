@@ -18,10 +18,11 @@ import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, us
 const DATE_TIME = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' } as const;
 
 /** Approval Stages · Approval Templates · Approval Status Report (Administration › Approval Process). */
-function ProcessTabs({ company }: { company: string }) {
+export function ProcessTabs({ company }: { company: string }) {
   const { t } = useTranslation();
   const here = useLocation().pathname;
-  const tabs: Array<[string, string]> = [['/admin/approvals/stages', t('apr.tab.stages')], ['/admin/approvals/templates', t('apr.tab.templates')], ['/admin/approvals/report', t('apr.tab.report')]];
+  const tabs: Array<[string, string]> = [['/admin/approvals/stages', t('apr.tab.stages')], ['/admin/approvals/templates', t('apr.tab.templates')], ['/admin/approvals/report', t('apr.tab.report')],
+    ['/admin/approvals/substitutes', t('apr.tab.substitutes')]];
   return (
     <nav aria-label={t('apr.process')} className="mb-5 flex flex-wrap gap-2 border-b border-line">
       {tabs.map(([to, label]) => (
@@ -551,7 +552,7 @@ function TrailList({ steps }: { steps: TrailStep[] }) {
           <span className="font-medium">{t('apr.stepOf', { n: s.step })}</span> · <span dir="auto">{s.stage_name}</span> · <span dir="auto">{s.template_name}</span>
           {' · '}{s.decision ? <span className={clsx('pill', s.decision === 'approved' ? 'pill-ok' : 'pill-crit')}>{t(`erp.status.${s.decision}`)}</span>
             : s.current ? <span className="pill pill-warning">{t('apr.votes', { a: s.approvals, n: s.need_approvals })}</span> : null}
-          {s.votes.length > 0 && <span className="text-muted" dir="auto"> · {s.votes.map((v) => `${v.user_name} (${t(`erp.status.${v.decision}`)})`).join(', ')}</span>}
+          {s.votes.length > 0 && <span className="text-muted" dir="auto"> · {s.votes.map((v) => `${v.user_name}${v.on_behalf_of_name ? ` ${t('apr.sub.forName', { name: v.on_behalf_of_name })}` : ''} (${t(`erp.status.${v.decision}`)})`).join(', ')}</span>}
         </li>
       ))}
     </ol>

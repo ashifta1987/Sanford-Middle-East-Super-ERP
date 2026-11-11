@@ -2215,7 +2215,17 @@
         "value": "Split in proportion to each line’s value.",
         "weight": "Split in proportion to each line’s weight: enter it on the lines.",
         "equal": "The same share for every line."
-      }
+      },
+      "rate": "Rate ({{local}} per 1 {{cur}})",
+      "rateFinance": "From Exchange Rates for the landed cost date. Only Financials can change it.",
+      "apInvoice": "Broker's A/P invoice (optional)",
+      "apNone": "Not linked",
+      "fxLine": "{{fc}} at {{rate}} = {{lc}}.",
+      "apLine": "Invoice {{no}}: clearing {{clear}}, rate difference {{diff}}.",
+      "clearing": "Clearing (invoice rate)",
+      "fxDiff": "Rate difference",
+      "chargesFx": "Costs in other currencies",
+      "fxNote": "Costs are split and posted in the company currency. A cost linked to the broker's A/P invoice clears the accrual at that invoice's rate; the difference is posted as an exchange rate gain or loss."
     },
     "setup": {
       "title": "Purchasing Setup",
@@ -4330,7 +4340,8 @@
     "tab": {
       "stages": "Approval Stages",
       "templates": "Approval Templates",
-      "report": "Approval Status Report"
+      "report": "Approval Status Report",
+      "substitutes": "Substitute Authorizer"
     },
     "position": "Position",
     "user": "User",
@@ -4513,6 +4524,45 @@
     "stageOfShort": "Stage {{n}} of {{of}}",
     "flash": {
       "rejectionRecorded": "Your rejection is recorded. This stage needs more rejections, so the document is still waiting for approval."
+    },
+    "sub": {
+      "title": "Substitute Authorizer",
+      "desc": "Who approves in an authorizer's place while they are on leave or travelling, with start and end dates.",
+      "mineTitle": "My substitute",
+      "mineDesc": "Name who decides your approval requests while you are away.",
+      "mine": "My substitute",
+      "new": "New substitution",
+      "editTitle": "Change substitution",
+      "rule": "While a substitution is active, the substitute may decide every request waiting at the stages the authorizer belongs to. Their vote is recorded on behalf of the authorizer, and the two count as one person. Before the start date, after the end date or once ended it stops working. Substitutions don't chain.",
+      "notAuthorizer": "You are not an authorizer of any approval stage in this company, so there is nothing to hand over.",
+      "authorizer": "Authorizer",
+      "substitute": "Substitute",
+      "from": "From",
+      "to": "To",
+      "note": "Note (optional)",
+      "period": "Period",
+      "stages": "Stages",
+      "decided": "Decided for them",
+      "stagesOf": "Stages handed over: {{stages}}",
+      "save": "Save substitution",
+      "none": "No substitutions",
+      "noneBody": "When an authorizer is away, name a substitute here.",
+      "end": "End now",
+      "endTitle": "End this substitution?",
+      "endBody": "{{name}} stops deciding for {{user}} at once. Decisions already made stay.",
+      "endedBy": "Ended by {{name}}",
+      "added": "Substitution saved ({{status}}).",
+      "changed": "Substitution changed ({{status}}).",
+      "ended": "{{name}} no longer decides as a substitute.",
+      "onBehalf": "On behalf of {{name}}",
+      "forName": "for {{name}}",
+      "voteBy": "{{who}} for {{name}} ({{decision}})",
+      "status": {
+        "active": "Active",
+        "planned": "Planned",
+        "expired": "Expired",
+        "ended": "Ended"
+      }
     }
   },
   "stp": {
@@ -4753,6 +4803,83 @@
     "rateLabel": "Currency and rate",
     "fxDiff": "Exchange rate difference",
     "gain": "gain",
-    "loss": "loss"
+    "loss": "loss",
+    "amountFc": "Amount (FC)",
+    "rateShort": "Rate"
+  },
+  "fxr": {
+    "title": "Exchange Rate Differences",
+    "titleN": "Exchange rate differences {{no}}",
+    "desc": "Revalue open foreign-currency receivables and payables at a period-end rate. The difference goes to the unrealised exchange gain or loss account.",
+    "detailDesc": "Revaluation of open foreign-currency items on {{date}}.",
+    "readOnly": "Revaluing needs full access to Financials.",
+    "selection": "Selection",
+    "date": "Revaluation date",
+    "currencies": "Currencies",
+    "noOpen": "No open foreign-currency items.",
+    "currenciesHint": "None ticked = every foreign currency with open items.",
+    "rateFor": "Rate for {{cur}} ({{local}} per 1 {{cur}})",
+    "rateTyped": "Typed rate (instead of Exchange Rates).",
+    "rateList": "Empty = the rate in Exchange Rates for {{date}}.",
+    "autoReverse": "Reverse automatically on the first day of the next period ({{date}})",
+    "noReverseNote": "Without the reversal the revalued amounts stay until the next revaluation; payments still compute their gain or loss from the document's own rate.",
+    "memo": "Remarks",
+    "preview": "Preview per partner",
+    "emptyTitle": "Nothing to revalue",
+    "emptyBody": "There are no open foreign-currency items on {{date}}.",
+    "summary": "Summary",
+    "gain": "Gain",
+    "loss": "Loss",
+    "net": "Net",
+    "fill": "Choose a date to see the preview.",
+    "what": "Posts each partner's receivable or payable against the gain account ({{gain}}) or the loss account ({{loss}}). No approval is needed.",
+    "notSet": "not set",
+    "already": "This date is already revalued ({{no}}). Cancel that revaluation to run it again.",
+    "later": "A later revaluation ({{no}} on {{date}}) is posted. Cancel it first or choose a later date.",
+    "nothing": "The open items are already at these rates.",
+    "post": "Post revaluation",
+    "history": "Revaluations",
+    "noHistory": "No revaluations yet.",
+    "state": {
+      "posted": "Posted",
+      "cancelled": "Cancelled"
+    },
+    "confirmTitle": "Post the revaluation?",
+    "confirmBody": "Revalue {{n}} partner balance(s) on {{date}} (net {{net}}), reversed on {{rev}}.",
+    "confirmBodyNoReverse": "Revalue {{n}} partner balance(s) on {{date}} (net {{net}}) without a reversal.",
+    "flash": {
+      "posted": "Revaluation {{no}} posted.",
+      "cancelled": "Revaluation cancelled. Its journals are mirrored."
+    },
+    "cancel": "Cancel revaluation",
+    "cancelTitle": "Cancel this revaluation?",
+    "cancelBody": "Mirror journals are posted on the revaluation date and on the reversal date. Both periods must be open.",
+    "cancelReason": "Reason",
+    "rates": "Rates",
+    "typed": "typed",
+    "reversal": "Automatic reversal",
+    "noReversal": "None",
+    "lines": "Partners",
+    "journals": "Journals",
+    "docs": "{{n}} open document(s)",
+    "action": {
+      "fx_revaluation_post": "Revaluation posted",
+      "fx_revaluation_cancel": "Revaluation cancelled",
+      "fx_revaluation_journal": "Journal posted",
+      "fx_revaluation_reverse": "Reversal posted"
+    },
+    "col": {
+      "partner": "Business partner",
+      "side": "Type",
+      "openFc": "Open (FC)",
+      "book": "Book value",
+      "rate": "Rate",
+      "new": "New value",
+      "gain": "Gain / loss"
+    },
+    "side": {
+      "receivable": "Receivable",
+      "payable": "Payable"
+    }
   }
 }

@@ -121,9 +121,10 @@ export function DocumentsPage() {
   const so = kind === 'sales_order' || cycle || pu || inv;
   const cfg = useMemo<ListConfig<R> | null>(() => def ? ({
     id: `document-${kind}`,
-    table: kind === 'sales_order' ? 'sales_order_list' : cycle ? 'sales_doc_list' : pu ? 'purchase_doc_list' : inv ? 'inventory_doc_list' : 'document',
+    // B5: sales and purchasing lists read the *_list_fc views (same columns + the document-currency total).
+    table: kind === 'sales_order' || cycle ? 'sales_doc_list_fc' : pu ? 'purchase_doc_list_fc' : inv ? 'inventory_doc_list' : 'document',
     select: so
-      ? `company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source${cycle || pu ? ',paid' : ''}${pu ? ',china_office' : ''}${inv ? ',from_whs,to_whs' : ''}`
+      ? `company_code,obj_type,doc_entry,doc_num,doc_no,doc_kind,status,state,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,source${cycle || pu ? ',paid' : ''}${kind === 'sales_order' || cycle || pu ? ',total_fc' : ''}${pu ? ',china_office' : ''}${inv ? ',from_whs,to_whs' : ''}`
       : 'company_code,obj_type,doc_entry,doc_num,doc_kind,status,doc_date,due_date,card_code,card_name,customer_ref,currency,total,vat_total,paid,from_whs,to_whs',
     searchCols: so ? ['card_code', 'card_name', 'customer_ref', 'comments', 'doc_no'] : ['card_code', 'card_name', 'customer_ref', 'comments'],
     numberSearchCols: ['doc_num'], searchLabel: t('erp.search.doc'),
@@ -156,6 +157,11 @@ export function DocumentsPage() {
         csv: (r) => (so && r.state && r.state !== 'approved' && r.state !== 'cancelled' ? r.state : r.status) },
       ...(pu ? [{ key: 'china_office', header: t('pu.office'), hideBelow: 'lg' as const, cell: (r: R) => r.china_office ?? '—' }] : []),
       ...(so ? [{ key: 'source', header: t('erp.col.source'), hideBelow: 'lg' as const, cell: (r: R) => (r.source === 'erp' ? 'Super ERP' : r.source === 'sap' ? 'SAP' : t('erp.sampleData')) }] : []),
+      ...(kind === 'sales_order' || cycle || pu ? [
+        { key: 'currency', header: t('cur.currency'), hideBelow: 'md' as const, cell: (r: R) => <span className="font-mono text-[13px]">{r.currency || localOf(r.company_code)}</span> },
+        { key: 'total_fc', header: t('cur.amountFc'), align: 'end' as const, hideBelow: 'sm' as const,
+          cell: (r: R) => (r.total_fc != null ? fmtMoney(r.total_fc, r.currency) : <span className="text-muted">—</span>), csv: (r: R) => r.total_fc ?? '' },
+      ] : []),
       { key: 'total', header: t('erp.col.total'), align: 'end', cell: (r) => lcLabel(r.total, r.currency, localOf(r.company_code), fmtMoney) },
       ...(kind.endsWith('invoice') ? [{ key: 'paid', header: t('erp.col.openAmount'), align: 'end' as const, sortable: false,
         cell: (r: R) => fmtMoney(Number(r.total) - Number(r.paid ?? 0)), csv: (r: R) => Number(r.total) - Number(r.paid ?? 0) }] : []),

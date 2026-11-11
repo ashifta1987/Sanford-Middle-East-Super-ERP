@@ -190,15 +190,20 @@ export interface LcLine {
   cbm: number | null; weight: number | null; allocated: number; to_inventory: number; to_cogs: number; on_hand: number; avg_before: number | null; avg_after: number | null;
   allocs?: Record<string, number> | null;
 }
-export interface LcCharge { charge_no: number; code: string; name: string; split_method: 'cbm' | 'qty' | 'value' | 'weight'; amount: number }
+export interface LcCharge {
+  charge_no: number; code: string; name: string; split_method: 'cbm' | 'qty' | 'value' | 'weight'; amount: number;
+  /** B5: the charge's currency, FC amount and rate; the linked broker A/P invoice; LC credited to clearing; rate difference (clearing − amount). */
+  currency?: string; amount_fc?: number | null; fx_rate?: number | null; ap_invoice_entry?: number | null; ap_invoice_no?: string | null;
+  clear_amount?: number; fx_diff?: number;
+}
 export interface LcEval {
   header: Record<string, unknown>; lines: LcLine[]; charges: LcCharge[]; allocs: Array<{ charge_no: number; line_num: number; basis: number; amount: number }>;
-  totals: { total: number; to_inventory: number; to_cogs: number; currency: string };
+  totals: { total: number; to_inventory: number; to_cogs: number; currency: string; clearing?: number; fx_diff?: number };
 }
 export const lcPreview = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, charges: Array<Record<string, unknown>>) =>
   rpc<LcEval>('landed_cost_preview', { p_company: company, p_header: header, p_lines: lines, p_charges: charges });
 export const lcCreate = (company: string, header: Record<string, unknown>, lines: Array<Record<string, unknown>>, charges: Array<Record<string, unknown>>, series: number | null = null) =>
-  rpc<{ doc_entry: number; doc_no: string; total: number; to_inventory: number; to_cogs: number; trans_id: number }>('landed_cost_create', { p_company: company, p_header: header, p_lines: lines, p_charges: charges, p_series: series });
+  rpc<{ doc_entry: number; doc_no: string; total: number; to_inventory: number; to_cogs: number; trans_id: number; fx_diff: number }>('landed_cost_create', { p_company: company, p_header: header, p_lines: lines, p_charges: charges, p_series: series });
 export interface LcInfo {
   doc_entry: number; doc_no: string; doc_date: string; card_code: string | null; card_name: string | null; reference: string | null; comments: string | null;
   total: number; to_inventory: number; to_cogs: number; currency: string; trans_id: number | null; can_read_journal: boolean; created_by_name: string | null; created_at: string;

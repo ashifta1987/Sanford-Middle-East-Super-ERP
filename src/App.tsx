@@ -69,6 +69,10 @@ const P_AdminSetupPages = from(() => import('@/features/erp/pages/AdminSetupPage
 const { AiAssistantPage, ApprovalTemplatesPage, CompanyDetailsPage, ExchangeRatesPage } = P_AdminSetupPages('AiAssistantPage', 'ApprovalTemplatesPage', 'CompanyDetailsPage', 'ExchangeRatesPage');
 const P_ApprovalProcessPages = from(() => import('@/features/erp/pages/ApprovalProcessPages'));
 const { ApprovalStagesPage, ApprovalStatusReportPage, ApprovalTemplateFormPage, ApprovalTemplatesListPage } = P_ApprovalProcessPages('ApprovalStagesPage', 'ApprovalStatusReportPage', 'ApprovalTemplateFormPage', 'ApprovalTemplatesListPage');
+const P_SubstitutePages = from(() => import('@/features/erp/pages/SubstitutePages'));
+const { SubstitutesPage } = P_SubstitutePages('SubstitutesPage');
+const P_RevaluationPages = from(() => import('@/features/erp/pages/RevaluationPages'));
+const { FxRevaluationDetailPage, FxRevaluationPage } = P_RevaluationPages('FxRevaluationDetailPage', 'FxRevaluationPage');
 const P_NumberingPages = from(() => import('@/features/erp/pages/NumberingPages'));
 const { CompaniesPage, CompanyFormPage, DocNumberingPage } = P_NumberingPages('CompaniesPage', 'CompanyFormPage', 'DocNumberingPage');
 const P_SalesRequestPages = from(() => import('@/features/erp/pages/SalesRequestPages'));
@@ -211,6 +215,9 @@ export default function App() {
         <Route path="financials/journals/drafts/:company/:id" element={<JournalDraftPage />} />
         {/* B3 · G/L Account Determination by tab, with item group and warehouse accounts */}
         <Route path="financials/gl-determination" element={<GlAccountDeterminationPage />} />
+        {/* B5 · Financials › Exchange Rate Differences (period-end revaluation) */}
+        <Route path="financials/fx-revaluation" element={<FxRevaluationPage />} />
+        <Route path="financials/fx-revaluation/:company/:id" element={<FxRevaluationDetailPage />} />
         <Route path="financials/periods" element={<PostingPeriodsPage />} />
         <Route path="financials/journals/:company/:id" element={<JournalDetail />} />
         <Route path="banking/payments/:dir" element={<PaymentsPage />} />
@@ -253,6 +260,9 @@ export default function App() {
         <Route path="admin/approvals/templates/new" element={<ApprovalTemplateFormPage key="apr-new" mode="new" />} />
         <Route path="admin/approvals/templates/:id" element={<ApprovalTemplateFormPage key="apr-edit" mode="edit" />} />
         <Route path="admin/approvals/report" element={<ApprovalStatusReportPage />} />
+        {/* B5 · Substitute Authorizer (all of the company) and the authorizer's own substitution */}
+        <Route path="admin/approvals/substitutes" element={<SubstitutesPage key="sub-admin" mode="admin" />} />
+        <Route path="approvals/substitute" element={<SubstitutesPage key="sub-mine" mode="mine" />} />
         {/* B1 · Document Numbering (several series per type, user defaults) and Choose/Create Company */}
         <Route path="admin/numbering" element={<DocNumberingPage />} />
         <Route path="admin/companies" element={<CompaniesPage />} />

@@ -316,8 +316,8 @@ BEGIN
     'G/L Account Determination › General has the conversion difference key (39 keys)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM erp.gl_determination WHERE posting_key = 'conversion_diff' AND company_code <> 'ZZ99'),
     'no conversion difference account for real companies (empty until Finance enters it)');
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = 23 AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '35_final_items.sql' AND object = 'conversion_diff_post'),
-    'system health lists 35_final_items.sql (23 files)');
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.sana_settings') IS NOT NULL THEN 24 ELSE 23 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '35_final_items.sql' AND object = 'conversion_diff_post'),
+    'system health lists 35_final_items.sql (23 files, 24 with U0+S1)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                                      WHERE n.nspname = 'erp' AND p.prosecdef AND (p.proname LIKE 'conversion_diff%' OR p.proname LIKE 'system_currency%' OR p.proname LIKE '\_cvd%' OR p.proname LIKE '\_sys\_cur%')
                                        AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR NOT coalesce(array_to_string(p.proconfig, ',') LIKE '%search_path=erp, pg_temp%', false))),

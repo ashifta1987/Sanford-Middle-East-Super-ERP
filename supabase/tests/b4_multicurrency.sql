@@ -406,7 +406,7 @@ BEGIN
     'manual candidates: the payment whose reference fits comes first (ref_match)', left(r::text, 400));
 
   -- ================= 7. Health =================
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 23 WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 22 ELSE 21 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '33_multicurrency.sql' AND object = 'currency_rate'),
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.sana_settings') IS NOT NULL THEN 24 WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 23 WHEN to_regclass('erp.fx_revaluation') IS NOT NULL THEN 22 ELSE 21 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '33_multicurrency.sql' AND object = 'currency_rate'),
     'system health lists 33_multicurrency.sql (21 files)');
 END $$;
 

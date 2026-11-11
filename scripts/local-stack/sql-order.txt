@@ -30,3 +30,4 @@ supabase/sql/32_gl_setup.sql
 supabase/sql/33_multicurrency.sql
 supabase/sql/34_open_items.sql
 supabase/sql/35_final_items.sql
+supabase/sql/36_sana.sql

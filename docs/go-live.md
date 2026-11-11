@@ -67,9 +67,10 @@ The list is also in `scripts/local-stack/sql-order-supabase.txt`.
 | 19 | `33_multicurrency.sql` | B4: documents and payments in the business partner's currency (rates from Exchange Rates), foreign-currency amounts on journals, realised FX gain/loss at payment, soft-switch stock (SAP on-hand + Super ERP movements; the sync no longer wipes Super ERP stock). Generated from `supabase/sql/src/33_multicurrency/` |
 | 20 | `34_open_items.sql` | B5: Substitute Authorizer (Approval Process), landed cost charges in a foreign currency (with the broker's A/P invoice), credit memos copying invoices with other rates, foreign-currency totals on the document and payment lists (new `*_list_fc` views), Financials › Exchange Rate Differences (period-end revaluation with automatic reversal; new G/L keys `general/fx_reval_gain` and `fx_reval_loss`, no accounts seeded for AE01–AE05). Generated from `supabase/sql/src/34_open_items/` |
 | 21 | `35_final_items.sql` | B6: landed cost vendor per cost line (broker on the header), optional system currency per company (Administration › Company Details; stays the local currency = inactive for AE01–AE05 until Sanford decides), system currency amounts on journal lines when active, Financials › Conversion Differences (correcting journal in the system currency only; new G/L key `general/conversion_diff`, no account seeded for AE01–AE05). Generated from `supabase/sql/src/35_final_items/` |
+| 22 | `36_sana.sql` | U0+S1: SANA, the Southfield AI Neural Assistant. Settings per company (`sana_settings`: on/off, voice, daily limit, languages; A10's AI Assistant on/off carries over), private conversation log, usage counters (counts only), feedback, and the read-only role-checked tools (`sana_*`, SECURITY INVOKER). Replaces A11's "Ask AI" (the `ai_*` SQL from 25/26 stays, unused). IT admin does not unlock business data in Sana. Nothing company-specific seeded |
 
 - **Never** run `15_sample_company.sql` or `scripts/local-stack/test-users.sql` on live. They are a fictional company and fictional users. On a throwaway branch they are fine for running the test suites (3.3).
-- Files 15–35 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
+- Files 15–36 were applied twice in a row on a fresh database **without** the sample company. Every file passed both times (CI checks this as well).
 - **How to run each file:** in the SQL editor, paste the whole file and run it once. Or use `psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/sql/<file>`. Stop at the first error and don't carry on with later files.
 
 ### 3.3 Tests on the branch
@@ -111,7 +112,7 @@ select erp.schema_release_record(f, 'live', 'Ashif', 'A14 go-live apply')
   from unnest(array['15_stage1_overview.sql','16_module_access.sql','17_sales_order.sql','18_posting.sql','19_sales_cycle.sql','20_banking.sql',
                     '21_purchasing.sql','22_inventory.sql','23_master_data.sql','24_hr.sql','25_admin.sql','26_reports.sql',
                     '27_migration_more.sql','28_production_service.sql','29_go_live.sql','30_numbering_company.sql','31_approvals.sql',
-                    '32_gl_setup.sql','33_multicurrency.sql','34_open_items.sql','35_final_items.sql']) f;
+                    '32_gl_setup.sql','33_multicurrency.sql','34_open_items.sql','35_final_items.sql','36_sana.sql']) f;
 ```
 Do the same on the branch with `'branch'`. `schema_release_record` can only be run from the SQL editor (postgres) or with the service role. Signed-in users can only read the log, on the System health page.
 
@@ -119,7 +120,7 @@ Do the same on the branch with `'branch'`. `schema_release_record` can only be r
 | Function | Deploy | Secrets it needs (names only) |
 |---|---|---|
 | `invite-user` (A10: invitations; the service key stays on the server) | `supabase functions deploy invite-user` | `APP_URL` (the production app address, for the invitation link). `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase automatically. |
-| `ai-assistant` (A10 settings, A11 Ask AI) | `supabase functions deploy ai-assistant` (only once a provider is chosen) | `AI_API_KEY`. Without it the app shows "AI not configured" and nothing is sent anywhere. |
+| `sana` (U0+S1: the Sana assistant; replaces A11's `ai-assistant`, which is no longer deployed — delete it if it was) | `supabase functions deploy sana` | `ANTHROPIC_API_KEY` (optional) and `SANA_MODEL` (optional, default `claude-sonnet-5-5`). Without the key Sana runs in **basic mode** (keyword routing to the same role-checked tools, labelled in the panel) and nothing is sent to any AI provider. |
 
 Deploy them to the branch first (Preview), then to live. `supabase secrets set NAME=…` is run by Ashif or IT. The values never go into the repo or into Vercel.
 

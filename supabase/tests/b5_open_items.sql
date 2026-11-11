@@ -459,8 +459,8 @@ BEGIN
     'G/L Account Determination › General has the two revaluation keys (38 keys, 39 with B6)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM erp.gl_determination g JOIN erp.company c USING (company_code) WHERE g.posting_key IN ('fx_reval_gain', 'fx_reval_loss') AND c.company_code <> 'ZZ99'),
     'no revaluation accounts for real companies (empty until Finance enters them)');
-  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 23 ELSE 22 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '34_open_items.sql' AND object = 'fx_revaluation_post'),
-    'system health lists 34_open_items.sql (22 files, 23 with B6)');
+  PERFORM pg_temp.check((SELECT count(*) FROM erp._health_files()) = CASE WHEN to_regclass('erp.sana_settings') IS NOT NULL THEN 24 WHEN to_regclass('erp.conv_diff_run') IS NOT NULL THEN 23 ELSE 22 END AND EXISTS (SELECT 1 FROM erp._health_files() WHERE file_name = '34_open_items.sql' AND object = 'fx_revaluation_post'),
+    'system health lists 34_open_items.sql (22 files, 23 with B6, 24 with U0+S1)');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                                      WHERE n.nspname = 'erp' AND p.prosecdef AND (p.proname LIKE 'fx_revaluation%' OR p.proname LIKE 'approval_substitute%' OR p.proname LIKE '\_fxr%' OR p.proname LIKE '\_apr\_sub%')
                                        AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR NOT coalesce(array_to_string(p.proconfig, ',') LIKE '%search_path=erp, pg_temp%', false))),

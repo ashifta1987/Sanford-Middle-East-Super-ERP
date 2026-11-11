@@ -1,6 +1,6 @@
-# Sanford Super ERP · UI/UX specification
+# Southfield · AI-Powered ERP · UI/UX specification
 
-The single reference for how every screen looks and behaves. It follows the canvas design ("Super ERP UI/UX Structure", 11 modules matched to SAP Business One) and the Stage 1 code, which already implements most of it. Reference screenshots: `design/reference/*.png`.
+The single reference for how every screen looks and behaves. **Product name: Southfield** (tagline "AI-Powered ERP"), built for the Sanford Middle East DWC Group. It follows the canvas design ("Super ERP UI/UX Structure", 11 modules matched to SAP Business One) and the Stage 1 code, which already implements most of it. Reference screenshots: `design/reference/*.png`. Brand files: `design/brand/` (logo mark SVG, the original logo, the sign-in reference image).
 
 When this document and a screenshot disagree, this document wins. When the code and this document disagree, fix the code.
 
@@ -13,36 +13,63 @@ When this document and a screenshot disagree, this document wins. When the code 
 4. **Same pattern everywhere.** One list pattern, one detail pattern and one document form pattern, shared by all modules.
 5. **English and Arabic, light and dark, desktop and phone,** all from the first build of each screen.
 
-## 2. Design tokens
-Defined once as CSS variables in `src/index.css` and used through Tailwind names (`tailwind.config.js`). Never hard-code a colour.
+## 2. Brand and design tokens
+**Logo.** `src/brand/Logo.tsx`: `<LogoMark/>` is the vector mark (blue, yellow, teal and coral rounded square with the white turn arrow); `<Logo size tone/>` is the mark plus the live-text wordmark "Southfield" (Outfit 700) over "AI-POWERED ERP" (Outfit 600, letter-spaced, teal). Never stretch, recolour or re-draw the mark. Keep clear space equal to a quarter of the mark's width. The wordmark stays in Latin letters in Arabic. Favicon: `public/favicon.svg`; iOS icon `public/apple-touch-icon.png`.
+
+**Brand colours** (logo only, sign-in panel, charts; never for status):
+| Name | Hex | Tailwind |
+|---|---|---|
+| Southfield blue | #226AD9 | `brand-blue` (also `primary`) |
+| Navy (text) | #012746 | `ink` |
+| Sidebar navy | #011C45 | `brand-navy`, `side` |
+| Teal | #08BBA9 | `brand-teal` |
+| Yellow | #F7B646 | `brand-yellow` |
+| Coral | #F4745B | `brand-coral` |
+
+**Interface tokens.** They are defined once as CSS variables in `src/index.css` and used through Tailwind names (`tailwind.config.js`). Never hard-code a colour.
 
 | Token (Tailwind) | Light | Dark | Use |
 |---|---|---|---|
-| `page` | #F4F5F7 | #0B0F17 | App background |
-| `surface` | #FFFFFF | #121826 | Cards, top bar, inputs |
-| `surface-2` | #F8F9FB | #182032 | Table headers, hover rows |
-| `line` / `line-strong` | #E4E7EC / #D0D5DD | #253049 / #33405A | Borders / input borders |
-| `ink` / `ink-2` / `muted` | #101828 / #475467 / #5D6B82 | #F2F4F7 / #C0C7D4 / #98A2B3 | Text, secondary text, labels |
-| `primary` | #4338CA | #4F46E5 | Primary buttons, links, focus |
-| `primary-soft` / `primary-text` / `primary-line` | #EEF0FF / #3730A3 / #C7CBFA | #1E2050 / #C7D2FE / #3B3F8F | Selected items, AI notes |
-| `side` / `side-active` / `side-active-text` | #FFFFFF / #EEF0FF / #3730A3 | #0E1420 / #1E2050 / #E0E7FF | Sidebar |
+| `page` | #F6F7FB | #070F1F | App background |
+| `surface` / `surface-2` | #FFFFFF / #F8FAFC | #0E1A2E / #13223A | Cards, top bar, inputs / table headers, hover rows |
+| `line` / `line-strong` | #E3E8EF / #CBD3E1 | #1F3150 / #2B4166 | Borders / input borders |
+| `ink` / `ink-2` / `muted` | #012746 / #3E5573 / #5F6F86 | #EEF3FA / #BCC8DA / #8D9BB3 | Text, secondary text, labels |
+| `primary` | #226AD9 | #2F76E8 | Primary buttons, links, focus |
+| `primary-soft` / `primary-text` / `primary-line` | #EAF2FF / #1A4FA8 / #BFD5F7 | #0F2A55 / #A9C8FF / #24467F | Selected items, AI notes |
+| `side` / `side-text` / `side-muted` | #011C45 / #C7D2E5 / #7E8FAD | #040C1B / #BCC8DA / #70809C | Navy sidebar, its text and section labels |
+| `side-hover` / `side-active` / `side-line` | #0C2856 / #123875 / #14305E | #0C1C36 / #10295A / #142440 | Sidebar hover, selected item (+ 3 px teal marker at the start), divider |
 | `ok` bg/fg | #ECFDF3 / #067647 | #0A2A1C / #75E0A7 | Approved, posted, active, live |
 | `warn` bg/fg | #FFFAEB / #B54708 | #2E1F06 / #FEC84B | Waiting, below minimum, preview banner |
 | `crit` bg/fg | #FEF3F2 / #B42318 | #2D1212 / #FDA29B | Blocked, cancelled, errors |
-| `info` bg/fg | #EEF0FF / #3730A3 | #1E2050 / #C7D2FE | Open, in progress |
-| `neutral` bg/fg | #F2F4F7 / #344054 | #1D2638 / #D0D5DD | Closed, planned, off |
+| `info` bg/fg | #EAF2FF / #1A4FA8 | #0F2A55 / #A9C8FF | Open, in progress |
+| `neutral` bg/fg | #F1F4F8 / #344054 | #1A263C / #D0D5DD | Closed, planned, off |
 
-- **Type:** IBM Plex Sans (Latin) and IBM Plex Sans Arabic (Arabic), IBM Plex Mono for codes (item no., account, document no.). Tabular numbers everywhere.
-- **Sizes:** page title 28 px / 600 (26 px on phones); section title 15 px / 600; body 15 px; table 14 px; labels and pills 12–13 px. Eyebrow: 12 px uppercase, letter-spacing .05em, `muted`.
-- **Radius:** cards 16 px, buttons and inputs 10 px, pills fully round.
-- **Shadow:** a 1 px soft shadow on cards in light mode, none in dark.
-- **Spacing:** 4 px grid. Card padding is 20 px. Gaps between cards are 20 px. Page gutter is 28 px on desktop and 16 px on phones. Content max width is 1280 px.
-- **Icons:** the canvas set in `src/features/erp/icons.tsx` for modules, `lucide-react` elsewhere. 18 px, stroke 1.8.
-- No emoji, gradients or decorative images.
+- **Type:**
+  - **Outfit** (600–700) for the wordmark, page titles (`h1`) and the sign-in headings: Tailwind `font-display`.
+  - IBM Plex Sans for everything else, and IBM Plex Sans Arabic for Arabic (Outfit has no Arabic letters, so Arabic headings fall back to Plex Arabic automatically).
+  - IBM Plex Mono for codes.
+  - Tabular numbers everywhere.
+- **Sizes:** page title 28 px / 600 (26 px on phones); section title 15 px / 600; body 15 px; table 14 px; labels and pills 12–13 px.
+- **Radius:** cards 16 px, buttons and inputs 10 px (12 px on the sign-in page), pills fully round.
+- **Shadow:** a 1 px soft navy shadow in light mode, none in dark.
+- **Spacing:** 4 px grid. Card padding 20 px, gaps 20 px. Page gutter 28 px on desktop and 16 px on phones. Max content width 1280 px.
+- **Icons:** module icons in `src/features/erp/icons.tsx`, `lucide-react` elsewhere, 18 px, stroke 1.8. No emoji.
+
+### 2.1 Sign-in page (`/login`, `/reset-password`): `src/auth/LoginPage.tsx`
+Built from the sign-in reference image (`design/brand/login-reference.png`).
+- **Layout:** two columns on desktop. Left (45 %) is the navy brand panel: logo-colour ribbons, the headline "Your business, in motion." (Outfit 700, white) with a teal underline, and a glass dashboard card. The panel is decorative only (`aria-hidden`) and is hidden on phones. Right (55 %) has a warm off-white background (#FCF8F5; `page` in dark mode).
+- **Form contents:** the large logo, "Welcome back" / "Sign in to your workspace", then:
+  - **Work email** (mail icon) and **Password** (lock icon, show/hide eye button)
+  - **Remember me** (unticked by default: ticked keeps the session in localStorage, unticked in sessionStorage, so it ends when the browser closes)
+  - **Forgot password?**
+  - a full-width **Sign in →** button (#0A47F0, 56 px)
+  - the language toggle at the top
+- **Forgot password:** the same page switches to "Reset your password", which sends a Supabase reset link to `/reset-password`. It always says "Check your email" and never reveals whether an account exists. `/reset-password` sets a new password (at least 10 characters, typed twice) or says "This link has expired".
+- **Errors** are in plain words, in English and Arabic: wrong email or password, too many attempts, email not confirmed, no connection, plus field checks.
 
 ## 3. App shell
-- **Sidebar (248 px, sticky):**
-  - brand block
+- **Sidebar (248 px, sticky, navy `side`):**
+  - Southfield logo (`<Logo size="sm" tone="light"/>`, links Home)
   - **Home**
   - **Modules** 01–11 in SAP order: Administration, Financials, Sales, Purchasing, Business Partners, Banking, Inventory, Production, Service, Human Resources, Reports. Each row shows its icon and number.
   - **Oversight:** Control Tower, Approvals

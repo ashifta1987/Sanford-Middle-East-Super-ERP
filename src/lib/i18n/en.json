@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Super ERP",
+    "name": "Southfield",
     "group": "Sanford Group",
     "loading": "Loading…",
     "empty": "Nothing here yet",
@@ -8,7 +8,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
-    "skip": "Skip to content"
+    "skip": "Skip to content",
+    "tagline": "AI-Powered ERP"
   },
   "nav": {
     "group": "Group",
@@ -60,13 +61,50 @@
     "caption": "PRO, licences, IT and system"
   },
   "auth": {
-    "title": "Sign in to Super ERP",
-    "email": "Email",
+    "title": "Sign in to Southfield",
+    "email": "Work email",
     "password": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "notConfigured": "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
-    "noProfile": "Your sign-in works, but you have no Super ERP profile yet. Ask IT to add you."
+    "noProfile": "Your sign-in works, but you have no Southfield profile yet. Ask IT to add you.",
+    "welcome": "Welcome back",
+    "subtitle": "Sign in to your workspace",
+    "emailPlaceholder": "name@company.ae",
+    "remember": "Remember me",
+    "forgot": "Forgot password?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "hero1": "Your business,",
+    "hero2": "in motion.",
+    "help": "Trouble signing in? Ask IT to check your account.",
+    "forgotTitle": "Reset your password",
+    "forgotBody": "Enter your work email. We’ll send you a link to choose a new password.",
+    "sendLink": "Send reset link",
+    "sending": "Sending…",
+    "sentTitle": "Check your email",
+    "sentBody": "If {{email}} has a Southfield account, a reset link is on its way. The link works once and expires in 1 hour.",
+    "backToSignIn": "Back to sign in",
+    "newPasswordTitle": "Choose a new password",
+    "newPasswordBody": "Use at least 10 characters. A short sentence is easy to remember and hard to guess.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "savePassword": "Save and sign in",
+    "saving": "Saving…",
+    "linkExpiredTitle": "This link has expired",
+    "linkExpiredBody": "Reset links work once and expire after 1 hour. Request a new one from the sign-in page.",
+    "err": {
+      "credentials": "Email or password is wrong. Check them and try again.",
+      "unconfirmed": "Your email address isn’t confirmed yet. Open the invite email first.",
+      "rate": "Too many attempts. Wait a minute and try again.",
+      "network": "We couldn’t reach the server. Check your connection and try again.",
+      "weak": "Choose a stronger password: at least 10 characters.",
+      "emailRequired": "Enter your work email.",
+      "emailFormat": "Enter a full email address, like name@company.ae.",
+      "passwordRequired": "Enter your password.",
+      "short": "Use at least 10 characters.",
+      "mismatch": "The two passwords don’t match."
+    }
   },
   "access": {
     "title": "No access",
@@ -292,7 +330,7 @@
         "done": "Uploaded",
         "failed": "Failed"
       },
-      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Super ERP › Back Office › Upload backup, or send me the link.\n\nThank you"
+      "itMessage": "Hello IT team,\n\nFor the Sanford ERP migration of {{company}} ({{name}}), please run the attached 05_hana_export.sql on the HANA schema {{schema}}:\n\n1. Query 1 → save as columns.csv (column order; the data files have no header)\n2. Query 2 → save as constraints.csv (real table keys)\n3. Query 4 → save as row_counts.csv (rows per table)\n4. Query 9 (EXPORT \"{{schema}}\".\"*\" AS CSV) → the data export folder\n\nPlease use CSV, not Excel (Excel changes some table names, e.g. AUG1 becomes a date). Zip the export folder together with the three CSV files and upload it in Southfield › Back Office › Upload backup, or send me the link.\n\nThank you"
     },
     "run": {
       "title": "Rebuild run",

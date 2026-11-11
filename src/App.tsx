@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppShell } from '@/layout/AppShell';
 import { CompanyProvider } from '@/layout/CompanyContext';
-import { LoginPage } from '@/auth/LoginPage';
+import { LoginPage, ResetPasswordPage } from '@/auth/LoginPage';
 import { RequireAccess } from '@/auth/RequireAccess';
 import { NoAccessPage, PlaceholderPage } from '@/pages/SystemPages';
 import { MigrationCentrePage } from '@/features/migration/pages/MigrationCentrePage';
@@ -39,6 +39,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         element={
           <RequireAccess access="signedIn">

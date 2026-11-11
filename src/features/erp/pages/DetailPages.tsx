@@ -80,7 +80,7 @@ export function BusinessPartnerDetail() {
               [t('erp.col.currency'), bp.currency], [t('erp.col.trn'), bp.trn], [t('erp.col.phone'), bp.phone ?? bp.mobile], [t('erp.col.email'), bp.email],
               [t('erp.col.city'), [bp.city, bp.country].filter(Boolean).join(', ')], [t('erp.col.balance'), <span className="num">{fmtMoney(bp.balance, bp.currency)}</span>],
               [t('erp.col.creditLimit'), <span className="num">{fmtMoney(bp.credit_limit, bp.currency)}</span>], [t('erp.col.created'), fmtDay(bp.created_on)],
-              [t('erp.col.source'), bp.source === 'sap' ? 'SAP Business One' : bp.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              [t('erp.col.source'), bp.source === 'sap' ? 'SAP Business One' : bp.source === 'sample' ? t('erp.sampleData') : 'Southfield'],
             ]} />
           </SectionCard>
           <SectionCard title={t('erp.section.documents')}>
@@ -189,7 +189,7 @@ export function DocumentDetail() {
               [t('erp.col.date'), fmtDay(d.doc_date)], [t('erp.col.dueDate'), fmtDay(d.due_date)], [t('erp.col.customerRef'), d.customer_ref],
               ...(d.from_whs || d.to_whs ? [[t('erp.col.warehouses'), [d.from_whs, d.to_whs].filter(Boolean).join(' → ')] as [string, React.ReactNode]] : []),
               [t('erp.col.currency'), d.currency], [t('erp.col.remarks'), d.comments],
-              [t('erp.col.source'), d.source === 'sap' ? 'SAP Business One' : d.source === 'sample' ? t('erp.sampleData') : 'Super ERP'],
+              [t('erp.col.source'), d.source === 'sap' ? 'SAP Business One' : d.source === 'sample' ? t('erp.sampleData') : 'Southfield'],
             ]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
@@ -243,7 +243,7 @@ export function JournalDetail() {
         <div className="space-y-5">
           <SectionCard title={t('erp.section.header')}>
             <Fields items={[[t('erp.col.postingDate'), fmtDay(je.ref_date)], [t('erp.col.remarks'), je.memo], [t('erp.col.ref'), [je.ref1, je.ref2].filter(Boolean).join(' / ')],
-              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Super ERP']]} />
+              [t('erp.col.source'), je.source === 'sap' ? 'SAP Business One' : je.source === 'sample' ? t('erp.sampleData') : 'Southfield']]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')} right={<span className={`pill ${Math.abs(dr - cr) < 0.005 ? 'pill-ok' : 'pill-crit'}`}>{Math.abs(dr - cr) < 0.005 ? t('erp.balanced') : t('erp.unbalanced')}</span>}>
             <Table empty={!q.data!.lines.length} head={[[t('erp.col.account')], [t('erp.col.name')], [t('erp.col.remarks')], [t('erp.col.debit'), true], [t('erp.col.credit'), true]]}>

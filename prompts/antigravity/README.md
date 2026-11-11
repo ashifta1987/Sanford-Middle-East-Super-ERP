@@ -1,4 +1,4 @@
-# Building Super ERP with Google Antigravity
+# Building Southfield (AI-Powered ERP) with Google Antigravity
 
 This folder holds the prompts that build the rest of the ERP, one phase at a time, on top of this repo. The stack is React + TypeScript + Vite, with Supabase and Vercel.
 

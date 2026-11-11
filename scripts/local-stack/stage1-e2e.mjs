@@ -177,6 +177,47 @@ const browser = await chromium.launch();
   await ctx.close();
 }
 
+// ---------- Sign-in page (Southfield) ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/login`);
+  await page.evaluate(() => { localStorage.setItem('lang', 'en'); localStorage.setItem('theme', 'light'); localStorage.removeItem('sf-remember'); });
+  await page.goto(`${BASE}/login`);
+  ok('sign-in shows the Southfield logo and "Welcome back"', (await page.locator('text=Southfield').count()) > 0 && (await page.locator('h1:has-text("Welcome back")').count()) === 1);
+  await page.click('button[type=submit]');
+  ok('empty submit shows field errors', (await page.locator('text=Enter your work email.').count()) === 1 && (await page.locator('text=Enter your password.').count()) === 1);
+  await page.fill('#email', 'qa.admin@sample.test'); await page.fill('#password', 'wrong-password');
+  await page.click('button[aria-label="Show password"]');
+  ok('show password reveals the text', (await page.getAttribute('#password', 'type')) === 'text');
+  await page.click('button[type=submit]');
+  ok('wrong password gives a plain message', await page.locator('text=Email or password is wrong').waitFor({ timeout: 8000 }).then(() => true, () => false));
+  await page.click('text=Forgot password?');
+  ok('forgot password switches to the reset form', (await page.locator('h1:has-text("Reset your password")').count()) === 1);
+  await page.click('text=Back to sign in');
+  await page.fill('#password', 'local-only-1');
+  await page.click('button[type=submit]');
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15000 });
+  const store = await page.evaluate(() => ({ local: Object.keys(localStorage).some((k) => k.includes('auth-token')), session: Object.keys(sessionStorage).some((k) => k.includes('auth-token')) }));
+  ok('without "Remember me" the session ends with the browser', store.session && !store.local);
+  await page.click('button[aria-label="Sign out"]');
+  await page.waitForURL((u) => u.pathname.startsWith('/login'), { timeout: 10000 });
+  await page.fill('#email', 'qa.admin@sample.test'); await page.fill('#password', 'local-only-1');
+  await page.check('input[type=checkbox]');
+  await page.click('button[type=submit]');
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15000 });
+  const store2 = await page.evaluate(() => ({ local: Object.keys(localStorage).some((k) => k.includes('auth-token')), session: Object.keys(sessionStorage).some((k) => k.includes('auth-token')) }));
+  ok('with "Remember me" the session is kept', store2.local && !store2.session);
+  await page.goto(`${BASE}/reset-password`);
+  await ctx.clearCookies();
+  const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p2 = await c2.newPage();
+  await p2.goto(`${BASE}/reset-password`);
+  ok('reset link without a session says it expired', await p2.locator('text=This link has expired').waitFor({ timeout: 8000 }).then(() => true, () => false));
+  await page.goto(`${BASE}/login`);
+  await c2.close(); await ctx.close();
+}
+
 await browser.close();
 fs.writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1));
 const failed = results.filter((r) => !r.pass);

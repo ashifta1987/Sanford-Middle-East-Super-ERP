@@ -7,7 +7,7 @@ SQL file: `supabase/sql/23_master_data.sql`.
   - code from a series per type (`C`, `S`, `L` + number, per company)
   - name, foreign (Arabic) name, group, currency, TRN (15-digit UAE format check for UAE partners), contacts, addresses, payment terms, price list, salesperson, credit limit
   - **Credit limit changes and bank detail changes need approval** (Finance manager); the history is kept in `audit_log`
-- **SAP partners stay read-only** until the company's cut-over. The edit button explains: "This partner comes from SAP. Change it in SAP until AE01 goes live on Super ERP."
+- **SAP partners stay read-only** until the company's cut-over. The edit button explains: "This partner comes from SAP. Change it in SAP until AE01 goes live on Southfield."
 - **Duplicate warning before saving:** same TRN, same phone, or a similar name (trigram similarity > 0.8). The user must confirm with a reason.
 - **Item create and edit:**
   - code, names, group, units, barcode (unique per company), HS code, MOQ, container quantities, sourcing type, preferred supplier, tax code, sales/purchase/inventory flags, batch/serial management

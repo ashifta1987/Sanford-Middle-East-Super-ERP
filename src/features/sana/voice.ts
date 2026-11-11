@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** Languages Sana understands by voice and text. `speech` is the browser speech-recognition / speech-synthesis locale. */
+/** Languages Sana understands by voice and text. English and Malayalam come first: Sanford's priority languages (11 Nov 2026). `speech` is the browser speech-recognition / speech-synthesis locale. */
 export const SANA_LANGUAGES: Array<{ code: string; label: string; speech: string; dir: 'ltr' | 'rtl' }> = [
   { code: 'auto', label: 'Auto', speech: '', dir: 'ltr' },
   { code: 'en', label: 'English', speech: 'en-US', dir: 'ltr' },
+  { code: 'ml', label: 'മലയാളം', speech: 'ml-IN', dir: 'ltr' },
   { code: 'ar', label: 'العربية', speech: 'ar-AE', dir: 'rtl' },
   { code: 'hi', label: 'हिन्दी', speech: 'hi-IN', dir: 'ltr' },
   { code: 'ur', label: 'اردو', speech: 'ur-PK', dir: 'rtl' },
-  { code: 'ml', label: 'മലയാളം', speech: 'ml-IN', dir: 'ltr' },
   { code: 'ta', label: 'தமிழ்', speech: 'ta-IN', dir: 'ltr' },
   { code: 'bn', label: 'বাংলা', speech: 'bn-IN', dir: 'ltr' },
   { code: 'tl', label: 'Filipino', speech: 'fil-PH', dir: 'ltr' },

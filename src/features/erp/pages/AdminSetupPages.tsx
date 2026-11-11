@@ -519,7 +519,7 @@ export function AiAssistantPage() {
             </SectionCard>
             <SectionCard title={t('adm.ai.languages', { n: langs.length })}>
               <div className="flex flex-wrap gap-2 p-5" data-testid="adm-ai-langs">
-                {q.data.all_languages.map((l) => (
+                {[...q.data.all_languages].sort((a, b) => SANA_LANGUAGES.findIndex((x) => x.code === a) - SANA_LANGUAGES.findIndex((x) => x.code === b)).map((l) => (
                   <label key={l} className="inline-flex min-h-[40px] items-center gap-2 rounded-btn border border-line px-3 text-sm">
                     <input type="checkbox" className="h-4 w-4" data-lang={l} disabled={!canWrite} checked={langs.includes(l)}
                       onChange={(e) => setF({ ...f, languages: e.target.checked ? [...langs, l] : langs.filter((x) => x !== l) })} />

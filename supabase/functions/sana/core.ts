@@ -266,98 +266,101 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
   const used: Json[] = [];
   const call = async (fn: string, a: Json) => { used.push({ tool: fn, input: a }); return runTool(rpc, fn, a) as Promise<Json>; };
   const ar = lang === 'ar';
+  const ml = lang === 'ml';   // English and Malayalam are Sana's priority languages (decision 11 Nov 2026)
+  /** Pick the reply in the user's language: Malayalam, Arabic, else English. */
+  const L = (en: string, a?: string, m?: string) => (ml && m !== undefined ? m : ar && a !== undefined ? a : en);
   const deny = (topic: string, r: unknown = { denied: true }): Basic => ({ reply: refusalText(topic, lang), results: [r], used });
   const ctxCompany = ctx?.company && /^[A-Z0-9]{2,8}$/.test(ctx.company) ? ctx.company : company;
   const num = q.match(/\b([A-Z]{1,5}-\d{2}-\d{3,8}|\d{3,9})\b/i)?.[1];
-  const kindWord: Array<[RegExp, string]> = [[/sales quotation|\bquotation|عرض سعر|عروض/, 'sales_quotation'], [/purchase order|\bpo\b|أمر شراء|أوامر الشراء|bon de commande|采购订单/, 'purchase_order'],
-    [/purchase request|طلب شراء/, 'purchase_request'],
-    [/sales order|\borders?\b|أوامر البيع|أمر البيع|أمر بيع|طلبات|commandes?|заказ|销售订单|बिक्री आदेश|ऑर्डर|آرڈر|ഓർഡർ|ஆர்டர்|অর্ডার|order/, 'sales_order'],
-    [/a\/?p invoice|supplier invoice|فاتورة مورد|فواتير الموردين/, 'ap_invoice'], [/invoice|فاتورة|فواتير|facture|счет|счёт|发票/, 'ar_invoice'], [/delivery|تسليم/, 'delivery'],
+  const kindWord: Array<[RegExp, string]> = [[/sales quotation|\bquotation|عرض سعر|عروض|ക്വട്ടേഷ/, 'sales_quotation'], [/purchase order|\bpo\b|أمر شراء|أوامر الشراء|bon de commande|采购订单|പർച്ചേസ് ഓർഡ/, 'purchase_order'],
+    [/purchase request|طلب شراء|പർച്ചേസ് അഭ്യർത്ഥ/, 'purchase_request'],
+    [/sales order|\borders?\b|أوامر البيع|أمر البيع|أمر بيع|طلبات|commandes?|заказ|销售订单|बिक्री आदेश|ऑर्डर|آرڈر|ഓർഡർ|ഓർഡറ|ஆர்டர்|অর্ডার|order/, 'sales_order'],
+    [/a\/?p invoice|supplier invoice|فاتورة مورد|فواتير الموردين|വിതരണക്കാരുടെ ഇൻവോയ്/, 'ap_invoice'], [/invoice|فاتورة|فواتير|facture|счет|счёт|发票|ഇൻവോയ്/, 'ar_invoice'], [/delivery|تسليم|ഡെലിവറി/, 'delivery'],
     [/goods receipt po|grpo/, 'goods_receipt_po'], [/goods receipt|استلام بضاعة/, 'goods_receipt'], [/goods issue|صرف بضاعة/, 'goods_issue'],
-    [/transfer request/, 'transfer_request'], [/transfer|تحويل/, 'inventory_transfer']];
+    [/transfer request|ട്രാൻസ്ഫർ അഭ്യർത്ഥ/, 'transfer_request'], [/transfer|تحويل|ട്രാൻസ്ഫർ/, 'inventory_transfer']];
   let kind = kindWord.find(([re]) => re.test(ql))?.[1];
-  if (kind === 'sales_order' && /purchase|شراء/.test(ql)) kind = 'purchase_order';
+  if (kind === 'sales_order' && /purchase|شراء|പർച്ചേസ്/.test(ql)) kind = 'purchase_order';
   const docTopic = (k: string) => (/^(purchase|goods_receipt_po|goods_return|ap_)/.test(k) ? 'purchasing' : /^(transfer|inventory|goods_)/.test(k) ? 'inventory' : 'sales');
 
-  if (/who am i|my role|what can you|what do you do|من أنا|ماذا تستطيع|qui suis-je|кто я/.test(ql)) {
+  if (/who am i|my role|what can you|what do you do|من أنا|ماذا تستطيع|qui suis-je|кто я|ഞാൻ ആര|എന്റെ റോൾ|എന്ത് ചെയ്യാൻ കഴിയും/.test(ql)) {
     const topics = Object.entries(t).filter(([k, v]) => v && !['approvals', 'own_employee_record', 'commercial_terms', 'cost_prices'].includes(k)).map(([k]) => k.replace(/_/g, ' '));
     const list = [...topics, 'approvals waiting for you', 'your own employee record'];
-    return { reply: ar ? `أنت ${who.name} (${who.position}). يمكنني مساعدتك في: ${list.join('، ')}.` : `You are ${who.name} (${who.position}). I can help you with: ${list.join(', ')}.`, results: [], used };
+    return { reply: L(`You are ${who.name} (${who.position}). I can help you with: ${list.join(', ')}.`, `أنت ${who.name} (${who.position}). يمكنني مساعدتك في: ${list.join('، ')}.`, `നിങ്ങൾ ${who.name} (${who.position}) ആണ്. എനിക്ക് സഹായിക്കാൻ കഴിയുന്നവ: ${list.join(', ')}.`), results: [], used };
   }
-  if (/approv|waiting for me|to approve|موافق|اعتماد/.test(ql)) {
+  if (/approv|waiting for me|to approve|موافق|اعتماد|അംഗീകാര|അപ്രൂവ/.test(ql)) {
     const r = await call('sana_my_approvals', {});
     const n = Number(r.waiting_count ?? 0);
     const first = (r.waiting as Json[] | undefined)?.[0];
-    return { reply: ar ? `لديك ${n} طلب اعتماد بانتظارك.` : n ? `${n} approval request${n === 1 ? ' is' : 's are'} waiting for you. The oldest: ${first?.template ?? first?.kind} ${first?.number ?? ''}${first?.total != null ? ` (${fmt(first.total)} ${first.currency ?? ''})` : ''}.` : `Nothing is waiting for your approval.${Number(r.sent_waiting) ? ` ${r.sent_waiting} of your own requests are still waiting.` : ''}`, results: [r], used };
+    return { reply: ml ? (n ? `${n} അംഗീകാര അഭ്യർത്ഥന${n === 1 ? '' : 'കൾ'} നിങ്ങൾക്കായി കാത്തിരിക്കുന്നു.${first ? ` ഏറ്റവും പഴയത്: ${first?.template ?? first?.kind} ${first?.number ?? ''}${first?.total != null ? ` (${fmt(first.total)} ${first.currency ?? ''})` : ''}.` : ''}` : 'നിങ്ങളുടെ അംഗീകാരത്തിനായി ഒന്നും കാത്തിരിക്കുന്നില്ല.') : ar ? `لديك ${n} طلب اعتماد بانتظارك.` : n ? `${n} approval request${n === 1 ? ' is' : 's are'} waiting for you. The oldest: ${first?.template ?? first?.kind} ${first?.number ?? ''}${first?.total != null ? ` (${fmt(first.total)} ${first.currency ?? ''})` : ''}.` : `Nothing is waiting for your approval.${Number(r.sent_waiting) ? ` ${r.sent_waiting} of your own requests are still waiting.` : ''}`, results: [r], used };
   }
-  if (/my (manager|department|job|title|joining|employee record|record)|who is my manager|مديري|قسمي/.test(ql)) {
+  if (/my (manager|department|job|title|joining|employee record|record)|who is my manager|مديري|قسمي|എന്റെ മാനേജർ|എന്റെ വകുപ്പ്|എന്റെ ജോലി/.test(ql)) {
     const r = await call('sana_my_employee', {});
-    if (!r.found) return { reply: ar ? 'لا يوجد سجل موظف مرتبط بحسابك.' : 'Your account is not linked to an employee record. HR can link it.', results: [r], used };
-    return { reply: ar ? `أنت ${r.name}، ${r.job_title ?? ''} في ${r.department ?? ''}.` : `You are ${r.name}, ${r.job_title ?? 'no job title'} in ${r.department ?? 'no department'}${r.manager ? `; your manager is ${r.manager}` : ''}${r.joined_on ? `; joined ${r.joined_on}` : ''}.`, results: [r], used };
+    if (!r.found) return { reply: L('Your account is not linked to an employee record. HR can link it.', 'لا يوجد سجل موظف مرتبط بحسابك.', 'നിങ്ങളുടെ അക്കൗണ്ട് ഒരു ജീവനക്കാരന്റെ രേഖയുമായി ബന്ധിപ്പിച്ചിട്ടില്ല. HR-ന് അത് ബന്ധിപ്പിക്കാം.'), results: [r], used };
+    return { reply: ml ? `നിങ്ങൾ ${r.name}, ${r.job_title ?? 'ജോലി പേരില്ല'} — ${r.department ?? 'വകുപ്പില്ല'}${r.manager ? `; നിങ്ങളുടെ മാനേജർ ${r.manager}` : ''}${r.joined_on ? `; ചേർന്നത് ${r.joined_on}` : ''}.` : ar ? `أنت ${r.name}، ${r.job_title ?? ''} في ${r.department ?? ''}.` : `You are ${r.name}, ${r.job_title ?? 'no job title'} in ${r.department ?? 'no department'}${r.manager ? `; your manager is ${r.manager}` : ''}${r.joined_on ? `; joined ${r.joined_on}` : ''}.`, results: [r], used };
   }
-  if (/journal|balance sheet|profit|trial balance|ledger|revenue total|p ?& ?l|قيود|ميزانية|أرباح|bilan|bénéfice|прибыл|баланс|利润/.test(ql)) {
+  if (/journal|balance sheet|profit|trial balance|ledger|revenue total|p ?& ?l|قيود|ميزانية|أرباح|bilan|bénéfice|прибыл|баланс|利润|ലാഭ|ബാലൻസ് ഷീറ്റ്|ജേണൽ|ട്രയൽ ബാലൻസ്/.test(ql)) {
     const r = await call('sana_finance_summary', { p_company: company });
     if (isDenied(r)) return deny('finance', r);
     const d = r.by_drawer as Record<string, number>;
-    return { reply: `Account totals: assets ${fmt(d.assets)}, liabilities ${fmt(d.liabilities)}, revenue ${fmt(d.revenue)}, expenses ${fmt(d.expenses)} ${cur}. ${r.journals_last_30_days} journals in the last 30 days.`, results: [r], used };
+    return { reply: L(`Account totals: assets ${fmt(d.assets)}, liabilities ${fmt(d.liabilities)}, revenue ${fmt(d.revenue)}, expenses ${fmt(d.expenses)} ${cur}. ${r.journals_last_30_days} journals in the last 30 days.`, undefined, `അക്കൗണ്ട് ആകെത്തുകകൾ: ആസ്തികൾ ${fmt(d.assets)}, ബാധ്യതകൾ ${fmt(d.liabilities)}, വരുമാനം ${fmt(d.revenue)}, ചെലവുകൾ ${fmt(d.expenses)} ${cur}. കഴിഞ്ഞ 30 ദിവസത്തിൽ ${r.journals_last_30_days} ജേണലുകൾ.`), results: [r], used };
   }
   if (/headcount|employees|staff|how many people|موظف|الموظفين|कर्मचारी|ملازم|ജീവനക്കാർ|ஊழியர்|কর্মচারী|empleyado|员工|employés|сотрудник/.test(ql)) {
     const term = q.match(/(?:in|named|called|department)\s+([A-Za-z][\w ]{1,30})\??$/i)?.[1] ?? null;
     const r = await call('sana_people', { p_query: term, p_company: company });
     if (isDenied(r)) return deny('hr', r);
-    return { reply: ar ? `عدد الموظفين النشطين ${r.headcount}.` : `There are ${r.headcount} active employees.${term && (r.matches as Json[]).length ? ` Matching "${term}": ${(r.matches as Json[]).map((m) => m.name).join(', ')}.` : ''}`, results: [r], used };
+    return { reply: ml ? `${r.headcount} സജീവ ജീവനക്കാർ ഉണ്ട്.${term && (r.matches as Json[]).length ? ` "${term}": ${(r.matches as Json[]).map((m) => m.name).join(', ')}.` : ''}` : ar ? `عدد الموظفين النشطين ${r.headcount}.` : `There are ${r.headcount} active employees.${term && (r.matches as Json[]).length ? ` Matching "${term}": ${(r.matches as Json[]).map((m) => m.name).join(', ')}.` : ''}`, results: [r], used };
   }
-  if (/bank|cash position|cash balance|payments? (made|received|last)|incoming payments?|outgoing payments?|بنك|نقد|banque|банк|银行/.test(ql)) {
+  if (/bank|cash position|cash balance|payments? (made|received|last)|incoming payments?|outgoing payments?|بنك|نقد|banque|банк|银行|ബാങ്ക്|പേയ്മെന്റ്/.test(ql)) {
     const r = await call('sana_banking', { p_company: company });
     if (isDenied(r)) return deny('banking', r);
     const accts = r.accounts as Json[]; const p = r.payments_last_30_days as Json; const w = r.waiting_for_approval as Json;
-    return { reply: `${accts.length} house account${accts.length === 1 ? '' : 's'}: ${accts.slice(0, 4).map((a) => `${a.bank} ${fmt(a.balance)} ${a.currency}`).join(', ') || 'none set up'}. Last 30 days: ${(p.incoming as Json).count} incoming (${fmt((p.incoming as Json).amount)}) and ${(p.outgoing as Json).count} outgoing payments (${fmt((p.outgoing as Json).amount)}); ${w.count} waiting for approval.`, results: [r], used };
+    return { reply: ml ? `${accts.length} ബാങ്ക് അക്കൗണ്ട്: ${accts.slice(0, 4).map((a) => `${a.bank} ${fmt(a.balance)} ${a.currency}`).join(', ') || 'ഒന്നും സജ്ജീകരിച്ചിട്ടില്ല'}. കഴിഞ്ഞ 30 ദിവസം: ${(p.incoming as Json).count} ഇൻകമിംഗ് (${fmt((p.incoming as Json).amount)}), ${(p.outgoing as Json).count} ഔട്ട്ഗോയിംഗ് പേയ്മെന്റുകൾ (${fmt((p.outgoing as Json).amount)}); ${w.count} അംഗീകാരത്തിനായി കാത്തിരിക്കുന്നു.` : `${accts.length} house account${accts.length === 1 ? '' : 's'}: ${accts.slice(0, 4).map((a) => `${a.bank} ${fmt(a.balance)} ${a.currency}`).join(', ') || 'none set up'}. Last 30 days: ${(p.incoming as Json).count} incoming (${fmt((p.incoming as Json).amount)}) and ${(p.outgoing as Json).count} outgoing payments (${fmt((p.outgoing as Json).amount)}); ${w.count} waiting for approval.`, results: [r], used };
   }
-  if (/payable|we owe|supplier invoices? due|due to suppliers|ذمم دائنة|مستحق للموردين/.test(ql)) {
+  if (/payable|we owe|supplier invoices? due|due to suppliers|ذمم دائنة|مستحق للموردين|നൽകാനുള്ള|അടയ്ക്കാനുള്ള/.test(ql)) {
     const r = await call('sana_payables', { p_company: company });
     if (isDenied(r)) return deny('payables', r);
-    return { reply: `Open supplier invoices: ${fmt(r.open_total)} ${cur}; ${fmt(r.due_7_days)} due within 7 days and ${fmt(r.overdue)} overdue.`, results: [r], used };
+    return { reply: L(`Open supplier invoices: ${fmt(r.open_total)} ${cur}; ${fmt(r.due_7_days)} due within 7 days and ${fmt(r.overdue)} overdue.`, undefined, `തുറന്ന വിതരണക്കാരുടെ ഇൻവോയ്സുകൾ: ${fmt(r.open_total)} ${cur}; 7 ദിവസത്തിനുള്ളിൽ ${fmt(r.due_7_days)} അടയ്ക്കണം, ${fmt(r.overdue)} കാലാവധി കഴിഞ്ഞു.`), results: [r], used };
   }
-  if (/overdue|receivable|aging|ageing|owe us|متأخر|مستحق|ذمم مدينة|impayé|просроч|逾期/.test(ql)) {
+  if (/overdue|receivable|aging|ageing|owe us|متأخر|مستحق|ذمم مدينة|impayé|просроч|逾期|കുടിശ്ശിക|കിട്ടാനുള്ള|ലഭിക്കാനുള്ള/.test(ql)) {
     const r = await call('sana_receivables', { p_company: company });
     if (isDenied(r)) return deny('receivables', r);
     const top = (r.top_overdue as Json[])[0];
     const overdue = Number(r.d1_30) + Number(r.d31_60) + Number(r.d61_90) + Number(r.over_90);
-    return { reply: ar ? `إجمالي المستحقات المفتوحة ${fmt(r.open_total)} ${cur}، منها ${fmt(overdue)} متأخرة.` : `Open receivables are ${fmt(r.open_total)} ${cur}; ${fmt(overdue)} is overdue.${top ? ` The largest overdue customer is ${top.customer} (${fmt(top.overdue)}).` : ''}`, results: [r], used };
+    return { reply: ml ? `തുറന്ന കിട്ടാനുള്ള തുക ${fmt(r.open_total)} ${cur}; അതിൽ ${fmt(overdue)} കാലാവധി കഴിഞ്ഞു.${top ? ` ഏറ്റവും വലിയ കുടിശ്ശിക ${top.customer} (${fmt(top.overdue)}).` : ''}` : ar ? `إجمالي المستحقات المفتوحة ${fmt(r.open_total)} ${cur}، منها ${fmt(overdue)} متأخرة.` : `Open receivables are ${fmt(r.open_total)} ${cur}; ${fmt(overdue)} is overdue.${top ? ` The largest overdue customer is ${top.customer} (${fmt(top.overdue)}).` : ''}`, results: [r], used };
   }
   const has = (...m: string[]) => m.some((x) => who.modules?.includes(x));
   // Asked about a kind of partner the role never sees: refuse on the question (the data is never looked up).
-  if (/supplier|vendor|مورد|fournisseur|поставщик|供应商/.test(ql) && !has('purchase', 'finance', 'bp', 'business')) return deny('purchasing');
-  if (/customer|client|عميل|عملاء/.test(ql) && !/supplier/.test(ql) && !has('sales', 'finance', 'bp', 'business') && !/overdue|receivable/.test(ql)) return deny('sales');
-  if (/(inventory|stock) (summary|overview|movements?)|below minimum|low stock|transfer requests?/.test(ql)) {
+  if (/supplier|vendor|مورد|fournisseur|поставщик|供应商|വിതരണക്കാര/.test(ql) && !has('purchase', 'finance', 'bp', 'business')) return deny('purchasing');
+  if (/customer|client|عميل|عملاء|ഉപഭോക്താ/.test(ql) && !/supplier|വിതരണക്കാര/.test(ql) && !has('sales', 'finance', 'bp', 'business') && !/overdue|receivable|കുടിശ്ശിക/.test(ql)) return deny('sales');
+  if (/(inventory|stock) (summary|overview|movements?)|below minimum|low stock|transfer requests?|സ്റ്റോക്ക് സംഗ്രഹം|മിനിമത്തിന് താഴെ/.test(ql)) {
     const r = await call('sana_inventory_summary', { p_company: company });
     if (isDenied(r)) return deny('inventory', r);
-    return { reply: `${qty(r.items_in_stock)} items in stock across ${r.warehouses} warehouses; ${r.below_minimum} below their minimum; ${r.open_transfer_requests} open transfer requests.`, results: [r], used };
+    return { reply: L(`${qty(r.items_in_stock)} items in stock across ${r.warehouses} warehouses; ${r.below_minimum} below their minimum; ${r.open_transfer_requests} open transfer requests.`, undefined, `${qty(r.items_in_stock)} ഇനങ്ങൾ സ്റ്റോക്കിൽ, ${r.warehouses} വെയർഹൗസുകളിൽ; ${r.below_minimum} എണ്ണം മിനിമത്തിന് താഴെ; ${r.open_transfer_requests} തുറന്ന ട്രാൻസ്ഫർ അഭ്യർത്ഥനകൾ.`), results: [r], used };
   }
   const itemCode = q.match(/\b[A-Z]{2,6}-[A-Z0-9-]{2,12}\b/i)?.[0];
   const isDocNo = itemCode && /^[A-Z]{1,5}-\d{2}-\d{3,8}$/i.test(itemCode);
   if ((!kind || (itemCode && !isDocNo)) && /stock|inventory|available|in stock|do we have|on hand|مخزون|متوفر|स्टॉक|اسٹاک|സ്റ്റോക്ക്|இருப்பு|স্টক|imbentaryo|库存|запас|остат/.test(ql)) {
     const code = (isDocNo ? undefined : itemCode) ?? (ctx?.type === 'item' ? ctx.code : undefined);
-    const STOP = new Set(['what', 'is', 'the', 'stock', 'of', 'for', 'inventory', 'available', 'in', 'how', 'much', 'many', 'do', 'we', 'have', 'show', 'me', 'check', 'level', 'levels', 'qty', 'quantity', 'on', 'hand', 'مخزون', 'المخزون', 'من', 'كم', 'متوفر']);
+    const STOP = new Set(['what', 'is', 'the', 'stock', 'of', 'for', 'inventory', 'available', 'in', 'how', 'much', 'many', 'do', 'we', 'have', 'show', 'me', 'check', 'level', 'levels', 'qty', 'quantity', 'on', 'hand', 'مخزون', 'المخزون', 'من', 'كم', 'متوفر', 'സ്റ്റോക്ക്', 'എത്ര', 'ഉണ്ട്', 'ലഭ്യമാണോ', 'ലഭ്യം', 'കാണിക്കൂ']);
     const term = code ?? (q.replace(/[?؟.,]/g, ' ').split(/\s+/).filter((w) => w && !STOP.has(w.toLowerCase())).join(' ') || q);
     const r = await call('sana_stock', { p_query: term, p_company: ctxCompany });
     if (isDenied(r)) return deny('inventory', r);
     const items = r.items as Json[];
-    if (!items.length) return { reply: ar ? 'لم أجد صنفاً بهذا الاسم.' : `I couldn't find an item matching "${term}".`, results: [r], used };
+    if (!items.length) return { reply: L(`I couldn't find an item matching "${term}".`, 'لم أجد صنفاً بهذا الاسم.', `"${term}" എന്ന ഇനം കണ്ടെത്താനായില്ല.`), results: [r], used };
     const it = items[0]; const wh = it.warehouses as Json[];
     const avail = wh.reduce((s, w) => s + Number(w.available), 0);
-    return { reply: `${it.code} ${it.name}: ${qty(avail)} ${it.unit ?? ''} available across ${wh.length} warehouse(s) (${wh.map((w) => `${w.warehouse} ${qty(w.on_hand)} on hand`).join(', ')}).`.replace(/ +/g, ' '), results: [r], used };
+    return { reply: (ml ? `${it.code} ${it.name}: ${qty(avail)} ${it.unit ?? ''} ലഭ്യം, ${wh.length} വെയർഹൗസിൽ (${wh.map((w) => `${w.warehouse} ${qty(w.on_hand)} കൈവശം`).join(', ')}).` : `${it.code} ${it.name}: ${qty(avail)} ${it.unit ?? ''} available across ${wh.length} warehouse(s) (${wh.map((w) => `${w.warehouse} ${qty(w.on_hand)} on hand`).join(', ')}).`).replace(/ +/g, ' '), results: [r], used };
   }
-  if (/alert|problem|exception|risk|attention|control tower|تنبيه|مشكلة|alerte|предупрежд/.test(ql)) {
+  if (/alert|problem|exception|risk|attention|control tower|تنبيه|مشكلة|alerte|предупрежд|മുന്നറിയിപ്പ്|പ്രശ്ന/.test(ql)) {
     const r = await call('sana_alerts', { p_company: company }); const a = r.alerts as Json[];
-    return { reply: a.length ? `${a.length} rule finding${a.length === 1 ? '' : 's'} (rules, not AI). The first: ${a[0].subject} — ${a[0].detail}.` : 'There are no rule findings for you right now.', results: [r], used };
+    return { reply: a.length ? L(`${a.length} rule finding${a.length === 1 ? '' : 's'} (rules, not AI). The first: ${a[0].subject} — ${a[0].detail}.`, undefined, `${a.length} നിയമ കണ്ടെത്തൽ (നിയമങ്ങൾ, AI അല്ല). ആദ്യത്തേത്: ${a[0].subject} — ${a[0].detail}.`) : L('There are no rule findings for you right now.', undefined, 'ഇപ്പോൾ നിങ്ങൾക്കായി നിയമ കണ്ടെത്തലുകളൊന്നുമില്ല.'), results: [r], used };
   }
-  if (/purchas|buying|top suppliers|مشتريات|achats|закупк|采购/.test(ql) && !kind) {
+  if (/purchas|buying|top suppliers|مشتريات|achats|закупк|采购|വാങ്ങൽ|പർച്ചേസ്/.test(ql) && !kind) {
     const to = new Date(); const from = new Date(to.getFullYear(), to.getMonth(), 1);
     const r = await call('sana_purchase_summary', { p_from: from.toISOString().slice(0, 10), p_to: to.toISOString().slice(0, 10), p_company: company });
     if (isDenied(r)) return deny('purchasing', r);
     const o = r.open_orders as Json;
-    return { reply: `Net purchases this month: ${fmt(r.net_purchases)} ${cur} from ${r.invoices} A/P invoices. Open purchase orders: ${o.count} (${fmt(o.value)} ${cur}); open purchase requests: ${r.open_requests}.`, results: [r], used };
+    return { reply: L(`Net purchases this month: ${fmt(r.net_purchases)} ${cur} from ${r.invoices} A/P invoices. Open purchase orders: ${o.count} (${fmt(o.value)} ${cur}); open purchase requests: ${r.open_requests}.`, undefined, `ഈ മാസത്തെ മൊത്തം വാങ്ങലുകൾ: ${fmt(r.net_purchases)} ${cur}, ${r.invoices} A/P ഇൻവോയ്സുകളിൽ നിന്ന്. തുറന്ന പർച്ചേസ് ഓർഡറുകൾ: ${o.count} (${fmt(o.value)} ${cur}); തുറന്ന പർച്ചേസ് അഭ്യർത്ഥനകൾ: ${r.open_requests}.`), results: [r], used };
   }
   // A document by number, or "this" document from the page the user came from.
   const ctxDoc = ctx?.type === 'document' && ctx.kind && ctx.number ? ctx : null;
@@ -366,39 +369,43 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
     const n = kind && num ? num : ctxDoc!.number!;
     const r = await call('sana_document', { p_kind: k, p_number: n, p_company: kind && num ? company : ctxCompany });
     if (isDenied(r)) return deny(docTopic(k), r);
-    if (!r.found) return { reply: ar ? 'لم أجد هذا المستند.' : "I couldn't find that document.", results: [r], used };
+    if (!r.found) return { reply: L("I couldn't find that document.", 'لم أجد هذا المستند.', 'ആ ഡോക്യുമെന്റ് കണ്ടെത്താനായില്ല.'), results: [r], used };
     const lines = r.lines as Json[];
+    if (ml) return { reply: `${String(k).replace(/_/g, ' ')} ${r.number} — ${r.partner}: ${r.status}, ആകെ ${fmt(r.total)} ${r.currency}, തീയതി ${r.date}; ${lines.length} വരി${lines[0] ? `, ആദ്യം ${lines[0].item} × ${qty(lines[0].quantity)}` : ''}.`, results: [r], used };
     return { reply: `${String(k).replace(/_/g, ' ')} ${r.number} for ${r.partner}: ${r.status}${r.approval_state ? ` (${String(r.approval_state).replace('_', ' ')})` : ''}, total ${fmt(r.total)} ${r.currency}, dated ${r.date}; ${lines.length} line${lines.length === 1 ? '' : 's'}${lines[0] ? `, first ${lines[0].item} × ${qty(lines[0].quantity)}` : ''}.`, results: [r], used };
   }
   if (kind) {
-    const status = /open|pending|مفتوح|ouvert|открыт/.test(ql) ? 'open' : null;
+    const status = /open|pending|مفتوح|ouvert|открыт|തുറന്ന|ബാക്കി/.test(ql) ? 'open' : null;
     const r = await call('sana_documents', { p_kind: kind, p_status: status, p_from: null, p_to: null, p_partner: null, p_company: company, p_limit: 5 });
     if (isDenied(r)) return deny(docTopic(kind), r);
     const KIND_AR: Record<string, string> = { sales_order: 'أوامر البيع', sales_quotation: 'عروض الأسعار', purchase_order: 'أوامر الشراء', ar_invoice: 'فواتير العملاء', ap_invoice: 'فواتير الموردين', delivery: 'التسليمات', inventory_transfer: 'تحويلات المخزون' };
     if (ar) return { reply: `عدد ${KIND_AR[kind] ?? kind}${status ? ' المفتوحة' : ''}: ${r.count}، بإجمالي ${fmt(r.total)} ${cur}.`, results: [r], used };
+    const KIND_ML: Record<string, string> = { sales_order: 'സെയിൽസ് ഓർഡറുകൾ', sales_quotation: 'ക്വട്ടേഷനുകൾ', purchase_order: 'പർച്ചേസ് ഓർഡറുകൾ', purchase_request: 'പർച്ചേസ് അഭ്യർത്ഥനകൾ', ar_invoice: 'ഉപഭോക്തൃ ഇൻവോയ്സുകൾ', ap_invoice: 'വിതരണക്കാരുടെ ഇൻവോയ്സുകൾ', delivery: 'ഡെലിവറികൾ', inventory_transfer: 'സ്റ്റോക്ക് ട്രാൻസ്ഫറുകൾ', transfer_request: 'ട്രാൻസ്ഫർ അഭ്യർത്ഥനകൾ' };
+    if (ml) return { reply: `${status ? 'തുറന്ന ' : ''}${KIND_ML[kind] ?? String(kind).replace(/_/g, ' ')}: ${r.count}, ആകെ ${fmt(r.total)} ${cur}.`, results: [r], used };
     return { reply: `${r.count} ${status ? 'open ' : ''}${String(kind).replace(/_/g, ' ')}s, total ${fmt(r.total)} ${cur}.`, results: [r], used };
   }
-  if (/sales|revenue|sold|مبيعات|ventes|продаж|销售|बिक्री/.test(ql)) {
+  if (/sales|revenue|sold|مبيعات|ventes|продаж|销售|बिक्री|വിൽപ്പന|വില്പന|സെയിൽസ്/.test(ql)) {
     const to = new Date(); const from = new Date(to.getFullYear(), to.getMonth(), 1);
     const r = await call('sana_sales_summary', { p_from: from.toISOString().slice(0, 10), p_to: to.toISOString().slice(0, 10), p_company: company });
     if (isDenied(r)) return deny('sales', r);
     const o = r.open_orders as Json;
-    return { reply: ar ? `صافي المبيعات هذا الشهر ${fmt(r.net_sales)} ${cur} من ${r.invoices} فاتورة.` : `Net sales this month: ${fmt(r.net_sales)} ${cur} from ${r.invoices} invoices. Open sales orders: ${o.count} (${fmt(o.value)} ${cur}).`, results: [r], used };
+    return { reply: ml ? `ഈ മാസത്തെ മൊത്തം വിൽപ്പന: ${fmt(r.net_sales)} ${cur}, ${r.invoices} ഇൻവോയ്സുകളിൽ നിന്ന്. തുറന്ന സെയിൽസ് ഓർഡറുകൾ: ${o.count} (${fmt(o.value)} ${cur}).` : ar ? `صافي المبيعات هذا الشهر ${fmt(r.net_sales)} ${cur} من ${r.invoices} فاتورة.` : `Net sales this month: ${fmt(r.net_sales)} ${cur} from ${r.invoices} invoices. Open sales orders: ${o.count} (${fmt(o.value)} ${cur}).`, results: [r], used };
   }
   const ctxPartner = ctx?.type === 'partner' && ctx.code ? ctx.code : null;
-  if (/customer|client|supplier|partner|عميل|مورد|عملاء/.test(ql) || ctxPartner) {
-    const term = (q.match(/\b[CSL]\d{4,6}\b/i)?.[0]) ?? ctxPartner ?? q.replace(/.*?(customer|client|supplier|partner|عميل|مورد)\s*/i, '').replace(/[?؟.]/g, '').trim();
+  if (/customer|client|supplier|partner|عميل|مورد|عملاء|ഉപഭോക്താ|വിതരണക്കാര/.test(ql) || ctxPartner) {
+    const term = (q.match(/\b[CSL]\d{4,6}\b/i)?.[0]) ?? ctxPartner ?? q.replace(/.*?(customer|client|supplier|partner|عميل|مورد|ഉപഭോക്താവ്|വിതരണക്കാരൻ)\s*/i, '').replace(/[?؟.]/g, '').trim();
     const r = await call('sana_partner', { p_query: term || q, p_company: ctxPartner ? ctxCompany : company });
     if (isDenied(r)) return deny('partners', r);
-    if (!r.found) return { reply: ar ? 'لم أجد هذا العميل أو المورد.' : "I couldn't find that customer or supplier.", results: [r], used };
+    if (!r.found) return { reply: L("I couldn't find that customer or supplier.", 'لم أجد هذا العميل أو المورد.', 'ആ ഉപഭോക്താവിനെയോ വിതരണക്കാരനെയോ കണ്ടെത്താനായില്ല.'), results: [r], used };
+    if (ml) return { reply: `${r.code} ${r.name} (${r.kind}): ബാലൻസ് ${fmt(r.balance)} ${r.currency}${Number(r.credit_limit) ? `, ക്രെഡിറ്റ് പരിധി ${fmt(r.credit_limit)}${r.credit_left != null ? `, ${fmt(r.credit_left)} ശേഷിക്കുന്നു` : ''}` : ''}.`, results: [r], used };
     return { reply: `${r.code} ${r.name} (${r.kind}): balance ${fmt(r.balance)} ${r.currency}${Number(r.credit_limit) ? `, credit limit ${fmt(r.credit_limit)}${r.credit_left != null ? `, ${fmt(r.credit_left)} left` : ''}` : ''}.`, results: [r], used };
   }
   if (ctx?.type === 'item' && ctx.code) return basicAnswer(`stock of ${ctx.code}`, lang, who, rpc, company, ctx, cur);
   const r = await call('sana_find', { p_query: q.slice(0, 60), p_company: company });
   const n = ['partners', 'items', 'documents'].reduce((s, k) => s + ((r[k] as unknown[] | undefined)?.length ?? 0), 0);
   return {
-    reply: n ? (ar ? `وجدت ${n} نتيجة.` : `I found ${n} matching records. Open one below.`)
-      : (ar ? 'لم أفهم السؤال. جرّب مثلاً: «المخزون من SMP-1010» أو «الفواتير المتأخرة».' : 'I couldn\'t answer that in basic mode. Try "stock of SMP-1010", "open sales orders" or "overdue invoices".'),
+    reply: n ? L(`I found ${n} matching records. Open one below.`, `وجدت ${n} نتيجة.`, `${n} പൊരുത്തപ്പെടുന്ന രേഖകൾ കണ്ടെത്തി. താഴെ ഒന്ന് തുറക്കുക.`)
+      : L('I couldn\'t answer that in basic mode. Try "stock of SMP-1010", "open sales orders" or "overdue invoices".', 'لم أفهم السؤال. جرّب مثلاً: «المخزون من SMP-1010» أو «الفواتير المتأخرة».', 'ബേസിക് മോഡിൽ അതിന് ഉത്തരം നൽകാനായില്ല. ഉദാ: "SMP-1010 സ്റ്റോക്ക്", "തുറന്ന സെയിൽസ് ഓർഡറുകൾ" അല്ലെങ്കിൽ "കുടിശ്ശികയുള്ള ഇൻവോയ്സുകൾ" എന്ന് ചോദിക്കുക.'),
     results: [r], used,
   };
 }

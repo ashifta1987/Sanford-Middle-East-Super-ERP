@@ -58,15 +58,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Generated SQL files match their sources (32, 33, 34)
+      - name: Generated SQL files match their sources (32, 33, 34, 35)
         run: |
           for b in supabase/sql/src/*/build.py; do python3 "$b" --check; done
+          # B6: 35 must be among them (a missing generator would silently skip it)
+          test -f supabase/sql/src/35_final_items/build.py
       - name: Start Postgres 17
         run: |
           docker run -d --name pg -p 5433:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17 \
             -c max_locks_per_transaction=1024
           for i in $(seq 1 30); do docker exec pg pg_isready -U postgres && break; sleep 2; done
-      - name: Fresh rebuild + every phase suite (a1 … a14, b1, b2)
+      - name: Fresh rebuild + every phase suite (a1 … a14, b1 … b6)
         env:
           PGHOST: 127.0.0.1
           PGPORT: '5433'

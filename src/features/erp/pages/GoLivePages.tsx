@@ -348,7 +348,7 @@ export function SystemHealthPage() {
             </SectionCard>
           </div>
           <SectionCard title={t('gl.health.companies')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-[14px]" data-testid="gl-health-companies">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className={th}>{t('gl.f.company')}</th>
@@ -373,7 +373,7 @@ export function SystemHealthPage() {
           </SectionCard>
           <div className="grid gap-5 xl:grid-cols-2">
             <SectionCard title={t('gl.health.files')}>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="gl-health-files">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className={th}>{t('gl.health.file')}</th><th scope="col" className={clsx(th, 'max-sm:hidden')}>{t('gl.health.object')}</th><th scope="col" className={th}>{t('erp.col.status')}</th>

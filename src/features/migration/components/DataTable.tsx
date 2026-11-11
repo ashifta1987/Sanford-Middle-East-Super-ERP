@@ -23,7 +23,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, foote
   minWidth?: number;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full border-collapse text-[15px]" style={{ minWidth }}>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>

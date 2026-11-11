@@ -130,7 +130,7 @@ export function DocNumberingPage() {
                 right={canWrite ? <Button variant="ghost" className="min-h-[40px] px-3 text-sm" id="num-new" onClick={() => { setErr(null); setForm(emptySeries(current.obj_type)); }} icon={<Plus className="h-4 w-4" aria-hidden />}>{t('num.new')}</Button> : undefined}>
                 {!current.used && <p className="border-b border-line bg-info-bg px-5 py-2.5 text-sm text-info-fg">{t('num.notUsedNote')}</p>}
                 {current.series.length === 0 ? <EmptyState title={t('num.noSeries')} body={t('num.noSeriesBody')} /> : (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className="w-full text-[14px]" data-testid="num-series">
                       <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                         <th scope="col" className="px-4 py-2.5 text-start">{t('num.f.name')}</th>
@@ -217,7 +217,7 @@ export function DocNumberingPage() {
               <SectionCard title={t('num.ud.title', { doc: current.label })}>
                 <p className="border-b border-line px-5 py-3 text-sm text-ink-2">{t('num.ud.body')}</p>
                 {(q.data?.users ?? []).length === 0 ? <p className="px-5 py-4 text-sm text-muted">{t('num.ud.none')}</p> : (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className="w-full text-[14px]" data-testid="num-user-defaults">
                       <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                         <th scope="col" className="px-4 py-2.5 text-start">{t('num.ud.user')}</th>
@@ -281,7 +281,7 @@ export function CompaniesPage() {
       <ReadOnlyNote show={Boolean(q.data && !canWrite)} />
       <SectionCard title={t('cmp.list')}>
         {q.isLoading ? <SkeletonRows rows={5} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !(q.data?.companies ?? []).length ? <EmptyState title={t('cmp.none')} body={t('cmp.noneBody')} /> : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px]" data-testid="cmp-list">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('cmp.f.code')}</th>

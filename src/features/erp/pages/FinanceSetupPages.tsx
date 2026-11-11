@@ -123,7 +123,7 @@ export function PostingPeriodsPage() {
           {q.isLoading ? <SkeletonRows rows={6} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : rows.length === 0 ? (
             <EmptyState title={t('fs.per.empty')} body={t('fs.per.emptyBody')} />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-[14px]" data-testid="per-table">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-2.5 text-start">{t('fs.per.period')}</th>

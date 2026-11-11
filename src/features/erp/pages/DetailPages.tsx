@@ -52,7 +52,7 @@ function Table({ head, children, empty }: { head: Array<[string, boolean?]>; chi
   const { t } = useTranslation();
   if (empty) return <EmptyState title={t('erp.list.empty')} />;
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[560px] text-[14px]">
         <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
           {head.map(([h, end]) => <th key={h} scope="col" className={`px-4 py-2.5 ${end ? 'text-end' : 'text-start'}`}>{h}</th>)}

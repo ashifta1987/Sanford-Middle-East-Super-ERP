@@ -103,7 +103,7 @@ function AccountField({ id, company, value, name, placeholder, disabled, label, 
 
 function Tabs<T extends string>({ id, tabs, value, onChange, label }: { id: string; tabs: Array<[T, string, number?]>; value: T; onChange: (t: T) => void; label: string }) {
   return (
-    <div role="tablist" aria-label={label} className="mb-5 flex gap-1 overflow-x-auto border-b border-line" id={id}>
+    <div role="tablist" aria-label={label} className="relative mb-5 flex gap-1 overflow-x-auto border-b border-line" id={id}>
       {tabs.map(([k, l, n]) => (
         <button key={k} type="button" role="tab" id={`${id}-${k}`} aria-selected={value === k} onClick={() => onChange(k)}
           className={clsx('-mb-px inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium',

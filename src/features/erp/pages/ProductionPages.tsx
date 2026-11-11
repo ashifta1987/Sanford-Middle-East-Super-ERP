@@ -309,7 +309,7 @@ export function BomPage() {
             [t('erp.col.status'), B.bom.active ? t('erp.status.active') : t('erp.status.inactive')], [t('ps.updated'), `${fmtWhen(B.bom.updated_at)}${B.bom.updated_by_name ? ` · ${B.bom.updated_by_name}` : ''}`], [t('erp.col.remarks'), B.bom.note]]} />
         </SectionCard>
         <SectionCard title={t('ps.bom.lines')} right={<span className="text-sm text-muted">{t('ps.bom.perBatch', { qty: fmtQty(B.bom.qty) })}</span>}>
-          <div className="overflow-x-auto"><table className="w-full text-sm" data-testid="bom-table">
+          <div className="relative overflow-x-auto"><table className="w-full text-sm" data-testid="bom-table">
             <thead className="bg-surface-2 text-xs text-muted"><tr><th scope="col" className={th}>{t('ps.bom.component')}</th><th scope="col" className={thEnd}>{t('erp.col.qty')}</th>
               <th scope="col" className={`${th} max-sm:hidden`}>{t('erp.col.warehouse')}</th><th scope="col" className={`${thEnd} max-md:hidden`}>{t('ps.unitCost')}</th><th scope="col" className={thEnd}>{t('ps.cost')}</th></tr></thead>
             <tbody>{B.lines.map((l) => (
@@ -468,7 +468,7 @@ export function ProdOrderPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('ps.order.components')}>
-            <div className="overflow-x-auto"><table className="w-full text-sm" data-testid="order-lines">
+            <div className="relative overflow-x-auto"><table className="w-full text-sm" data-testid="order-lines">
               <thead className="bg-surface-2 text-xs text-muted"><tr><th scope="col" className={th}>{t('ps.bom.component')}</th><th scope="col" className={thEnd}>{t('ps.order.planned')}</th>
                 <th scope="col" className={thEnd}>{t('ps.order.issued')}</th><th scope="col" className={`${thEnd} max-sm:hidden`}>{t('ps.order.inStock')}</th>
                 {released && O.can_write && <th scope="col" className={thEnd}>{t('ps.order.issueNow')}</th>}</tr></thead>

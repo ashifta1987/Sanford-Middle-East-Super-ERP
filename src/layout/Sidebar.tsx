@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
@@ -66,7 +66,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         aria-label={t('nav.main')}
       >
         <div className="flex items-center justify-between px-5 py-4">
-          <NavLink to="/" onClick={onClose} aria-label={t('app.name')} className="rounded-btn"><Logo size="sm" tone="light" /></NavLink>
+          <Link to="/" onClick={onClose} aria-label={t('app.name')} className="rounded-btn"><Logo size="sm" tone="light" /></Link>
           <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-btn text-side-text hover:bg-side-hover lg:hidden" aria-label={t('nav.closeMenu')}>
             <X className="h-5 w-5" aria-hidden />
           </button>

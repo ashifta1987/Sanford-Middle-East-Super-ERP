@@ -431,7 +431,7 @@ function JournalDraftView({ info, onChanged }: { info: JeDraftInfo; onChanged: (
               [t('erp.col.remarks'), info.memo], [t('erp.col.total'), fmtMoney(info.total, cur)], [t('erp.col.source'), 'Southfield']]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-[14px] sm:min-w-[560px]">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.account')}</th>

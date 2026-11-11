@@ -161,7 +161,7 @@ export function UsersPage() {
             {q.isLoading ? <SkeletonRows rows={6} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : rows.length === 0 ? (
               <EmptyState title={t('adm.users.empty')} body={t('adm.users.emptyBody')} />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="adm-users-table">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('adm.users.col.user')}</th>
@@ -407,7 +407,7 @@ export function AuthorizationsPage() {
       {q.isLoading ? <div className="card"><SkeletonRows rows={8} /></div> : q.error ? <div className="card"><ErrorState error={q.error} onRetry={() => q.refetch()} /></div> : (
         <div className="space-y-5">
           <SectionCard title={t('adm.auth.matrix')} right={<span className="text-xs text-muted">{t('adm.auth.legend')}</span>}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[960px] text-[13px]" data-testid="adm-matrix">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="sticky start-0 z-10 bg-surface-2 px-4 py-2.5 text-start">{t('adm.users.col.position')}</th>

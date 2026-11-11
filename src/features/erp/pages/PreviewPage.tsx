@@ -19,7 +19,7 @@ const AUTH_COLS = ['Admin', 'Financials', 'Sales', 'Purchasing', 'Business Partn
 function Grid({ head, rows, emptyText }: { head: string[]; rows: Array<Array<React.ReactNode>>; emptyText: string }) {
   if (!rows.length) return <EmptyState title={emptyText} />;
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[640px] text-[14px]">
         <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">{head.map((h) => <th key={h} scope="col" className="px-4 py-2.5 text-start">{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="px-4 py-2.5 align-top">{c}</td>)}</tr>)}</tbody>

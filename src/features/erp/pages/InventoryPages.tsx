@@ -641,7 +641,7 @@ export function InvDocPage({ kind }: { kind: InvKind }) {
             ]} />
           </SectionCard>
           <SectionCard title={t('inv.lines')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-sm" data-testid="inv-lines">
                 <thead className="bg-surface-2 text-start text-xs text-muted"><tr>
                   <th scope="col" className="px-4 py-2 text-start">{t('inv.item')}</th>
@@ -674,7 +674,7 @@ export function InvDocPage({ kind }: { kind: InvKind }) {
           </SectionCard>
           {I.movements.length > 0 && (
             <SectionCard title={t('inv.movements')}>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-sm" data-testid="inv-movements">
                   <thead className="bg-surface-2 text-xs text-muted"><tr>
                     <th scope="col" className="px-4 py-2 text-start">{t('inv.item')}</th><th scope="col" className="px-4 py-2 text-start">{t('erp.col.warehouse')}</th>
@@ -913,7 +913,7 @@ export function CountPage() {
           {rep && (
             <SectionCard title={t('inv.count.report')} right={<span className="num text-sm">{t('inv.count.gainLoss', { g: fmtMoney(rep.totals.gain), l: fmtMoney(rep.totals.loss), cur: rep.totals.currency })}</span>}>
               {rep.errors.map((e, i) => <p key={i} role="alert" dir="auto" className="px-5 pt-3 text-[13px] text-crit-fg">{e.message}</p>)}
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-sm" data-testid="count-report">
                   <thead className="bg-surface-2 text-xs text-muted"><tr>
                     <th scope="col" className="px-4 py-2 text-start">{t('inv.item')}</th><th scope="col" className="px-4 py-2 text-end">{t('inv.count.system')}</th>
@@ -1020,7 +1020,7 @@ export function LotPage() {
             [t('inv.lots.where'), L.balances.length ? L.balances.map((b) => `${b.whs_code} ${fmtQty(b.qty)}`).join(', ') : t('inv.lots.out')]]} />
         </SectionCard>
         <SectionCard title={t('inv.lots.history')}>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm" data-testid="lot-history">
               <thead className="bg-surface-2 text-xs text-muted"><tr>
                 <th scope="col" className="px-4 py-2 text-start">{t('erp.col.date')}</th><th scope="col" className="px-4 py-2 text-start">{t('erp.col.docNo')}</th>
@@ -1075,7 +1075,7 @@ export function InventorySetupPage() {
       <div className="space-y-5">
         <SectionCard title={t('inv.setup.warehouses')} right={<label className="flex items-center gap-2 text-sm"><input id="inv-blind" type="checkbox" className="h-5 w-5" disabled={!canW} checked={Boolean(S?.blind_count)}
           onChange={(e) => run(() => invSettingSet(company, { blind_count: e.target.checked }), t('inv.setup.saved'))} />{t('inv.setup.blind')}</label>}>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm" data-testid="inv-whs-table">
               <thead className="bg-surface-2 text-xs text-muted"><tr>
                 <th scope="col" className="px-4 py-2 text-start">{t('erp.col.warehouse')}</th><th scope="col" className="px-4 py-2 text-start">{t('inv.setup.bins')}</th>
@@ -1101,7 +1101,7 @@ export function InventorySetupPage() {
         </SectionCard>
 
         <SectionCard title={t('inv.setup.binsTitle')}>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm" data-testid="inv-bins-table">
               <thead className="bg-surface-2 text-xs text-muted"><tr>
                 <th scope="col" className="px-4 py-2 text-start">{t('inv.bin')}</th><th scope="col" className="px-4 py-2 text-start">{t('erp.col.warehouse')}</th>
@@ -1128,7 +1128,7 @@ export function InventorySetupPage() {
         </SectionCard>
 
         <SectionCard title={t('inv.setup.reasons')}>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm" data-testid="inv-reasons-table">
               <thead className="bg-surface-2 text-xs text-muted"><tr>
                 <th scope="col" className="px-4 py-2 text-start">{t('erp.col.code')}</th><th scope="col" className="px-4 py-2 text-start">{t('erp.col.name')}</th>
@@ -1173,7 +1173,7 @@ export function ItemHistoryCard({ company, item }: { company: string; item: stri
   return (
     <SectionCard title={t('inv.history.title')} right={<span className="text-xs text-muted">{t('inv.history.last')}</span>}>
       {q.isLoading ? <p className="p-5 text-sm text-muted">{t('inv.loading')}</p> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data!.length ? <EmptyState title={t('inv.history.empty')} /> : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm" data-testid="item-history">
             <thead className="bg-surface-2 text-xs text-muted"><tr>
               <th scope="col" className="px-4 py-2 text-start">{t('erp.col.date')}</th><th scope="col" className="px-4 py-2 text-start">{t('erp.col.docNo')}</th>

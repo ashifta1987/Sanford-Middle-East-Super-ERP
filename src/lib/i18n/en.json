@@ -3305,7 +3305,8 @@
         "count_variance_value": "Inventory counts: total gains and losses above this value.",
         "bp_credit_limit": "Business partners: a new or raised credit limit.",
         "bp_bank_detail": "Business partners: new or changed bank details.",
-        "credit_memo_amount": "A/R credit memos: total above the limit (no limit = every credit memo)."
+        "credit_memo_amount": "A/R credit memos: total above the limit (no limit = every credit memo).",
+        "incoming_payment": "Incoming payments: every incoming payment waits for approval while the template is active."
       },
       "leaveTitle": "Long leave (Human Resources)",
       "leaveBody": "Leave longer than {{n}} days also needs the owner position ({{owner}}) after HR ({{hr}}).",

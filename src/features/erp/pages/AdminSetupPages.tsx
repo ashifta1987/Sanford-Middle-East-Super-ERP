@@ -130,7 +130,7 @@ export function ApprovalTemplatesPage() {
                 <p className="border-b border-line px-5 py-3 text-sm text-ink-2">{t(`adm.tpl.cond.${s.rule_code}`)}</p>
                 {editor(s)}
                 {rows.length === 0 ? <p className="px-5 py-4 text-sm text-muted">{t('adm.tpl.none')}</p> : (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className="w-full text-[14px]" data-testid="adm-rules" data-rule={s.rule_code}>
                       <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                         <th scope="col" className="px-4 py-2 text-start">{t('adm.tpl.requester')}</th>
@@ -406,7 +406,7 @@ export function ExchangeRatesPage() {
             {rows.isLoading || setup.isLoading ? <SkeletonRows rows={6} /> : rows.error ? <ErrorState error={rows.error} onRetry={() => rows.refetch()} /> : byDate.length === 0 ? (
               <EmptyState title={t('adm.fx.empty')} body={t('adm.fx.emptyBody')} />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="adm-fx-table">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('adm.fx.date')}</th>

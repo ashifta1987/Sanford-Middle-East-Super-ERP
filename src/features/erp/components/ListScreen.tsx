@@ -175,7 +175,7 @@ export function ListScreen<T extends Row>({ config, toolbar }: { config: ListCon
       {list.isLoading ? <SkeletonRows rows={8} /> : list.error ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : !list.data?.rows.length ? (
         <EmptyState title={q || activeFilters.length ? t('erp.list.noMatch') : config.emptyTitle ?? t('erp.list.empty')} body={q || activeFilters.length ? t('erp.list.noMatchBody') : config.emptyBody} />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full border-collapse text-[14px] sm:min-w-[640px]">
             <thead>
               <tr className="border-y border-line bg-surface-2 text-start text-xs font-semibold uppercase tracking-wide text-muted">

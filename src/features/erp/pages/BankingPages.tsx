@@ -423,7 +423,7 @@ function PaymentForm({ dir }: { dir: Dir }) {
               : (
                 <>
                   {docs.data!.docs.length === 0 ? <p className="p-5 text-sm text-muted" data-testid="bk-no-docs">{t('bk.noOpenDocs')}</p> : (
-                    <div className="overflow-x-auto">
+                    <div className="relative overflow-x-auto">
                       <table className="w-full text-[14px] sm:min-w-[620px]" data-testid="bk-docs">
                         <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                           <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.document')}</th>
@@ -572,7 +572,7 @@ export function PaymentDetailPage() {
           </SectionCard>
           <SectionCard title={t('bk.allocations')}>
             {p.allocations.length === 0 ? <p className="p-5 text-sm text-muted">{t('bk.noAllocations')}</p> : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="bk-allocations">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.document')}</th>
@@ -598,7 +598,7 @@ export function PaymentDetailPage() {
           </SectionCard>
           {p.cheques.length > 0 && (
             <SectionCard title={t('bk.cheques')}>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="bk-cheques">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('bk.chequeCol')}</th>

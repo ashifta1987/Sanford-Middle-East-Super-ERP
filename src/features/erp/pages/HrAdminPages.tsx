@@ -208,7 +208,7 @@ function PayCard({ company, info, onDone }: { company: string; info: EmployeeInf
   };
   return (
     <SectionCard title={t('hr.emp.pay')} right={info.can_edit_hr && !open ? <Button variant="ghost" data-testid="hr-pay-change" onClick={() => setOpen(true)}>{t('hr.emp.changePay')}</Button> : undefined}>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm" data-testid="hr-pay">
           <thead className="bg-surface-2 text-xs text-muted"><tr><th scope="col" className="px-5 py-2 text-start">{t('hr.col.wage')}</th><th scope="col" className="px-5 py-2 text-start">{t('hr.col.from')}</th><th scope="col" className="px-5 py-2 text-end">{t('hr.col.amount')}</th></tr></thead>
           <tbody>
@@ -458,7 +458,7 @@ export function PayrollRunPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-5">
           <SectionCard title={t('hr.payroll.employees')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-sm" data-testid="hr-run-emps">
                 <thead className="bg-surface-2 text-xs text-muted"><tr>
                   <th scope="col" className="px-4 py-2 text-start">{t('hr.col.employee')}</th>
@@ -495,7 +495,7 @@ export function PayrollRunPage() {
           </SectionCard>
           {journal && (
             <SectionCard title={t('hr.payroll.journal', { n: run.trans_id })} right={<Link to={`/financials/journals/${company}/${run.trans_id}`} className="text-sm font-medium text-primary hover:underline">{t('hr.open')}</Link>}>
-              <div className="overflow-x-auto"><table className="w-full text-sm" data-testid="hr-run-journal"><tbody>
+              <div className="relative overflow-x-auto"><table className="w-full text-sm" data-testid="hr-run-journal"><tbody>
                 {journal.map((l, i) => <tr key={i} className="border-t border-line"><td className="px-5 py-2 font-mono text-xs">{l.acct_code}</td><td className="px-5 py-2" dir="auto">{l.name}</td>
                   <td className="num px-5 py-2 text-end">{Number(l.debit) ? fmtMoney(l.debit) : ''}</td><td className="num px-5 py-2 text-end">{Number(l.credit) ? fmtMoney(l.credit) : ''}</td></tr>)}
               </tbody></table></div>
@@ -694,7 +694,7 @@ function RowsCard({ title, kind, rows, cols, ed, save, idKey, removeKind, noAdd,
   const commit = async () => { if (!edit) return; if (await save(kind, prep ? prep(edit) : edit)) setEdit(null); };
   return (
     <SectionCard title={title} right={ed && !noAdd && !edit ? <Button variant="ghost" icon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => begin()}>{t('hr.add')}</Button> : undefined}>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm" data-testid={testid}>
           <thead className="bg-surface-2 text-xs text-muted"><tr>{cols.map(([k, l]) => <th key={k} scope="col" className="px-4 py-2 text-start">{l}</th>)}<th scope="col" className="w-24"><span className="sr-only">{t('hr.edit')}</span></th></tr></thead>
           <tbody>

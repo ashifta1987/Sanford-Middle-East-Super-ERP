@@ -558,7 +558,7 @@ export function PurchaseDocPage({ kind }: { kind: PurchaseKind }) {
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
             {lines.length === 0 ? <EmptyState title={t('erp.list.empty')} /> : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px] sm:min-w-[600px]">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('so.item')}</th>
@@ -1035,7 +1035,7 @@ export function QuotationComparePage() {
       <PuFlowStrip company={company} obj={1470000113} entry={id} current="quotation" />
       <SectionCard title={t('pu.compareCard', { n: quotes.length })}>
         {quotes.length === 0 ? <EmptyState title={t('pu.noQuotes')} body={t('pu.noQuotesBody')} /> : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px]" data-testid="pu-compare-table" style={{ minWidth: `${280 + quotes.length * 170}px` }}>
               <thead>
                 <tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -1393,7 +1393,7 @@ export function PurchaseViewPage({ kind }: { kind: PurchaseViewKind }) {
             ]} />
           </SectionCard>
           <SectionCard title={t('erp.section.lines')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-[14px] sm:min-w-[560px]">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-2.5 text-start">{t('so.item')}</th>
@@ -1718,7 +1718,7 @@ function LcSplitTable({ lines, charges, currency }: { lines: Array<{ line_num: n
   const { t } = useTranslation();
   return (
     <SectionCard title={t('pu.lc.split')}>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-[14px]" data-testid="lc-split" style={{ minWidth: `${220 + charges.length * 140}px` }}>
           <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
             <th scope="col" className="px-4 py-2.5 text-start">{t('so.item')}</th>
@@ -1798,7 +1798,7 @@ export function LandedCostPage() {
             </SectionCard>
           )}
           <SectionCard title={t('pu.lc.avgTitle')}>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-[14px] sm:min-w-[560px]">
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-2.5 text-start">{t('so.item')}</th>

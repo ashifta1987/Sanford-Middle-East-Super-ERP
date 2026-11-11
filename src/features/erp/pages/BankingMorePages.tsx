@@ -139,7 +139,7 @@ export function DepositNewPage() {
               </SectionCard>
               <SectionCard title={t('bk.chequesOnHand')}>
                 {cheques.length === 0 ? <p className="p-5 text-sm text-muted">{t('bk.noChequesOnHand')}</p> : (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className="w-full text-[14px] sm:min-w-[560px]" data-testid="dep-cheques">
                       <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                         <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">{t('bk.choose')}</span></th>
@@ -359,7 +359,7 @@ function ImportCard() {
               {mode === 'amount' ? sel('imp-amount', t('bk.mapAmount'), map.amount, (v) => setMap((m) => ({ ...m, amount: v })))
                 : <>{sel('imp-debit', t('bk.mapDebit'), map.debit, (v) => setMap((m) => ({ ...m, debit: v })))}{sel('imp-credit', t('bk.mapCredit'), map.credit, (v) => setMap((m) => ({ ...m, credit: v })))}</>}
             </div>
-            <div className="overflow-x-auto rounded-btn border border-line">
+            <div className="relative overflow-x-auto rounded-btn border border-line">
               <table className="w-full text-[13px]" data-testid="imp-preview">
                 <caption className="px-3 py-2 text-start text-xs text-muted">{t('bk.preview', { n: rows.length, shown: Math.min(rows.length, 5) })}</caption>
                 <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -432,7 +432,7 @@ export function StatementPage() {
         <label className="inline-flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" id="stmt-only" checked={only} onChange={(e) => setOnly(e.target.checked)} className="h-4 w-4" /> {t('bk.onlyUnmatched')}</label>}>
         <p className="border-b border-line px-5 py-2 text-xs text-muted" data-testid="stmt-rule">{t('bk.matchRuleRef', { n: s.match_days ?? 3 })}</p>
         {lines.length === 0 ? <EmptyState title={t('bk.allMatched')} body={t('bk.allMatchedBody')} /> : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px] sm:min-w-[720px]" data-testid="stmt-lines">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.date')}</th>
@@ -550,7 +550,7 @@ export function CashPositionPage() {
           </div>
           <SectionCard title={t('bk.accounts')} right={<span className="text-sm text-muted">{t('bk.asOf', { when: fmtDay(d.as_of) })}</span>}>
             {d.accounts.length === 0 ? <EmptyState title={t('bk.noAccounts')} body={t('bk.noAccountsBody')} /> : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="cp-accounts">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('bk.bankAccount')}</th>
@@ -714,7 +714,7 @@ export function BankingSetupPage() {
           <SectionCard title={t('bk.houseAccounts')} right={<Button variant="secondary" id="ba-new" disabled={!canWrite} disabledReason={!canWrite ? readOnlyReason : undefined} onClick={() => setEdit(null)}><Plus className="h-4 w-4" aria-hidden /> {t('bk.addAccount')}</Button>}>
             {edit !== undefined && <BankAccountForm company={company} row={edit} onClose={() => setEdit(undefined)} onDone={done} />}
             {q.data!.accounts.length === 0 ? <EmptyState title={t('bk.noAccounts')} body={t('bk.noAccountsBody')} /> : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[14px]" data-testid="ba-list">
                   <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                     <th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.code')}</th><th scope="col" className="px-4 py-2.5 text-start">{t('erp.col.name')}</th>

@@ -66,11 +66,11 @@ export function SanaHero() {
               aria-pressed={mic.listening} aria-label={mic.listening ? t('sana.stopListening') : t('sana.speak')} disabled={!mic.supported}
               title={mic.supported ? t('sana.speak') : t('sana.mic.unsupported')}
               className={clsx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition disabled:opacity-40',
-                mic.listening ? 'border-[#F4745B] bg-[#F4745B] text-white' : 'border-[#CBD3E1] text-[#012746] hover:border-[#226AD9] hover:text-[#226AD9]')}>
+                mic.listening ? 'border-brand-coral bg-brand-coral text-white' : 'border-[#CBD3E1] text-[#012746] hover:border-brand-blue hover:text-brand-blue')}>
               <Mic className="h-5 w-5" aria-hidden />
             </button>
             <button type="submit" disabled={!q.trim()} aria-label={t('sana.send')}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#226AD9] text-white hover:bg-[#1B56B3] disabled:bg-[#E3E8EF] disabled:text-[#8D9BB3]">
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-blue text-white hover:bg-primary-hover disabled:bg-[#E3E8EF] disabled:text-[#8D9BB3]">
               <ArrowUp className="h-5 w-5" aria-hidden />
             </button>
           </form>
@@ -103,7 +103,7 @@ export function SanaHero() {
             <ul className="mt-3 space-y-2">
               {top.map((a, i) => (
                 <li key={i} className="flex gap-3 rounded-btn bg-white/[0.06] px-3 py-2.5">
-                  <span className={clsx('mt-1.5 h-2 w-2 shrink-0 rounded-full', a.severity === 'critical' ? 'bg-[#F4745B]' : 'bg-[#F7B646]')} aria-label={a.severity} />
+                  <span className={clsx('mt-1.5 h-2 w-2 shrink-0 rounded-full', a.severity === 'critical' ? 'bg-brand-coral' : 'bg-brand-yellow')} aria-label={a.severity} />
                   <span className="min-w-0">
                     <span className="block truncate text-[14px] font-medium text-white">{t(`erp.control.check.${a.check}`, { defaultValue: a.check })} · {a.subject}</span>
                     <span className="block truncate text-[12.5px] text-white/65">{a.detail}</span>

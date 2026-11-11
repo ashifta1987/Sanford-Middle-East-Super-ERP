@@ -93,7 +93,7 @@ function DocumentApprovals() {
         {q.isLoading ? <SkeletonRows rows={3} /> : q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : rows.length === 0 ? (
           <EmptyState title={t(`inbox.empty_${view}`)} body={t(`inbox.emptyBody_${view}`)} />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px] sm:min-w-[640px]" data-testid="inbox-table">
               <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5 text-start">{t('inbox.col.document')}</th>

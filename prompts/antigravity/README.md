@@ -49,5 +49,5 @@ This folder holds the prompts that build the rest of the ERP, one phase at a tim
 - The list of real users, their positions and companies.
 - The go-live date for each company.
 - A **sanitized** SAP backup for test runs: names, phones, emails, TRNs and bank details replaced, amounts kept.
-- The AI provider for chat and voice (for A11), with its API key stored as a server secret.
+- The AI provider and model for Sana (chat and voice), with its API key stored as a Supabase secret. Sana already works in basic mode without it.
 - Any SAP report layouts (invoices, delivery notes) to match for printing.

@@ -36,6 +36,7 @@ The menus mirror SAP Business One: 11 modules with the same functions in the sam
 | `src/features/erp/pages/*` | Stage 1 pages (lists, details, home, Control Tower, previews, search) |
 | `src/features/migration/*` | SAP migration console (working; don't restyle or rewrite) |
 | `src/layout/*`, `src/theme/*`, `src/index.css`, `tailwind.config.js` | Shell (navy sidebar) and design tokens |
+| `src/features/sana/*`, `supabase/functions/sana/*`, `supabase/sql/15_sana.sql`, `docs/sana-assistant.md` | **Sana**, the AI voice and text assistant (built: role-limited tools, Edge Function, panel, voice, home hero). Any new module that Sana should answer about needs a new read-only `erp.sana_*` tool with the same role checks |
 | `src/auth/LoginPage.tsx` | Sign-in, forgot password, reset password, remember me (built; reuse its `authError()` for auth messages) |
 | `src/lib/supabase.ts` | `erp()` = `supabase.schema('erp')`. Every call goes through it |
 | `src/lib/i18n/en.json`, `ar.json` | All UI words. Add keys to **both** files |

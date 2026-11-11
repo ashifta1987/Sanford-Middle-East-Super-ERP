@@ -144,6 +144,22 @@ Two columns on desktop (main + 360 px aside); on phones the aside follows the ma
 - **Validation:** shown inline under the field, plus a summary at the top that links to each problem. The server's message is shown as written (section 8).
 - **Leaving with unsaved changes** asks for confirmation.
 
+### 4.9 Sana assistant and the Sana-powered home page
+The full design is in `docs/sana-assistant.md`.
+- **Sana logo:** `src/features/sana/SanaMark.tsx` (vector). "Powered by SANA" badge: `PoweredBySana`. The name is written **SANA** in Outfit 700, with "Southfield AI Neural Assistant" under it.
+- **Ways to open it:** top-bar button "Ask Sana" (Sana mark + text, primary-soft), Ctrl/⌘ J, the floating round Sana button on phones, the home page box and suggestion chips.
+- **Panel:** desktop is a 440 px side panel with a dimmed page; phones get a full-screen sheet. Esc closes it.
+  - **Header:** navy `brand-navy`, mark, SANA / full name, answer-language select, read-aloud toggle, new conversation, close.
+  - **Messages:** user bubbles on the end side (primary, 18 px radius). Sana cards on the start side (surface, border), with source chips (primary-soft pills linking to records) and a Listen button. Refusals are neutral grey with a lock icon. Errors are `crit`. A three-dot typing indicator shows while waiting.
+  - **Empty state:** large mark, "Hi {name}, how can I help?", one line on role limits, up to four suggestions for the user's modules.
+  - **Composer:** auto-growing text box, 48 px round microphone (coral while listening, with a live transcript and pulsing dot), 48 px round send button, and the privacy line with a teal shield.
+  - **Basic mode:** an amber note when no AI model is connected.
+- **Home page hero** (`src/features/sana/SanaHero.tsx`): a navy card with soft brand ribbons.
+  - **Left:** "Powered by SANA", a time-based greeting (Outfit 700), one lead line, a white Ask Sana box with mark, microphone and send, and suggestion chips (glass pills).
+  - **Right:** the **Needs attention** glass card, showing the top 3 rule findings the role may see, a "Control Tower rules" label, a link to the Control Tower with the count, and an "Ask Sana" button.
+
+  Below the hero come "Today at a glance" (KPI cards), then the modules. On phones everything stacks, with no horizontal scroll.
+
 ### 4.5 Approvals inbox (`/approvals`)
 - **Tabs:** Waiting for me / Sent by me / Decided.
 - **Rows:** rule, document (link), requester, amount, how long it has waited.

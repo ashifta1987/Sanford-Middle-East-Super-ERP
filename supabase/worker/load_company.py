@@ -125,7 +125,11 @@ class Loader:
                 with cur.copy(sql.SQL("copy {} from stdin (format csv, delimiter ',', quote '\"', null '')").format(sql.Identifier(tmp))) as cp:
                     with open(f, 'rb') as fh:
                         while chunk := fh.read(1 << 20):
-                            cp.write(chunk)
+                            # HANA's CSV export can leave a bare carriage return unquoted inside text (seen in DRF1),
+                            # which COPY rejects ("unquoted carriage return found in data"). A CR is never a field or
+                            # row separator here (rows end in LF), so dropping every CR keeps the CSV structure intact;
+                            # multi-line texts keep their line feeds, only the CR of CRLF is lost.
+                            cp.write(chunk.replace(b'\r', b''))
         return self.con.execute(sql.SQL('select count(*) from {}').format(sql.Identifier(tmp))).fetchone()[0]
 
     def _insert(self, name, cols, tmp):
@@ -180,10 +184,19 @@ class Loader:
     # ---- two phases (the migration worker) ----
     def stage(self, name, cols, files):
         """Copy one table's files into a session temp table. Returns rows staged; raises on unreadable files."""
-        tmp = '_stg_%d' % len(self.staged)
+        # A fresh name for every attempt, and the temp table is dropped when the copy fails: before, a failed table
+        # left _stg_N behind and every later table hit "relation _stg_N already exists" (one bad file failed them all).
+        self._stg_seq = getattr(self, '_stg_seq', 0) + 1
+        tmp = '_stg_%d' % self._stg_seq
         t = time.monotonic()
         try:
             n = self._copy(tmp, len(cols), files, False)
+        except Exception:
+            try:
+                self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(tmp)))
+            except Exception:
+                pass
+            raise
         finally:
             self.stage_seconds += time.monotonic() - t
         self.staged[name] = (tmp, n)

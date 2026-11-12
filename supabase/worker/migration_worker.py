@@ -202,7 +202,26 @@ def safe_extract(path, dest):
             z.extractall(dest)
     else:
         with tarfile.open(path) as tf:
-            tf.extractall(dest, filter='data')
+            if hasattr(tarfile, 'data_filter'):
+                # Python 3.12+ / patched 3.8-3.11: the standard library's own safe filter
+                tf.extractall(dest, filter='data')
+            else:
+                # Older Pythons (e.g. macOS's 3.9.6) have no extraction filter: do the same checks by hand.
+                # Only plain files and folders are extracted; links, devices and FIFOs are skipped; every path
+                # must stay inside dest; permissions are reset so nothing setuid/executable comes out of an archive.
+                for m in tf:
+                    target = os.path.realpath(os.path.join(dest, m.name))
+                    if m.name.startswith('/') or (not target.startswith(root + os.sep) and target != root):
+                        raise StepError('unsafe path in archive %s: %s' % (os.path.basename(path), m.name))
+                    if m.isdir():
+                        os.makedirs(target, exist_ok=True)
+                    elif m.isfile():
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        src = tf.extractfile(m)
+                        with open(target, 'wb') as out:
+                            shutil.copyfileobj(src, out, 1 << 20)
+                        os.chmod(target, 0o644)
+                    # symlinks, hard links, devices, FIFOs: skipped (an SAP CSV export has none)
 
 
 def storage_download(prefix, dest):

@@ -21,7 +21,7 @@ Use the direct connection or the session pooler (port 5432), not the transaction
 The migration worker (migration_worker.py) imports this file and uses the Loader class in two phases:
 stage every table first (company data untouched if any file is unreadable), then cast them.
 """
-import argparse, csv, glob, os, re, sys, time, uuid
+import argparse, codecs, csv, glob, os, re, sys, time, uuid
 from collections import defaultdict
 import psycopg
 from psycopg import sql
@@ -122,14 +122,22 @@ class Loader:
             sql.SQL(' on commit drop' if on_commit_drop else '')))
         with self.con.cursor() as cur:
             for f in files:
-                with cur.copy(sql.SQL("copy {} from stdin (format csv, delimiter ',', quote '\"', null '')").format(sql.Identifier(tmp))) as cp:
+                # HANA's EXPORT ... AS CSV escapes a quote inside a quoted text with a backslash (6\" RICE BOWL) and a
+                # backslash as \\ - not by doubling it - so COPY must use escape '\'. With the default escape, such
+                # texts either failed ("extra data after last expected column") or lost their quotes silently.
+                with cur.copy(sql.SQL("copy {} from stdin (format csv, delimiter ',', quote '\"', escape '\\', null '')").format(sql.Identifier(tmp))) as cp:
+                    # Invalid UTF-8 (a few bytes in ODRF / OQUT) would abort the whole table: replace just those bytes
+                    # with U+FFFD. The incremental decoder keeps multi-byte characters that span a chunk boundary.
+                    dec = codecs.getincrementaldecoder('utf-8')(errors='replace')
                     with open(f, 'rb') as fh:
                         while chunk := fh.read(1 << 20):
-                            # HANA's CSV export can leave a bare carriage return unquoted inside text (seen in DRF1),
-                            # which COPY rejects ("unquoted carriage return found in data"). A CR is never a field or
-                            # row separator here (rows end in LF), so dropping every CR keeps the CSV structure intact;
-                            # multi-line texts keep their line feeds, only the CR of CRLF is lost.
-                            cp.write(chunk.replace(b'\r', b''))
+                            # HANA can leave a bare carriage return unquoted inside text (seen in DRF1), which COPY
+                            # rejects. Rows end in LF and CR is never a separator, so dropping every CR keeps the CSV
+                            # structure; multi-line texts keep their line feeds (only the CR of CRLF is lost).
+                            cp.write(dec.decode(chunk).replace('\r', '').encode('utf-8'))
+                        tail = dec.decode(b'', final=True)
+                        if tail:
+                            cp.write(tail.replace('\r', '').encode('utf-8'))
         return self.con.execute(sql.SQL('select count(*) from {}').format(sql.Identifier(tmp))).fetchone()[0]
 
     def _insert(self, name, cols, tmp):

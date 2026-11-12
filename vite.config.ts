@@ -31,7 +31,7 @@ function cspMeta(supabaseUrl: string | undefined): Plugin {
       const http = `${u.protocol}//${u.host}`;
       const ws = `${u.protocol === 'https:' ? 'wss:' : 'ws:'}//${u.host}`;
       const policy = `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; ` +
-        `img-src 'self' data: blob: ${http}; connect-src 'self' data: blob: ${http} ${ws}; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'`;
+        `img-src 'self' data: blob: ${http}; connect-src 'self' data: blob: ${http} ${ws}; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'`;
       return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`);
     },
   };

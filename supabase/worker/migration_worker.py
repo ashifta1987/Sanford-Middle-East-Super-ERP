@@ -34,7 +34,7 @@ with an info issue; no data is touched.
 The DSN must be the database owner (postgres) on the direct connection or session pooler: the worker loads
 the sap schema and drops/adds links.
 """
-import argparse, csv, datetime, io, json, os, re, shutil, socket, sys, tarfile, tempfile, time, traceback, urllib.parse, urllib.request, uuid, zipfile
+import argparse, csv, datetime, io, json, os, re, shutil, socket, sys, tarfile, tempfile, time, traceback, urllib.error, urllib.parse, urllib.request, uuid, zipfile
 import psycopg
 from psycopg import sql
 
@@ -263,10 +263,20 @@ def storage_download(prefix, dest):
             rel = full[len(prefix):].lstrip('/')
             out = os.path.join(dest, rel)
             os.makedirs(os.path.dirname(out), exist_ok=True)
-            req = urllib.request.Request('%s/storage/v1/object/%s/%s' % (base, BUCKET, urllib.parse.quote(full)), headers=hdr)
-            with urllib.request.urlopen(req, timeout=600) as r, open(out, 'wb') as fh:
-                while chunk := r.read(1 << 20):
-                    fh.write(chunk)
+            # A short network drop (Wi-Fi reconnect, 'Connection reset by peer') must not fail the run: retry each
+            # object up to 5 times with a growing pause, starting the file again from the beginning.
+            for attempt in range(1, 6):
+                try:
+                    req = urllib.request.Request('%s/storage/v1/object/%s/%s' % (base, BUCKET, urllib.parse.quote(full)), headers=hdr)
+                    with urllib.request.urlopen(req, timeout=600) as r, open(out, 'wb') as fh:
+                        while chunk := r.read(1 << 20):
+                            fh.write(chunk)
+                    break
+                except (urllib.error.URLError, OSError, ConnectionError) as e:
+                    if attempt == 5 or (isinstance(e, urllib.error.HTTPError) and e.code in (400, 401, 403, 404)):
+                        raise
+                    print('  download %s: %s - retry %d/4 in %ds' % (name, e, attempt, 15 * attempt), flush=True)
+                    time.sleep(15 * attempt)
             n += 1
     walk(prefix)
     return n
@@ -1004,7 +1014,9 @@ def main():
     ap.add_argument('--attachments-dest', default='storage', help="'storage' (bucket attachments) or local:<dir> for tests")
     ap.add_argument('--attachments-only', metavar='RUN', help='copy the attachments of an existing run again (no reload)')
     a = ap.parse_args()
-    with psycopg.connect(a.dsn, autocommit=True) as con, psycopg.connect(a.dsn, autocommit=True) as bk:
+    # TCP keepalives: a long-idle COPY/INSERT session behind the pooler is kept open and a dead link is noticed in ~1 min
+    ka = dict(keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=6)
+    with psycopg.connect(a.dsn, autocommit=True, **ka) as con, psycopg.connect(a.dsn, autocommit=True, **ka) as bk:
         for c in (con, bk):
             c.execute('set statement_timeout = 0')
             c.execute('set idle_in_transaction_session_timeout = 0')

@@ -227,8 +227,10 @@ def safe_extract(path, dest):
                     # symlinks, hard links, devices, FIFOs: skipped (an SAP CSV export has none)
 
 
-def storage_download(prefix, dest):
-    """Download every object under prefix in bucket sap-exports (Supabase Storage REST API). Returns file count."""
+def storage_download(prefix, dest, cache=None):
+    """Download every object under prefix in bucket sap-exports (Supabase Storage REST API) into dest. Returns file count.
+    cache: a folder kept between runs (~/erp-work/cache/<run_id>). A file already there with the same size as in Storage
+    is reused - hard-linked into dest, no copy - instead of downloading it again (a re-run skips the 2.3 GB archive)."""
     base = os.environ.get('SUPABASE_URL', '').rstrip('/')
     key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
     if not base or not key:
@@ -236,6 +238,7 @@ def storage_download(prefix, dest):
     hdr = {'Authorization': 'Bearer ' + key, 'apikey': key}
     prefix = prefix.strip('/')
     n = 0
+    stats = {'downloaded': 0, 'reused': 0, 'bytes_reused': 0}
 
     def listing(p):
         off = 0
@@ -263,23 +266,53 @@ def storage_download(prefix, dest):
             rel = full[len(prefix):].lstrip('/')
             out = os.path.join(dest, rel)
             os.makedirs(os.path.dirname(out), exist_ok=True)
+            size = (it.get('metadata') or {}).get('size')
+            if cache:
+                cpath = os.path.join(cache, rel)
+                if os.path.isfile(cpath) and (size is None or os.path.getsize(cpath) == int(size)):
+                    _link_or_copy(cpath, out)
+                    stats['reused'] += 1; stats['bytes_reused'] += os.path.getsize(cpath)
+                    print('  reused %s from the local cache (%.1f MB) - not downloaded' % (rel, os.path.getsize(cpath) / 1e6), flush=True)
+                    n += 1
+                    continue
+                os.makedirs(os.path.dirname(cpath), exist_ok=True)
+                target = cpath + '.part'                  # renamed only when complete: a broken download is never reused
+            else:
+                target = out
             # A short network drop (Wi-Fi reconnect, 'Connection reset by peer') must not fail the run: retry each
             # object up to 5 times with a growing pause, starting the file again from the beginning.
             for attempt in range(1, 6):
                 try:
                     req = urllib.request.Request('%s/storage/v1/object/%s/%s' % (base, BUCKET, urllib.parse.quote(full)), headers=hdr)
-                    with urllib.request.urlopen(req, timeout=600) as r, open(out, 'wb') as fh:
+                    with urllib.request.urlopen(req, timeout=600) as r, open(target, 'wb') as fh:
                         while chunk := r.read(1 << 20):
                             fh.write(chunk)
+                    if size is not None and os.path.getsize(target) != int(size):
+                        raise OSError('incomplete download: %d of %s bytes' % (os.path.getsize(target), size))
                     break
                 except (urllib.error.URLError, OSError, ConnectionError) as e:
                     if attempt == 5 or (isinstance(e, urllib.error.HTTPError) and e.code in (400, 401, 403, 404)):
                         raise
                     print('  download %s: %s - retry %d/4 in %ds' % (name, e, attempt, 15 * attempt), flush=True)
                     time.sleep(15 * attempt)
+            if cache:
+                os.replace(target, cpath)
+                _link_or_copy(cpath, out)
+            stats['downloaded'] += 1
             n += 1
     walk(prefix)
+    storage_download.stats = stats
     return n
+
+
+def _link_or_copy(src, dst):
+    """Hard link (same disk: no extra space, no copy time); copy when linking is not possible."""
+    if os.path.exists(dst):
+        os.remove(dst)
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
 
 
 def sniff_csv(path):
@@ -977,9 +1010,13 @@ def process(con, bk, run_id, a):
             raise SystemExit('--folder must be an existing folder for --source local')
         return run.execute(os.path.abspath(a.folder))
     work = tempfile.mkdtemp(prefix='mig_%s_' % str(run_id)[:8], dir=a.workdir)
+    # downloads are kept per run id, so re-running the same upload does not download it again
+    cache = os.path.join(a.workdir or tempfile.gettempdir(), 'cache', str(run_id))
     try:
-        n = storage_download(run.prefix or '%s/%s' % (run.company, run_id), work)
-        print('downloaded %d objects from %s/%s' % (n, BUCKET, run.prefix))
+        n = storage_download(run.prefix or '%s/%s' % (run.company, run_id), work, cache)
+        st = getattr(storage_download, 'stats', {})
+        print('downloaded %d objects from %s/%s (%d downloaded, %d reused from %s)' % (
+            n, BUCKET, run.prefix, st.get('downloaded', 0), st.get('reused', 0), cache), flush=True)
     except Exception as e:
         run.init_steps(DATA_STEPS)
         run.bk.execute("update erp.migration_step set status = 'failed', message = %s where run_id = %s and code = 'validate'", ['download: %s' % e, run_id])
@@ -987,11 +1024,16 @@ def process(con, bk, run_id, a):
         run.set_status('failed', finished_at=datetime.datetime.now(datetime.timezone.utc))
         shutil.rmtree(work, ignore_errors=True)
         return 'failed'
+    result = None
     try:
-        return run.execute(work)
+        result = run.execute(work)
+        return result
     finally:
         if not a.keep:
-            shutil.rmtree(work, ignore_errors=True)
+            shutil.rmtree(work, ignore_errors=True)      # the unpacked copy; the cache keeps the downloaded files
+        if result == 'needs_review':                     # committed: this upload will not be re-run, free its cache
+            shutil.rmtree(cache, ignore_errors=True)
+            print('  cache %s removed (run committed)' % cache, flush=True)
 
 
 def main():

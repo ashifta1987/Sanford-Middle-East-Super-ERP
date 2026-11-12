@@ -47,6 +47,9 @@ ATT_BUCKET = 'attachments'
 LOCK_KEY = 7212026          # pg_advisory_lock: one rebuild at a time (links are global)
 DATA_STEPS = ['validate', 'stage', 'cast', 'clean_02', 'orphans_03', 'links_04', 'real_keys', 'security_06',
               'app_sync', 'check_sync', 'check_deleted', 'cross_check']
+BATCH = int(os.environ.get('MIG_BATCH', '50'))          # tables staged + cast + released per batch
+DISK_MIN_FREE = 1.5e9                                    # stop the run when less free disk than this ...
+DISK_MIN_FREE_PCT = 0.12                                  # ... or than 12 % of the disk
 TX_STEPS = DATA_STEPS[2:]   # one database transaction: committed only after cross_check, rolled back on failure or stop
 RUN_STATUS = {'validate': 'validating', 'stage': 'loading', 'cast': 'loading', 'clean_02': 'rebuilding', 'orphans_03': 'rebuilding',
               'links_04': 'rebuilding', 'real_keys': 'rebuilding', 'security_06': 'rebuilding', 'app_sync': 'rebuilding',
@@ -457,12 +460,44 @@ class Run:
         return '%s is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.' % self.company
 
     def drop_staging(self):
-        if self.loader:
-            for tmp, _ in self.loader.staged.values():
-                try:
-                    self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(tmp)))
-                except psycopg.Error:
-                    pass
+        """After any run (and after a failure): drop every _stg_* temp table this session still holds."""
+        try:
+            if self.con.info.transaction_status == psycopg.pq.TransactionStatus.INERROR:
+                self.con.rollback()
+            for (t,) in self.con.execute("""select c.relname from pg_class c where c.relnamespace = pg_my_temp_schema()
+                                              and c.relname like '\\_stg\\_%'""").fetchall():
+                self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(t)))
+        except psycopg.Error:
+            pass
+
+    # --- database disk guard (Supabase cannot grow a disk more than once every 6 hours; a full disk turns the
+    #     whole database read-only, live app included). Stops the run - which rolls back - before that happens.
+    def disk_status(self):
+        """(used_bytes, size_bytes) of the database disk via the Supabase Management API, or None."""
+        tok, url = os.environ.get('SUPABASE_ACCESS_TOKEN'), os.environ.get('SUPABASE_URL', '')
+        m = re.match(r'https://([a-z0-9]+)\.supabase\.co', url)
+        if not tok or not m:
+            return None
+        try:
+            req = urllib.request.Request('https://api.supabase.com/v1/projects/%s/config/disk/util' % m.group(1),
+                                         headers={'Authorization': 'Bearer ' + tok})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                d = json.load(r)['metrics']
+            return int(d['fs_used_bytes']), int(d['fs_size_bytes'])
+        except Exception:
+            return None
+
+    def disk_guard(self, where):
+        st = self.disk_status()
+        if not st:
+            return None
+        used, size = st
+        free = size - used
+        if free < max(DISK_MIN_FREE, size * DISK_MIN_FREE_PCT):
+            raise StepError('database disk nearly full at %s: %.1f GB of %.1f GB used (%.1f GB free). Stopped and rolled back '
+                            'before Supabase would switch the database to read-only. Enlarge the disk (Settings > Compute and '
+                            'Disk) and re-run.' % (where, used / 1e9, size / 1e9, free / 1e9))
+        return used, size
 
     # --- steps
     def validate(self):
@@ -565,18 +600,20 @@ class Run:
                 % (base, r['file_tables'], r['file_fields'], r['matched_tables'], len(r['not_in_sap']), len(r['missing']), len(r['mismatch']), sum(repaired.values())))
 
     def s_stage(self):
-        ld, staged, skipped, failed = self.loader, 0, 0, []
+        """Plan the load. No data is held here any more: cast stages, casts and releases the tables in batches of
+        BATCH (a run of 2,800 tables once filled an 8 GB disk with staging tables alone)."""
+        ld, skipped, empty = self.loader, 0, 0
         self.to_cast = []
+        dropped = ld.drop_leftovers()
         for name, cols, files in self.plan:
             if name not in ld.coltypes:
                 self.skips.append((name, 'table not in the sap schema (working table or view)', None)); skipped += 1; continue
             if not files:
                 self.skips.append((name, 'no data file in the export', None)); skipped += 1; continue
-            try:
-                staged += ld.stage(name, cols, files)
-                self.to_cast.append((name, cols))
-            except Exception as e:
-                failed.append('%s (%s)' % (name, str(e).splitlines()[0][:160]))
+            if not load_company.has_rows(files):
+                self.skips.append((name, 'export file has 0 rows', 0)); empty += 1; continue
+            self.to_cast.append((name, cols, files))
+        failed = []
         if self.kind == 'full':      # tables SAP counted but the export does not contain
             have = {n for n, _, _ in self.plan}
             for t, n in ld.expected.items():
@@ -591,7 +628,12 @@ class Run:
             for (t,) in self.con.execute("select relname from pg_class where relnamespace = 'sap'::regnamespace and relkind = 'r' and relname !~ '^_' order by 1").fetchall():
                 if self.con.execute(sql.SQL('select exists (select 1 from sap.{} where company_code = %s)').format(sql.Identifier(t)), [self.company]).fetchone()[0]:
                     self.company_tables.add(t)
-        return ('ok', staged, '%d tables staged, %d skipped (not in sap schema or no data file), %.1fs' % (len(self.to_cast), skipped, ld.stage_seconds))
+        disk = self.disk_status()
+        print('  stage plan: %d tables to load in batches of %d, %d empty skipped, %d not in sap schema / no file, %d leftover _stg_ dropped%s'
+              % (len(self.to_cast), BATCH, empty, skipped, dropped,
+                 ', disk %.1f/%.1f GB' % (disk[0] / 1e9, disk[1] / 1e9) if disk else ''), flush=True)
+        return ('ok', len(self.to_cast), '%d tables to load in batches of %d; %d empty export files skipped; %d not in sap schema or no data file'
+                % (len(self.to_cast), BATCH, empty, skipped))
 
     def fk_names(self):
         return re.findall(r'^ALTER TABLE sap\."([^"]+)" DROP CONSTRAINT IF EXISTS "([^"]+)";$', self.script('04z_drop_foreign_keys.sql'), re.M)
@@ -606,20 +648,49 @@ class Run:
             ld.log(t, 'skipped', loaded=loaded, msg=msg)
         removed = 0
         if self.kind == 'full':      # the export is the whole company: clear its rows in every other table
-            keep = {n for n, _ in self.to_cast}
+            keep = {n for n, _, _ in self.to_cast}
             for t in sorted(self.company_tables - keep):
                 removed += con.execute(sql.SQL('delete from sap.{} where company_code = %s').format(sql.Identifier(t)), [self.company]).rowcount
-        rows, st = 0, {}
-        for name, cols in self.to_cast:
-            s, n = ld.cast(name, cols)
-            rows += n
-            st[s] = st.get(s, 0) + 1
-        msg = '%s; %d links dropped (04z); %d stale rows removed from tables not in the export; %.1fs' % (
-            ', '.join('%d %s' % (v, k) for k, v in sorted(st.items())), existing, removed, ld.cast_seconds)
-        if st.get('failed'):
-            bad = [r[0] + ': ' + (r[1] or '')[:160] for r in con.execute("select table_name, message from sap._load_log where run_id = %s and status = 'failed'", [self.run_id])]
-            raise StepError('%d table(s) failed to cast: %s' % (st['failed'], '; '.join(bad[:10])))
-        return ('warning' if st.get('count_mismatch') or st.get('column_mismatch') else 'ok', rows, msg)
+        rows, st, t0 = 0, {}, time.monotonic()
+        cr_rows = joined_rows = skipped_rows = 0
+        failed, total = [], len(self.to_cast)
+        nb = (total + BATCH - 1) // BATCH
+        for b in range(nb):
+            batch = self.to_cast[b * BATCH:(b + 1) * BATCH]
+            self.guard('cast')                      # a stop request is honoured between batches
+            disk = self.disk_guard('batch %d/%d' % (b + 1, nb))
+            bt, brows = time.monotonic(), 0
+            for name, cols, files in batch:
+                r = ld.load_table(name, cols, files)
+                rows += r['rows']; brows += r['rows']
+                st[r['status']] = st.get(r['status'], 0) + 1
+                if r['status'] == 'failed':
+                    failed.append(name)
+                    self.issue('critical', 'load', 'table_failed:' + name, 'Table %s could not be loaded' % name, r['error'], name)
+                    continue
+                if r['cr']:
+                    cr_rows += r['cr']
+                    self.issue('warning', 'load', 'bare_cr:' + name, '%s: %d carriage return(s) inside values kept as part of the text' % (name, r['cr']),
+                               'The export had bare CR characters inside fields (COPY rejects them raw). They were loaded as part of the value.', name)
+                if r['path'] == 'tolerant':
+                    joined_rows += r['joined']; skipped_rows += r['skipped']
+                    self.issue('warning', 'load', 'tolerant:' + name,
+                               '%s: loaded with the tolerant parser - %d row(s) re-joined after a line break inside a field, %d row(s) skipped'
+                               % (name, r['joined'], r['skipped']), r['error'], name)
+            done = min((b + 1) * BATCH, total)
+            el = time.monotonic() - t0
+            eta = el / done * (total - done) if done else 0
+            print('  cast batch %3d/%d  tables %4d/%d  rows %9d  %5.1fs  failed so far %d  elapsed %dm  eta %dm%s'
+                  % (b + 1, nb, done, total, brows, time.monotonic() - bt, len(failed), el // 60, eta // 60,
+                     '  disk %.1f/%.1f GB' % (disk[0] / 1e9, disk[1] / 1e9) if disk else ''), flush=True)
+            self.bk.execute("update erp.migration_step set rows = %s, message = %s where run_id = %s and code = 'cast'",
+                            [rows, 'batch %d/%d: %d of %d tables, %d rows, %d failed' % (b + 1, nb, done, total, rows, len(failed)), self.run_id])
+        self.cr_rows, self.joined_rows, self.skipped_rows = cr_rows, joined_rows, skipped_rows
+        msg = '%s; %d CR kept in values, %d rows re-joined, %d rows skipped (tolerant parser); %d links dropped (04z); %d stale rows removed; stage %.0fs, cast %.0fs' % (
+            ', '.join('%d %s' % (v, k) for k, v in sorted(st.items())), cr_rows, joined_rows, skipped_rows, existing, removed, ld.stage_seconds, ld.cast_seconds)
+        if failed:
+            msg = '%d table(s) failed (see issues): %s; ' % (len(failed), ', '.join(failed[:15])) + msg
+        return ('warning' if failed or cr_rows or joined_rows or skipped_rows or st.get('count_mismatch') or st.get('column_mismatch') else 'ok', rows, msg)
 
     def s_clean_02(self):
         n = 0

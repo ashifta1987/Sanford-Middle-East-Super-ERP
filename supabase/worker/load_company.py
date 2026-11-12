@@ -27,6 +27,21 @@ import psycopg
 from psycopg import sql
 
 DATA_FILE = re.compile(r'^data(\.csv(\.\d+)?)?$')
+CR_MARK = '\x1f'      # a bare carriage return inside a value travels through COPY as U+001F and is restored when cast
+TEXT_TYPES = ('text', 'character', 'char', 'bpchar', 'varchar', 'character varying')
+
+
+def has_rows(files):
+    """False when every data file of a table is empty (0 bytes or only whitespace), so the table is skipped."""
+    for f in files:
+        try:
+            if os.path.getsize(f) > 2:
+                return True
+            if open(f, 'rb').read().strip():
+                return True
+        except OSError:
+            return True
+    return False
 
 
 def create_sql_columns(ddl):
@@ -117,30 +132,75 @@ class Loader:
         return None
 
     def _copy(self, tmp, ncols, files, on_commit_drop):
+        """Fast path: Postgres COPY (csv) over a lightly cleaned stream. Returns rows staged.
+        Sets self._last_cr = number of bare carriage returns kept inside values (restored as CR when cast)."""
         self.con.execute(sql.SQL('create temp table {} ({}){}').format(
             sql.Identifier(tmp), sql.SQL(', ').join(sql.SQL('{} text').format(sql.Identifier('c%d' % i)) for i in range(ncols)),
             sql.SQL(' on commit drop' if on_commit_drop else '')))
+        cr = 0
         with self.con.cursor() as cur:
             for f in files:
                 # HANA's EXPORT ... AS CSV escapes a quote inside a quoted text with a backslash (6\" RICE BOWL) and a
-                # backslash as \\ - not by doubling it - so COPY must use escape '\'. With the default escape, such
-                # texts either failed ("extra data after last expected column") or lost their quotes silently.
+                # backslash as \\ - not by doubling it - so COPY must use escape '\'.
                 with cur.copy(sql.SQL("copy {} from stdin (format csv, delimiter ',', quote '\"', escape '\\', null '')").format(sql.Identifier(tmp))) as cp:
-                    # Invalid UTF-8 (a few bytes in ODRF / OQUT) would abort the whole table: replace just those bytes
-                    # with U+FFFD. The incremental decoder keeps multi-byte characters that span a chunk boundary.
+                    # Invalid UTF-8 (a few bytes in ODRF / OQUT ...) is replaced with U+FFFD instead of failing the table;
+                    # the incremental decoder keeps multi-byte characters that span a chunk boundary.
                     dec = codecs.getincrementaldecoder('utf-8')(errors='replace')
+                    carry = ''
                     with open(f, 'rb') as fh:
-                        while chunk := fh.read(1 << 20):
-                            # HANA can leave a bare carriage return unquoted inside text (seen in DRF1), which COPY
-                            # rejects. Rows end in LF and CR is never a separator, so dropping every CR keeps the CSV
-                            # structure; multi-line texts keep their line feeds (only the CR of CRLF is lost).
-                            cp.write(dec.decode(chunk).replace('\r', '').encode('utf-8'))
-                        tail = dec.decode(b'', final=True)
-                        if tail:
-                            cp.write(tail.replace('\r', '').encode('utf-8'))
+                        while True:
+                            chunk = fh.read(1 << 20)
+                            text = carry + dec.decode(chunk, final=not chunk)
+                            # keep a trailing CR for the next chunk so a CRLF split across chunks is still seen as one
+                            carry = text[-1:] if chunk and text.endswith('\r') else ''
+                            if carry:
+                                text = text[:-1]
+                            # CRLF row endings become LF; a bare CR inside a value (DRF1) is kept as part of the value:
+                            # COPY rejects it raw, so it travels as U+001F and is turned back into CR when cast.
+                            text = text.replace('\r\n', '\n')
+                            n = text.count('\r')
+                            if n:
+                                cr += n
+                                text = text.replace('\r', CR_MARK)
+                            if text:
+                                cp.write(text.encode('utf-8'))
+                            if not chunk:
+                                break
+        self._last_cr = cr
         return self.con.execute(sql.SQL('select count(*) from {}').format(sql.Identifier(tmp))).fetchone()[0]
 
-    def _insert(self, name, cols, tmp):
+    def _copy_tolerant(self, tmp, ncols, files):
+        """Fallback when COPY rejects a file: parse it in Python and repair what COPY cannot.
+        A row cut short by a bare line break inside a field is joined with the next line (the break stays in the value);
+        a row that still has too many fields is skipped. Returns (rows, joined_rows, skipped_rows)."""
+        self.con.execute(sql.SQL('create temp table {} ({})').format(
+            sql.Identifier(tmp), sql.SQL(', ').join(sql.SQL('{} text').format(sql.Identifier('c%d' % i)) for i in range(ncols))))
+        csv.field_size_limit(1 << 30)
+        rows = joined = skipped = 0
+        with self.con.cursor() as cur:
+            for f in files:
+                with cur.copy(sql.SQL('copy {} from stdin').format(sql.Identifier(tmp))) as cp:
+                    with open(f, 'r', encoding='utf-8', errors='replace', newline='') as fh:
+                        pending = None
+                        for rec in csv.reader(fh, delimiter=',', quotechar='"', escapechar='\\', doublequote=False, strict=False):
+                            if pending is not None:          # continue a row that was cut by a bare CR/LF
+                                pending[-1] = pending[-1] + '\n' + (rec[0] if rec else '')
+                                pending.extend(rec[1:])
+                                rec, pending = pending, None
+                                joined += 1
+                            if len(rec) < ncols:
+                                pending = rec
+                                continue
+                            if len(rec) > ncols:
+                                skipped += 1
+                                continue
+                            cp.write_row([v if v != '' else None for v in rec])
+                            rows += 1
+                        if pending is not None:
+                            skipped += 1
+        return rows, joined, skipped
+
+    def _insert(self, name, cols, tmp, restore_cr=False):
         target = self.coltypes[name]
         extra = [c for c in cols if c not in target]
         missing = [c for c in target if c not in cols and c not in ('company_code', '_row_id')]
@@ -151,6 +211,10 @@ class Loader:
             ref = sql.Identifier('c%d' % idx[c])
             if target[c] == 'bytea':
                 return sql.SQL("decode(nullif({}, ''), 'hex')").format(ref)
+            if restore_cr and target[c].split('(')[0] in TEXT_TYPES:
+                return sql.SQL("replace({}, chr(31), chr(13))::{}").format(ref, sql.SQL(target[c]))
+            if restore_cr:      # a non-text column never keeps a CR
+                return sql.SQL("nullif(replace({}, chr(31), ''), '')::{}").format(ref, sql.SQL(target[c]))
             return sql.SQL('{}::{}').format(ref, sql.SQL(target[c]))
         self.con.execute(sql.SQL('set local sap.company = {}').format(sql.Literal(self.company)))
         self.con.execute(sql.SQL('delete from sap.{} where company_code = %s').format(sql.Identifier(name)), [self.company])
@@ -189,42 +253,63 @@ class Loader:
             self.log(name, 'failed', msg=str(e)[:900])
             return False, 0
 
-    # ---- two phases (the migration worker) ----
-    def stage(self, name, cols, files):
-        """Copy one table's files into a session temp table. Returns rows staged; raises on unreadable files."""
-        # A fresh name for every attempt, and the temp table is dropped when the copy fails: before, a failed table
-        # left _stg_N behind and every later table hit "relation _stg_N already exists" (one bad file failed them all).
+    # ---- the migration worker: one table at a time inside the run's transaction, in batches ----
+    def load_table(self, name, cols, files):
+        """Stage one table into a temp table, cast it into sap.<name> (replacing this company's rows) and release the
+        temp table straight away, all inside the caller's transaction (savepoints keep a failure to this table).
+        Returns dict(status, rows, cr, joined, skipped, error). Never raises for data problems."""
         self._stg_seq = getattr(self, '_stg_seq', 0) + 1
         tmp = '_stg_%d' % self._stg_seq
+        out = {'status': 'failed', 'rows': 0, 'cr': 0, 'joined': 0, 'skipped': 0, 'error': None, 'path': 'copy'}
         t = time.monotonic()
+        staged = False
         try:
-            n = self._copy(tmp, len(cols), files, False)
-        except Exception:
+            try:                                            # fast path: COPY
+                with self.con.transaction():
+                    self._copy(tmp, len(cols), files, False)
+                out['cr'] = self._last_cr
+                staged = True
+            except Exception as e:                          # tolerant path: Python csv, repair split rows
+                out['path'], first = 'tolerant', str(e).splitlines()[0][:200]
+                try:
+                    with self.con.transaction():
+                        _, out['joined'], out['skipped'] = self._copy_tolerant(tmp, len(cols), files)
+                    staged = True
+                    out['error'] = 'COPY rejected the file (%s); loaded with the tolerant parser' % first
+                except Exception as e2:
+                    out['error'] = 'could not read: %s / tolerant parser: %s' % (first, str(e2).splitlines()[0][:200])
+            self.stage_seconds += time.monotonic() - t
+            if not staged:
+                self.log(name, 'failed', msg=out['error'][:900])
+                return out
+            t = time.monotonic()
             try:
+                with self.con.transaction():
+                    n, extra, missing = self._insert(name, cols, tmp, restore_cr=out['cr'] > 0)
+                out['rows'] = n
+                out['status'] = self._finish(name, n, extra, missing)
+            except Exception as e:
+                out['error'] = 'cast failed: %s' % str(e).splitlines()[0][:300]
+                self.log(name, 'failed', msg=out['error'][:900])
+            self.cast_seconds += time.monotonic() - t
+            return out
+        finally:
+            # created in this transaction, so TRUNCATE gives the space back at once (DROP alone would hold it to commit)
+            try:
+                if staged:
+                    self.con.execute(sql.SQL('truncate {}').format(sql.Identifier(tmp)))
                 self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(tmp)))
             except Exception:
                 pass
-            raise
-        finally:
-            self.stage_seconds += time.monotonic() - t
-        self.staged[name] = (tmp, n)
-        return n
 
-    def cast(self, name, cols):
-        """Replace this company's rows of one table with the staged rows. Returns (status, rows)."""
-        tmp, _ = self.staged[name]
-        t = time.monotonic()
-        try:
-            with self.con.transaction():
-                n, extra, missing = self._insert(name, cols, tmp)
-            status = self._finish(name, n, extra, missing)
-            return status, n
-        except Exception as e:
-            self.log(name, 'failed', msg=str(e)[:900])
-            return 'failed', 0
-        finally:
-            self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(tmp)))
-            self.cast_seconds += time.monotonic() - t
+    def drop_leftovers(self):
+        """Drop every _stg_* temp table this session still has (start of a run, after a failure)."""
+        n = 0
+        for (t,) in self.con.execute("""select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                                         where n.oid = pg_my_temp_schema() and c.relname like '\\_stg\\_%'""").fetchall():
+            self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(t)))
+            n += 1
+        return n
 
 
 def main():

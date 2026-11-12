@@ -592,7 +592,7 @@ export function AiAssistantPage() {
                 )}
                 <p className="flex items-center gap-2 font-medium text-ink"><KeyRound className="h-4 w-4" aria-hidden />{cfg.data ? (cfg.data.mode === 'ai' ? t('adm.ai.prov.modeAi') : t('adm.ai.prov.modeBasic')) : (tot?.ai ?? 0) > 0 ? t('adm.ai.modeAi') : t('adm.ai.modeBasic')}</p>
                 <p>{t('adm.ai.prov.body')}</p>
-                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-2.5-flash</code>
+                <code className="block rounded-btn bg-surface-2 px-3 py-2 text-[12px]" dir="ltr">supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-3.8-flash</code>
                 {(tot?.fallback ?? 0) > 0 && <p className="text-warn-fg">{t('adm.ai.fallbacks', { count: tot?.fallback ?? 0 })}</p>}
               </div>
             </SectionCard>

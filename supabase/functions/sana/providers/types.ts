@@ -28,7 +28,7 @@ export interface SanaModel {
   /** 'gemini' | 'anthropic' */
   provider: string;
   model: string;
-  /** provider:model, e.g. gemini:gemini-2.5-flash */
+  /** provider:model, e.g. gemini:gemini-3.8-flash */
   name: string;
   ask(req: AskRequest): Promise<Turn>;
   toolResults(results: Array<{ id: string; content: string }>): ProviderMessage;

@@ -26,7 +26,7 @@ const system = 'You are Sana.\nTopics this role covers: sales.\n2. … reply wit
 // ---------- 1. Gemini adapter ----------
 for (const stream of [false, true]) {
   const tag = stream ? 'stream' : 'json';
-  const g = gemini(KEY, 'gemini-2.5-flash', { baseUrl: `${MB}/gemini/v1beta` });
+  const g = gemini(KEY, 'gemini-3.8-flash', { baseUrl: `${MB}/gemini/v1beta` });
   const deltas = [];
   const msgs = [{ role: 'user', content: 'How many open sales orders?' }];
   const t1 = await g.ask({ system, messages: msgs, tools: specs, maxTokens: 900, signal: sig(), onText: stream ? (d) => deltas.push(d) : undefined });
@@ -49,7 +49,7 @@ for (const stream of [false, true]) {
   const decl = functionDeclarations(TOOLS);
   ok('gemini: every Sana tool maps to a function declaration; tools without parameters carry none', decl.length === TOOLS.length
     && decl.filter((d) => !d.parameters).map((d) => d.name).sort().join() === TOOLS.filter((t) => !Object.keys(t.input_schema.properties ?? {}).length).map((t) => t.name).sort().join());
-  const g = gemini(KEY, 'gemini-2.5-flash', { baseUrl: `${MB}/gemini/v1beta` });
+  const g = gemini(KEY, 'gemini-3.8-flash', { baseUrl: `${MB}/gemini/v1beta` });
   const all = TOOLS.map(({ name, description, input_schema }) => ({ name, description, input_schema }));
   const t = await g.ask({ system, messages: [{ role: 'user', content: 'alerts please' }], tools: all, maxTokens: 900, signal: sig() });
   ok('gemini: all 16 declarations accepted by the (strict) mock', t.toolCalls[0]?.name === 'alerts', JSON.stringify(t));
@@ -63,16 +63,16 @@ for (const stream of [false, true]) {
   ok('gemini: MALFORMED_FUNCTION_CALL → ModelError (core falls back)', e instanceof ModelError);
   e = null; try { await g.ask({ system, messages: [{ role: 'user', content: 'x [[mock:error]]' }], tools: specs, maxTokens: 900, signal: sig() }); } catch (x) { e = x; }
   ok('gemini: HTTP 500 → ModelError 500, message without request data or key', e instanceof ModelError && e.status === 500 && !String(e.message).includes(KEY), e?.message);
-  e = null; try { await gemini('', 'gemini-2.5-flash', { baseUrl: `${MB}/gemini/v1beta` }).ask({ system, messages: [{ role: 'user', content: 'hi' }], tools: specs, maxTokens: 900, signal: sig() }); } catch (x) { e = x; }
+  e = null; try { await gemini('', 'gemini-3.8-flash', { baseUrl: `${MB}/gemini/v1beta` }).ask({ system, messages: [{ role: 'user', content: 'hi' }], tools: specs, maxTokens: 900, signal: sig() }); } catch (x) { e = x; }
   ok('gemini: no key header → 403 from the API', e instanceof ModelError && e.status === 403);
   e = null; const t0 = Date.now();
   try { await g.ask({ system, messages: [{ role: 'user', content: 'x [[mock:slow]]' }], tools: specs, maxTokens: 900, signal: AbortSignal.timeout(400) }); } catch (x) { e = x; }
   ok('gemini: the timeout aborts the call', e != null && Date.now() - t0 < 3000, e?.name);
   // bad request shapes are refused by the mock exactly like the API: proves the adapter's own shapes are the valid ones
-  const bad = await fetch(`${MB}/gemini/v1beta/models/gemini-2.5-flash:generateContent`, { method: 'POST', headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' },
+  const bad = await fetch(`${MB}/gemini/v1beta/models/gemini-3.8-flash:generateContent`, { method: 'POST', headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' },
     body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'q' }] }], tools: [{ functionDeclarations: [{ name: 'alerts', description: 'x', parameters: { type: 'object', properties: {} } }] }] }) });
   ok('mock: an empty OBJECT schema is refused like the real API (400)', bad.status === 400);
-  const bad2 = await fetch(`${MB}/gemini/v1beta/models/gemini-2.5-flash:generateContent?key=x`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const bad2 = await fetch(`${MB}/gemini/v1beta/models/gemini-3.8-flash:generateContent?key=x`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
   ok('mock: a key in the URL is refused (the adapter uses the header)', bad2.status === 400);
 }
 
@@ -94,13 +94,13 @@ for (const stream of [false, true]) {
 // ---------- 3. Provider choice and config ----------
 ok('pickModel: no key → basic mode (null)', pickModel({}) === null && pickModel({ SANA_PROVIDER: 'anthropic', GEMINI_API_KEY: KEY }) === null);
 const pm = pickModel({ GEMINI_API_KEY: KEY });
-ok('pickModel: default provider gemini, model gemini-2.5-flash', pm?.provider === 'gemini' && pm.model === 'gemini-2.5-flash');
-const pa = pickModel({ SANA_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: KEY, SANA_MODEL: 'gemini-2.5-flash' });
+ok('pickModel: default provider gemini, model gemini-3.8-flash', pm?.provider === 'gemini' && pm.model === 'gemini-3.8-flash');
+const pa = pickModel({ SANA_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: KEY, SANA_MODEL: 'gemini-3.8-flash' });
 ok('pickModel: SANA_PROVIDER=anthropic → fallback adapter, a gemini SANA_MODEL is not sent to Anthropic', pa?.provider === 'anthropic' && pa.model === 'claude-sonnet-5-5');
-ok('pickModel: SANA_MODEL=gemini-2.5-pro honoured', pickModel({ GEMINI_API_KEY: KEY, SANA_MODEL: 'gemini-2.5-pro' })?.model === 'gemini-2.5-pro');
+ok('pickModel: SANA_MODEL=gemini-3.8-pro honoured', pickModel({ GEMINI_API_KEY: KEY, SANA_MODEL: 'gemini-3.8-pro' })?.model === 'gemini-3.8-pro');
 const secretish = 'zz-not-a-real-key-0123456789';
 const cfg = providerConfig({ GEMINI_API_KEY: secretish, SANA_PROVIDER: 'gemini' });
-ok('config: provider, model, voice models, key configured yes — and never the key itself', cfg.provider === 'gemini' && cfg.key_configured === true && cfg.voice.tts_model === 'gemini-2.5-flash-preview-tts'
+ok('config: provider, model, voice models, key configured yes — and never the key itself', cfg.provider === 'gemini' && cfg.key_configured === true && cfg.voice.tts_model === 'gemini-3.8-flash-tts'
   && !JSON.stringify(cfg).includes(secretish) && !JSON.stringify(cfg).includes('zz-not'), JSON.stringify(cfg));
 ok('config: no key → key configured no, basic mode', providerConfig({}).key_configured === false && providerConfig({}).mode === 'basic');
 
@@ -110,11 +110,11 @@ ok('config: no key → key configured no, basic mode', providerConfig({}).key_co
   const wav = Buffer.from(pcmToWav(pcm, 16000));
   ok('pcmToWav: RIFF/WAVE header, PCM 16-bit mono, sizes', wav.toString('ascii', 0, 4) === 'RIFF' && wav.toString('ascii', 8, 12) === 'WAVE' && wav.readUInt32LE(24) === 16000
     && wav.readUInt16LE(34) === 16 && wav.readUInt32LE(40) === pcm.length);
-  const t = await geminiTranscribe({ apiKey: KEY, model: 'gemini-2.5-flash', baseUrl: `${MB}/gemini/v1beta`, audio: wav.toString('base64'), mime: 'audio/wav', languageHint: 'The speaker uses Malayalam.', signal: sig() });
+  const t = await geminiTranscribe({ apiKey: KEY, model: 'gemini-3.8-flash', baseUrl: `${MB}/gemini/v1beta`, audio: wav.toString('base64'), mime: 'audio/wav', languageHint: 'The speaker uses Malayalam.', signal: sig() });
   ok('STT: audio inlineData → transcript in the chosen language (Malayalam)', /[ഀ-ൿ]/.test(t.text) && t.usage.in > 0, t.text);
-  const sp = await geminiSpeak({ apiKey: KEY, model: 'gemini-2.5-flash-preview-tts', voice: 'Kore', baseUrl: `${MB}/gemini/v1beta`, text: 'തുറന്ന സെയിൽസ് ഓർഡറുകൾ 16', signal: sig() });
+  const sp = await geminiSpeak({ apiKey: KEY, model: 'gemini-3.8-flash-tts', voice: 'Kore', baseUrl: `${MB}/gemini/v1beta`, text: 'തുറന്ന സെയിൽസ് ഓർഡറുകൾ 16', signal: sig() });
   ok('TTS: PCM from inlineData (audio/L16, rate 24000)', sp.rate === 24000 && sp.pcm.length > 1000 && sp.pcm.length % 2 === 0);
-  let e = null; try { await geminiSpeak({ apiKey: KEY, model: 'gemini-2.5-flash', voice: 'Kore', baseUrl: `${MB}/gemini/v1beta`, text: 'x', signal: sig() }); } catch (x) { e = x; }
+  let e = null; try { await geminiSpeak({ apiKey: KEY, model: 'gemini-3.8-flash', voice: 'Kore', baseUrl: `${MB}/gemini/v1beta`, text: 'x', signal: sig() }); } catch (x) { e = x; }
   ok('TTS: a non-TTS model is refused', e instanceof ModelError);
 }
 ok('mock stats: sizes only, no key, no audio', !JSON.stringify(stats).includes(KEY) && !JSON.stringify(stats).includes('UklGR') && stats.requests.length > 10);

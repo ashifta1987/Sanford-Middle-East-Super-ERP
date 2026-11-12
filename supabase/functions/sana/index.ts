@@ -3,7 +3,7 @@
 // POST { action: 'config', company } → admin-only provider config for the settings screen (names and yes/no, never a key).
 // Deploy:  supabase functions deploy sana
 // Secrets (S2, decision 11 Nov 2026 — Gemini is the provider; the key values are set by IT and never written anywhere else):
-//   supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-2.5-flash      (GEMINI_API_KEY is already a secret on live)
+//   supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-3.8-flash      (GEMINI_API_KEY is already a secret on live)
 //   Fallback: SANA_PROVIDER=anthropic with ANTHROPIC_API_KEY (SANA_MODEL=claude-…). Without a key for the chosen provider Sana
 //   runs in basic mode. Optional: SANA_THINKING_BUDGET (default 0 on Flash).
 // SUPABASE_URL and SUPABASE_ANON_KEY are provided by Supabase automatically. The service role key is NOT used.

@@ -70,11 +70,11 @@ Edge Function "sana-voice" (supabase/functions/sana-voice/index.ts → core.ts):
   | Secret | Default | Meaning |
   |---|---|---|
   | `SANA_PROVIDER` | `gemini` | `anthropic` selects the fallback adapter |
-  | `SANA_MODEL` | `gemini-2.5-flash` | text model (a `claude-*` name when the provider is anthropic; otherwise `claude-sonnet-5-5`) |
+  | `SANA_MODEL` | `gemini-3.8-flash` | text model (a `claude-*` name when the provider is anthropic; otherwise `claude-sonnet-5-5`) |
   | `GEMINI_API_KEY` | — (already set on live) | Gemini key; text, and always for provider voice |
   | `ANTHROPIC_API_KEY` | — | only used when `SANA_PROVIDER=anthropic` |
-  | `SANA_STT_MODEL` | `gemini-2.5-flash` | speech-to-text (audio in, text out) |
-  | `SANA_VOICE_MODEL` | `gemini-2.5-flash-preview-tts` | text-to-speech model (16-bit PCM 24 kHz, wrapped as WAV) |
+  | `SANA_STT_MODEL` | `gemini-3.8-flash` | speech-to-text (audio in, text out) |
+  | `SANA_VOICE_MODEL` | `gemini-3.8-flash-tts` | text-to-speech model (16-bit PCM 24 kHz, wrapped as WAV) |
   | `SANA_TTS_VOICE` | `Kore` | prebuilt Gemini voice |
   | `SANA_THINKING_BUDGET` | `0` on Flash | Gemini thinking tokens (billed as output); Sana's lookups don't need them |
 
@@ -94,7 +94,7 @@ Edge Function "sana-voice" (supabase/functions/sana-voice/index.ts → core.ts):
 ## 4. Switching on the AI model (S2: Gemini)
 1. Apply `supabase/sql/36_sana.sql` and `supabase/sql/37_sana_gemini.sql` to the Supabase project (a branch first).
 2. `supabase functions deploy sana` and `supabase functions deploy sana-voice`
-3. `supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-2.5-flash` (optional: `SANA_STT_MODEL`, `SANA_VOICE_MODEL`, `SANA_TTS_VOICE`).
+3. `supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-3.8-flash` (optional: `SANA_STT_MODEL`, `SANA_VOICE_MODEL`, `SANA_TTS_VOICE`).
    `GEMINI_API_KEY` is already a secret on live; IT sets it on a branch the same way. Key values are never typed into a file, a table, a chat or the browser.
 4. Run the real-model evaluation below on the branch, then ask the test questions in §6 as a sales user, a finance user and an IT user before giving access to real staff.
 5. Fallback: `supabase secrets set SANA_PROVIDER=anthropic SANA_MODEL=claude-sonnet-5-5` plus `ANTHROPIC_API_KEY` (set by IT).

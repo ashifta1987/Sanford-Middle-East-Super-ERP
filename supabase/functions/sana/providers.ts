@@ -1,5 +1,5 @@
 // Sana model adapters. One interface (providers/types.ts), one file per provider; the Supabase secret SANA_PROVIDER picks one.
-//   gemini    (default, decision 11 Nov 2026) — providers/gemini.ts, key GEMINI_API_KEY, model SANA_MODEL (default gemini-2.5-flash)
+//   gemini    (default, decision 11 Nov 2026) — providers/gemini.ts, key GEMINI_API_KEY, model SANA_MODEL (default gemini-3.8-flash)
 //   anthropic (fallback)                      — providers/anthropic.ts, key ANTHROPIC_API_KEY, model SANA_MODEL if it is a
 //                                               claude-* name, else claude-sonnet-5-5
 // No key for the chosen provider = basic mode (keyword routing, no model). Keys are read only from the Edge Function's

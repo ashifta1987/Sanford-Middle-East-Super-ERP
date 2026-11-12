@@ -70,7 +70,8 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
         let text = '';
         try {
           text = (await geminiTranscribe({ apiKey: env.GEMINI_API_KEY, model: m.stt, baseUrl: env.SANA_GEMINI_BASE_URL, audio, mime, languageHint: hint, signal: ac.signal })).text;
-        } catch {
+        } catch (e) {
+          console.error('sana stt failed', (e as { status?: number })?.status ?? 'network', (e as Error)?.message ?? '');
           await record(asked ?? fallbackLang, seconds, m.stt, false).catch(() => {});
           return fail(502, "Sana couldn't hear that clearly. Try again or type your question.");
         }
@@ -90,9 +91,10 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
       let wav: Uint8Array; let seconds = 0;
       try {
         const r = await geminiSpeak({ apiKey: env.GEMINI_API_KEY, model: m.tts, voice: m.voice, baseUrl: env.SANA_GEMINI_BASE_URL, text, signal: ac.signal });
-        seconds = r.pcm.length / (r.rate * 2);
-        wav = pcmToWav(r.pcm, r.rate);
-      } catch {
+        seconds = (r.isWav ? Math.max(0, r.pcm.length - 44) : r.pcm.length) / (r.rate * 2);
+        wav = r.isWav ? r.pcm : pcmToWav(r.pcm, r.rate);
+      } catch (e) {
+        console.error('sana tts failed', (e as { status?: number })?.status ?? 'network', (e as Error)?.message ?? '');
         await record(lang, 0, m.tts, false).catch(() => {});
         return fail(502, "Sana couldn't read that aloud right now. Try again in a moment.");
       }

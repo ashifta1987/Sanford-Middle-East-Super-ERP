@@ -4,7 +4,7 @@
 // Needs the user's session token. Audio is never stored or logged; only metadata is audited (erp.sana_voice_use).
 // Deploy:  supabase functions deploy sana-voice
 // Secrets: GEMINI_API_KEY (already set on live — never printed or written anywhere), optional SANA_STT_MODEL
-//          (default gemini-2.5-flash), SANA_VOICE_MODEL (TTS, default gemini-2.5-flash-preview-tts), SANA_TTS_VOICE (default Kore).
+//          (default gemini-3.8-flash), SANA_VOICE_MODEL (TTS, default gemini-3.8-flash-tts), SANA_TTS_VOICE (default Kore).
 // The test-only base-URL variable of the local provider mock is deliberately NOT read here.
 import { handleVoice } from './core.ts';
 import type { Env } from '../sana/core.ts';

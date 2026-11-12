@@ -35,7 +35,7 @@ CREATE FUNCTION pg_temp.u(n integer) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ S
 CREATE FUNCTION pg_temp.save(n integer, p text) RETURNS jsonb LANGUAGE sql AS $$
   SELECT pg_temp.call(pg_temp.u(n), format('SELECT erp.sana_settings_save(%L, %L::jsonb)', 'ZZ99', p))
 $$;
-CREATE FUNCTION pg_temp.voice(n integer, mode text, lang text, secs numeric DEFAULT 3.5, provider text DEFAULT 'gemini', model text DEFAULT 'gemini-2.5-flash',
+CREATE FUNCTION pg_temp.voice(n integer, mode text, lang text, secs numeric DEFAULT 3.5, provider text DEFAULT 'gemini', model text DEFAULT 'gemini-3.8-flash',
                               company text DEFAULT 'ZZ99') RETURNS jsonb LANGUAGE sql AS $$
   SELECT pg_temp.call(pg_temp.u(n), format('SELECT erp.sana_voice_use(%L, %L, %L, %s, %L, %L, true)', company, mode, lang, coalesce(secs::text, 'NULL'), provider, model))
 $$;
@@ -119,7 +119,7 @@ BEGIN
   PERFORM pg_temp.expect(pg_temp.voice(2, 'stt', 'en', 3, 'gemini', 'bad model!'), 'Model names use letters, digits and . _ : / - only (up to 80).', 'voice: bad model name refused');
   PERFORM pg_temp.expect(pg_temp.voice(2, 'stt', 'en', 900), 'Audio length must be from 0 to 600 seconds.', 'voice: audio length checked');
   PERFORM pg_temp.expect(pg_temp.voice(2, 'stt', 'de'), 'That language is not switched on for Sana in ZZ99.', 'voice: unknown language refused');
-  PERFORM pg_temp.expect(pg_temp.voice(2, 'stt', 'en', 3, 'gemini', 'gemini-2.5-flash', 'AE01'), 'You don''t have access to company AE01.', 'voice: a company the user cannot see');
+  PERFORM pg_temp.expect(pg_temp.voice(2, 'stt', 'en', 3, 'gemini', 'gemini-3.8-flash', 'AE01'), 'You don''t have access to company AE01.', 'voice: a company the user cannot see');
   PERFORM pg_temp.expect(pg_temp.voice(3, 'stt', 'en'), 'You need a Southfield profile to use Sana.', 'voice: no profile refused');
   r := pg_temp.call(NULL, 'SELECT erp.sana_voice_use(''ZZ99'', ''stt'', ''en'', 1, ''gemini'', ''m'', true)', 'anon');
   PERFORM pg_temp.check(r ->> 'error' = '42501' AND NOT has_function_privilege('anon', 'erp.sana_voice_use(varchar,text,text,numeric,text,text,boolean)', 'EXECUTE'),
@@ -142,12 +142,12 @@ BEGIN
   -- ---------- sana_log: provider, model and token counts ----------
   SELECT count(*) INTO n0 FROM erp.audit_log WHERE action = 'sana.ask';
   r := pg_temp.call(pg_temp.u(2), $q$SELECT erp.sana_log(NULL, 'ZZ99', 'en', 'open sales orders', 'There are 3.', '[{"tool":"sana_documents"}]', '[]', false, 'ai', 'text',
-                                     NULL, false, 'gemini', 'gemini-2.5-flash', '{"in": 2400, "out": 61, "secret": 5, "bad": "x"}')$q$);
+                                     NULL, false, 'gemini', 'gemini-3.8-flash', '{"in": 2400, "out": 61, "secret": 5, "bad": "x"}')$q$);
   PERFORM pg_temp.ok(r, 'log: AI answer with provider gemini, model and tokens');
   c1 := r ->> 'conversation_id'; m := (r ->> 'message_id')::bigint;
-  PERFORM pg_temp.check((SELECT provider = 'gemini' AND model = 'gemini-2.5-flash' FROM erp.sana_message WHERE message_id = m), 'log: the answer row keeps provider and model');
+  PERFORM pg_temp.check((SELECT provider = 'gemini' AND model = 'gemini-3.8-flash' FROM erp.sana_message WHERE message_id = m), 'log: the answer row keeps provider and model');
   SELECT * INTO al FROM erp.audit_log WHERE action = 'sana.ask' ORDER BY audit_id DESC LIMIT 1;
-  PERFORM pg_temp.check(al.detail ->> 'provider' = 'gemini' AND al.detail ->> 'model' = 'gemini-2.5-flash' AND al.detail -> 'tokens' = '{"in": 2400, "out": 61}'::jsonb
+  PERFORM pg_temp.check(al.detail ->> 'provider' = 'gemini' AND al.detail ->> 'model' = 'gemini-3.8-flash' AND al.detail -> 'tokens' = '{"in": 2400, "out": 61}'::jsonb
                         AND NOT (al.detail::text ~ 'open sales orders'), 'log: audit has provider, model and only in/out token counts (never the question)', al.detail::text);
   r := pg_temp.call(pg_temp.u(2), $q$SELECT erp.sana_log(NULL, 'ZZ99', 'en', 'q', 'a', '[]', '[]', false, 'ai', 'text', NULL, false, 'anthropic', 'claude-sonnet-5-5', NULL)$q$);
   PERFORM pg_temp.ok(r, 'log: the Anthropic fallback is accepted');

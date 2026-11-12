@@ -19,6 +19,8 @@ export const PRICES = {
     gemini: 'https://ai.google.dev/gemini-api/docs/pricing (Gemini Developer API, paid tier)',
     anthropic: 'https://www.anthropic.com/pricing (Claude API)',
   },
+  // NOTE (12 Nov 2026): live now runs gemini-3.8-flash / gemini-3.8-flash-tts (2.5 is closed to new users). These are the
+  // 2.5 list prices used for the S2 estimate; replace them with the 3.8 prices from ai.google.dev/gemini-api/docs/pricing.
   'gemini-2.5-flash': { in: 0.30, audio_in: 1.00, out: 2.50 },             // USD per 1M tokens; output includes thinking tokens
   'gemini-2.5-flash-preview-tts': { in: 0.50, audio_out: 10.00 },
   'claude-sonnet-5-5': { in: 2.00, out: 10.00 },

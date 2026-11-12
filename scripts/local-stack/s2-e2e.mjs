@@ -102,10 +102,10 @@ try {
     await login(p, 'qa.admin@sample.test', 'local-only-1');
     await p.goto(`${BASE}/admin/ai-assistant`); await settle(p);
     await seen(p.locator('[data-testid=adm-ai-provider]'));
-    ok('admin: provider card from the config action — Google Gemini, gemini-2.5-flash', (await txt(p.locator('[data-testid=adm-ai-prov-name]'))) === 'Google Gemini'
-      && (await txt(p.locator('[data-testid=adm-ai-prov-model]'))) === 'gemini-2.5-flash');
-    ok('admin: voice models shown (STT gemini-2.5-flash, TTS gemini-2.5-flash-preview-tts · Kore)', (await txt(p.locator('[data-testid=adm-ai-prov-stt]'))) === 'gemini-2.5-flash'
-      && (await txt(p.locator('[data-testid=adm-ai-prov-tts]'))).includes('gemini-2.5-flash-preview-tts'));
+    ok('admin: provider card from the config action — Google Gemini, gemini-3.8-flash', (await txt(p.locator('[data-testid=adm-ai-prov-name]'))) === 'Google Gemini'
+      && (await txt(p.locator('[data-testid=adm-ai-prov-model]'))) === 'gemini-3.8-flash');
+    ok('admin: voice models shown (STT gemini-3.8-flash, TTS gemini-3.8-flash-tts · Kore)', (await txt(p.locator('[data-testid=adm-ai-prov-stt]'))) === 'gemini-3.8-flash'
+      && (await txt(p.locator('[data-testid=adm-ai-prov-tts]'))).includes('gemini-3.8-flash-tts'));
     ok('admin: key configured = No in the local stack (no key here), basic mode explained', (await txt(p.locator('[data-testid=adm-ai-prov-key]'))) === 'No' && /Basic mode: no key/.test(await txt(p.locator('[data-testid=adm-ai-key]'))));
     const keyish = await p.locator('main input, main textarea, main select').evaluateAll((els) => els.filter((e) => /key|secret|token|password|credential/i.test(
       [e.id, e.getAttribute('name'), e.getAttribute('placeholder'), e.getAttribute('aria-label'), e.type].join(' '))).length);

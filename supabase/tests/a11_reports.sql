@@ -264,7 +264,7 @@ BEGIN
   PERFORM pg_temp.check((r->>'configured')::boolean = false AND jsonb_array_length(r->'tools') = 0, 'no provider set: AI not configured, no tools', left(r::text, 160));
   PERFORM pg_temp.expect(pg_temp.call(sales, 'SELECT erp.ai_ask_context(''ZZ99'', ''who owes us money?'', NULL)'), 'The AI Assistant is off for ZZ99.', 'asking while off is refused');
   PERFORM pg_temp.expect(pg_temp.call(nobody, 'SELECT erp.ai_status(''ZZ99'')'), 'You don''t have access to company ZZ99.', 'AI status refused without company access');
-  PERFORM pg_temp.ok(pg_temp.call(admin, $q$SELECT erp.ai_setting_save('ZZ99', '{"enabled": true, "chat_provider": "google", "chat_model": "gemini-2.5-flash", "monthly_limit": 100,
+  PERFORM pg_temp.ok(pg_temp.call(admin, $q$SELECT erp.ai_setting_save('ZZ99', '{"enabled": true, "chat_provider": "google", "chat_model": "gemini-3.8-flash", "monthly_limit": 100,
       "allowed_modules": ["finance", "sales", "purchase", "inventory"],
       "allowed_tables": ["account", "journal_entry", "journal_line", "document", "document_line", "stock_balance", "item"]}')$q$), 'admin switches the assistant on (A10 settings)');
   r := pg_temp.call(sales, 'SELECT erp.ai_status(''ZZ99'')');

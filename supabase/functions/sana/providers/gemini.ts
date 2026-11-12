@@ -8,11 +8,11 @@ import { ModelError, sseJson, type SanaModel, type ToolSpec, type Turn, type Usa
 
 export const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 /** Text (and tool use). Secret SANA_MODEL. */
-export const GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash';
+export const GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash';
 /** Speech-to-text runs on the normal multimodal model (audio in, text out). Secret SANA_STT_MODEL. */
-export const GEMINI_DEFAULT_STT_MODEL = 'gemini-2.5-flash';
+export const GEMINI_DEFAULT_STT_MODEL = 'gemini-3.8-flash';
 /** Text-to-speech model. Secret SANA_VOICE_MODEL. */
-export const GEMINI_DEFAULT_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+export const GEMINI_DEFAULT_TTS_MODEL = 'gemini-3.8-flash-tts';
 /** Prebuilt TTS voice. Secret SANA_TTS_VOICE. */
 export const GEMINI_DEFAULT_VOICE = 'Kore';
 
@@ -55,7 +55,12 @@ function usageOf(u: GenResponse['usageMetadata']): Usage {
 function headers(apiKey: string) { return { 'x-goog-api-key': apiKey, 'content-type': 'application/json' }; }
 async function post(url: string, apiKey: string, body: unknown, signal: AbortSignal): Promise<Response> {
   const res = await fetch(url, { method: 'POST', headers: headers(apiKey), body: JSON.stringify(body), signal });
-  if (!res.ok) throw new ModelError(`model error ${res.status}`, res.status);   // the body is not echoed (no request data in errors)
+  if (!res.ok) {
+    // Google's own error message only (status + reason); the request body is never echoed.
+    let reason = '';
+    try { reason = String(((await res.json()) as { error?: { message?: string } })?.error?.message ?? '').slice(0, 300); } catch { /* no JSON body */ }
+    throw new ModelError(`model error ${res.status}${reason ? ': ' + reason : ''}`, res.status);
+  }
   return res;
 }
 
@@ -64,7 +69,7 @@ export interface GeminiOptions { baseUrl?: string; thinkingBudget?: number | nul
 /** baseUrl exists for the LOCAL provider mock only (the local gateway passes it; the Edge Function never does). */
 export function gemini(apiKey: string, model: string, opts: GeminiOptions = {}): SanaModel {
   const base = (opts.baseUrl || GEMINI_BASE).replace(/\/+$/, '');
-  // Gemini 2.5 Flash thinks by default and thinking tokens count as output: Sana's answers are lookups, so thinking is off
+  // Gemini Flash models think by default and thinking tokens count as output: Sana's answers are lookups, so thinking is off
   // (budget 0) unless SANA_THINKING_BUDGET says otherwise. Models that cannot switch it off (Pro) get no thinkingConfig.
   const budget = opts.thinkingBudget ?? (/flash/.test(model) ? 0 : null);
   const ids = new Map<string, { name: string; gid?: string }>();
@@ -163,7 +168,7 @@ export async function geminiTranscribe(o: { apiKey: string; model: string; baseU
 
 /** Text-to-speech: answer text → 16-bit mono PCM from the TTS model (sample rate from its mime type, 24 kHz by default). */
 export async function geminiSpeak(o: { apiKey: string; model: string; voice: string; baseUrl?: string; text: string; signal: AbortSignal }):
-  Promise<{ pcm: Uint8Array; rate: number; usage: Usage }> {
+  Promise<{ pcm: Uint8Array; rate: number; isWav: boolean; usage: Usage }> {
   const base = (o.baseUrl || GEMINI_BASE).replace(/\/+$/, '');
   const body = {
     contents: [{ role: 'user', parts: [{ text: o.text }] }],
@@ -174,7 +179,10 @@ export async function geminiSpeak(o: { apiKey: string; model: string; voice: str
   const inline = (r.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data)?.inlineData;
   if (!inline) throw new ModelError('no audio in the reply', 502);
   const rate = Number(inline.mimeType.match(/rate=(\d+)/)?.[1] ?? 24000);
-  return { pcm: b64ToBytes(inline.data), rate, usage: usageOf(r.usageMetadata) };
+  const bytes = b64ToBytes(inline.data);
+  // gemini-3.8-flash-tts returns a complete WAV (RIFF header); older TTS models return headerless PCM.
+  const isWav = bytes.length > 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+  return { pcm: bytes, rate, isWav, usage: usageOf(r.usageMetadata) };
 }
 
 /** Wraps 16-bit little-endian mono PCM in a WAV header, so every browser can play it. */

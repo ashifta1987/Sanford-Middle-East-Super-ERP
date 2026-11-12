@@ -295,7 +295,7 @@ BEGIN
     'Table audit_log can''t be read by the AI Assistant.', 'admin tables refused');
   PERFORM pg_temp.expect(pg_temp.call(admin, 'SELECT erp.ai_setting_save(''ZZ99'', ''{"chat_provider":"acme"}''::jsonb)'), 'Chat provider acme is not supported.', 'unknown provider refused');
   PERFORM pg_temp.check(NOT ('employee_pay' = ANY (erp._ai_tables())) AND NOT ('hr_pay' = ANY (erp._ai_tables())) AND 'item' = ANY (erp._ai_tables()), 'AI table catalogue excludes salary', '');
-  PERFORM pg_temp.ok(pg_temp.call(admin, 'SELECT erp.ai_setting_save(''ZZ99'', ''{"enabled":true,"chat_provider":"google","chat_model":"gemini-2.5-flash","allowed_modules":["sales","inventory"],"allowed_tables":["item","erp.stock_balance"],"monthly_limit":1000}''::jsonb)'),
+  PERFORM pg_temp.ok(pg_temp.call(admin, 'SELECT erp.ai_setting_save(''ZZ99'', ''{"enabled":true,"chat_provider":"google","chat_model":"gemini-3.8-flash","allowed_modules":["sales","inventory"],"allowed_tables":["item","erp.stock_balance"],"monthly_limit":1000}''::jsonb)'),
     'admin switches the assistant on');
   r := pg_temp.call(sales, 'SELECT erp.ai_request_check(''ZZ99'')');
   PERFORM pg_temp.check(r->>'chat_provider' = 'google' AND (r->>'remaining')::int = 1000 AND r->'modules' = '["sales"]'::jsonb, 'request check limits modules to the user''s own', r::text);

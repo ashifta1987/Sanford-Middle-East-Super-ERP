@@ -25,6 +25,11 @@ Failure safety: stage only fills session temp tables. Everything from cast to cr
 committed at the end. A failure - or "Stop run" (erp.migration_cancel on a running run, checked between steps) -
 rolls it back, so the company keeps exactly its previous raw rows, links and app rows; the run becomes failed
 (critical issue) or cancelled (info issue). Progress is written on a second connection, so it survives the rollback.
+Resumable mode (--resumable or MIG_RESUMABLE=1, used by the cloud worker): cast commits after every batch of tables
+and a re-run of the same run skips the tables already committed (sap._load_log of that run); only clean_02 to
+cross_check stay one transaction. A lost database connection re-queues the run by itself (MIG_MAX_AUTO_RESUME, 5).
+On failure the company keeps the raw rows loaded so far (fine for a first load of an empty company), not its old ones.
+The DSN is read from env DATABASE_URL (a password on the command line is visible to every process).
 Needs max_locks_per_transaction raised (about 38,000 locks for 3,656 links; see README).
 Only the run's company is touched: the loader replaces that company's rows; 02 is run for that company only;
 for kind 'full' the company's rows in tables missing from the export are removed. Links (04z/04) are global,
@@ -34,7 +39,7 @@ with an info issue; no data is touched.
 The DSN must be the database owner (postgres) on the direct connection or session pooler: the worker loads
 the sap schema and drops/adds links.
 """
-import argparse, csv, datetime, io, json, os, re, shutil, socket, sys, tarfile, tempfile, time, traceback, urllib.error, urllib.parse, urllib.request, uuid, zipfile
+import argparse, contextlib, csv, datetime, io, json, os, re, shutil, signal, socket, sys, tarfile, tempfile, time, traceback, urllib.error, urllib.parse, urllib.request, uuid, zipfile
 import psycopg
 from psycopg import sql
 
@@ -54,11 +59,27 @@ TX_STEPS = DATA_STEPS[2:]   # one database transaction: committed only after cro
 RUN_STATUS = {'validate': 'validating', 'stage': 'loading', 'cast': 'loading', 'clean_02': 'rebuilding', 'orphans_03': 'rebuilding',
               'links_04': 'rebuilding', 'real_keys': 'rebuilding', 'security_06': 'rebuilding', 'app_sync': 'rebuilding',
               'check_sync': 'checking', 'check_deleted': 'checking', 'cross_check': 'checking'}
+LOADED = ('loaded', 'count_mismatch', 'column_mismatch')   # sap._load_log statuses of a table whose rows are in
+MAX_AUTO_RESUME = int(os.environ.get('MIG_MAX_AUTO_RESUME', '5'))   # resumable: re-queue itself after a lost connection
 MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
 
 class StepError(Exception):
     pass
+
+
+class Terminated(BaseException):     # not an Exception: no 'except Exception' (tolerant parser...) swallows it
+    """SIGTERM (docker stop, systemctl restart, reboot): the run is re-queued (resumable) or failed, then the worker exits."""
+
+
+TERMINATING = False
+
+
+def _on_sigterm(signum, frame):
+    global TERMINATING
+    if not TERMINATING:
+        TERMINATING = True
+        raise Terminated('worker stopped (SIGTERM)')
 
 
 class StopRun(Exception):
@@ -362,6 +383,11 @@ class Run:
         self.orphan_links = set()
         self.loader = None
         self.plan = []
+        # Resumable mode (--resumable / MIG_RESUMABLE=1): cast commits after every batch and a re-run of the same run
+        # skips the tables already committed; only the steps after cast are one transaction. A lost connection then
+        # costs one batch, not the whole load. The company's previous raw rows are not kept on failure (first loads).
+        self.resumable = bool(getattr(args, 'resumable', False))
+        self.committed_tables = 0
 
     # --- bookkeeping
     def set_status(self, status, **kw):
@@ -372,7 +398,7 @@ class Run:
     def bk_ok(self):
         """Reconnect the progress session if a network drop closed it, so failures can still be recorded."""
         if self.bk.closed or self.bk.info.transaction_status == psycopg.pq.TransactionStatus.UNKNOWN:
-            self.bk = psycopg.connect(self.a.dsn, autocommit=True, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=6)
+            self.bk = connect(self.a.dsn)
         return self.bk
 
     def issue(self, severity, area, key, title, detail=None, table=None):
@@ -446,11 +472,16 @@ class Run:
             self.con.execute('select pg_advisory_lock(%s)', [LOCK_KEY])
             locked = True
             self.step('stage', self.s_stage)          # temp tables only: nothing of the company changes here
+            tx_steps = TX_STEPS
+            if self.resumable:                        # cast commits batch by batch; a re-run continues where it stopped
+                self.guard('cast')
+                self.step('cast', self.s_cast)
+                tx_steps = TX_STEPS[1:]
             # From here to cross_check everything is ONE transaction (links, raw rows, 02, 04, app sync, checks).
             self.con.autocommit = False
             self.in_tx = True
             self.con.execute('select 1')
-            for code in TX_STEPS:
+            for code in tx_steps:
                 self.guard(code)
                 self.step(code, getattr(self, 's_' + code))
             self.locks = self.con.execute('select count(*) from pg_locks where pid = pg_backend_pid()').fetchone()[0]
@@ -482,10 +513,20 @@ class Run:
             self.set_status('cancelled', finished_at=self.now())
             print('run %s: CANCELLED before %s - %s' % (self.run_id, e.args[0], note))
             return 'cancelled'
-        except Exception as e:
+        except (Exception, Terminated) as e:
             note = self.roll_back()
             self.bk_ok().execute("update erp.migration_step set status = 'skipped' where run_id = %s and status in ('pending', 'running')", [self.run_id])
             msg = str(e) if isinstance(e, StepError) else traceback.format_exc()[-1500:]
+            if self.resumable and connection_lost(e):
+                n = self.bk.execute("select count(*) from erp.migration_issue where run_id = %s and issue_key like 'auto\\_resume\\_%%'",
+                                    [self.run_id]).fetchone()[0]
+                if n < MAX_AUTO_RESUME:
+                    self.issue('warning', 'worker', 'auto_resume_%d' % (n + 1),
+                               '%s - run re-queued to resume (%d of %d)' % ('Worker stopped (SIGTERM)' if isinstance(e, Terminated) else 'Database connection lost',
+                                                                            n + 1, MAX_AUTO_RESUME), msg + ' ' + note)
+                    self.set_status('queued', started_at=None, finished_at=None)
+                    print('run %s: connection lost - re-queued to resume (%d/%d) - %s' % (self.run_id, n + 1, MAX_AUTO_RESUME, note), flush=True)
+                    return 'requeued'
             self.issue('critical', 'worker', 'run_failed', 'Run failed: ' + str(e)[:180], msg + ' ' + note)
             self.set_status('failed', finished_at=self.now())
             print('run %s: FAILED - %s %s' % (self.run_id, e, note))
@@ -498,12 +539,15 @@ class Run:
                 if locked:
                     try:
                         self.con.execute('select pg_advisory_unlock(%s)', [LOCK_KEY])
-                    except psycopg.Error:
+                    except Exception:
                         pass
 
     def roll_back(self):
         """Undo everything the run did to the database (raw rows, links, 02, app layer, checks)."""
+        kept = self.resume_note()
         if not self.in_tx:
+            if kept:
+                return kept
             return '%s was not changed (the run stopped before any company data was written).' % self.company
         self.in_tx = False
         try:
@@ -515,13 +559,27 @@ class Run:
                 self.con.close()
             except Exception:
                 pass
-            return '%s is exactly as before the run: the database connection was lost, so the server rolled the open transaction back (nothing was committed).' % self.company
+            return kept or '%s is exactly as before the run: the database connection was lost, so the server rolled the open transaction back (nothing was committed).' % self.company
         try:
             self.bk.execute("update erp.migration_step set message = concat_ws(' ', message, '[rolled back]') "
                             "where run_id = %s and code = any(%s) and status in ('ok', 'warning', 'failed')", [self.run_id, TX_STEPS])
         except psycopg.Error:
             pass
-        return '%s is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.' % self.company
+        return kept or '%s is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.' % self.company
+
+    def resume_note(self):
+        """Resumable mode: what stays committed after a failure or stop."""
+        if not self.resumable:
+            return None
+        try:
+            n, r = self.bk_ok().execute('select count(distinct table_name), coalesce(sum(rows_loaded), 0) from sap._load_log where run_id = %s and status = any(%s)',
+                                        [self.run_id, list(LOADED)]).fetchone()
+        except psycopg.Error:
+            return None
+        if not n:
+            return None
+        return ('Resumable mode: the raw rows of %d tables (%d rows) committed so far stay in %s, the app layer is unchanged and the '
+                'links dropped by 04z stay dropped until the run finishes. Re-queue this same run to continue where it stopped.' % (n, r, self.company))
 
     def drop_staging(self):
         """After any run (and after a failure): drop every _stg_* temp table this session still holds."""
@@ -531,7 +589,7 @@ class Run:
             for (t,) in self.con.execute("""select c.relname from pg_class c where c.relnamespace = pg_my_temp_schema()
                                               and c.relname like '\\_stg\\_%'""").fetchall():
                 self.con.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(t)))
-        except psycopg.Error:
+        except Exception:      # a connection left mid-COPY by a SIGTERM or a drop: the server drops temp tables anyway
             pass
 
     # --- database disk guard (Supabase cannot grow a disk more than once every 6 hours; a full disk turns the
@@ -702,30 +760,50 @@ class Run:
     def fk_names(self):
         return re.findall(r'^ALTER TABLE sap\."([^"]+)" DROP CONSTRAINT IF EXISTS "([^"]+)";$', self.script('04z_drop_foreign_keys.sql'), re.M)
 
+    def batch_tx(self):
+        """Resumable mode: every batch is its own committed transaction. Otherwise the batch runs inside the run's
+        single transaction (nothing to open here)."""
+        return self.con.transaction() if self.resumable else contextlib.nullcontext()
+
     def s_cast(self):
         con, ld = self.con, self.loader
+        done = {}
+        if self.resumable:
+            # tables committed by an earlier attempt of this same run (same upload) are not loaded again
+            done = {t: n or 0 for t, n in con.execute(
+                "select table_name, max(rows_loaded) from sap._load_log where run_id = %s and status = any(%s) group by 1",
+                [self.run_id, list(LOADED)]).fetchall()}
+            con.execute('delete from sap._load_log where run_id = %s and status <> all(%s)', [self.run_id, list(LOADED)])
         names = {c for _, c in self.fk_names()}
-        existing = con.execute("select count(*) from pg_constraint where contype = 'f' and connamespace = 'sap'::regnamespace and conname = any(%s)", [list(names)]).fetchone()[0]
-        if existing:      # BEGIN/COMMIT removed: the drop is part of the run's transaction
-            con.execute('\n'.join(l for l in self.script('04z_drop_foreign_keys.sql').splitlines() if l.strip().upper() not in ('BEGIN;', 'COMMIT;')))
-        for t, msg, loaded in self.skips:
-            ld.log(t, 'skipped', loaded=loaded, msg=msg)
-        removed = 0
-        if self.kind == 'full':      # the export is the whole company: clear its rows in every other table
-            keep = {n for n, _, _ in self.to_cast}
-            for t in sorted(self.company_tables - keep):
-                removed += con.execute(sql.SQL('delete from sap.{} where company_code = %s').format(sql.Identifier(t)), [self.company]).rowcount
-        rows, st, t0 = 0, {}, time.monotonic()
+        with self.batch_tx():
+            existing = con.execute("select count(*) from pg_constraint where contype = 'f' and connamespace = 'sap'::regnamespace and conname = any(%s)", [list(names)]).fetchone()[0]
+            if existing:      # BEGIN/COMMIT removed: the drop is part of the run's transaction (resumable: committed now)
+                con.execute('\n'.join(l for l in self.script('04z_drop_foreign_keys.sql').splitlines() if l.strip().upper() not in ('BEGIN;', 'COMMIT;')))
+            for t, msg, loaded in self.skips:
+                ld.log(t, 'skipped', loaded=loaded, msg=msg)
+            removed = 0
+            if self.kind == 'full':      # the export is the whole company: clear its rows in every other table
+                keep = {n for n, _, _ in self.to_cast}
+                for t in sorted(self.company_tables - keep):
+                    removed += con.execute(sql.SQL('delete from sap.{} where company_code = %s').format(sql.Identifier(t)), [self.company]).rowcount
+        todo = [x for x in self.to_cast if x[0] not in done]
+        if done:
+            print('  resume: %d of %d tables already loaded by an earlier attempt of this run (%d rows) - %d left'
+                  % (len(self.to_cast) - len(todo), len(self.to_cast), sum(done.values()), len(todo)), flush=True)
+        rows, st, t0 = sum(done.values()), ({'loaded earlier': len(self.to_cast) - len(todo)} if done else {}), time.monotonic()
         cr_rows = joined_rows = skipped_rows = 0
-        failed, total = [], len(self.to_cast)
+        failed, total = [], len(todo)
         nb = (total + BATCH - 1) // BATCH
         for b in range(nb):
-            batch = self.to_cast[b * BATCH:(b + 1) * BATCH]
+            batch = todo[b * BATCH:(b + 1) * BATCH]
             self.guard('cast')                      # a stop request is honoured between batches
             disk = self.disk_guard('batch %d/%d' % (b + 1, nb))
             bt, brows = time.monotonic(), 0
-            for name, cols, files in batch:
-                r = ld.load_table(name, cols, files)
+            results = []
+            with self.batch_tx():                   # resumable: committed here, so a later drop keeps this batch
+                for name, cols, files in batch:
+                    results.append((name, ld.load_table(name, cols, files)))
+            for name, r in results:
                 rows += r['rows']; brows += r['rows']
                 st[r['status']] = st.get(r['status'], 0) + 1
                 if r['status'] == 'failed':
@@ -741,6 +819,8 @@ class Run:
                     self.issue('warning', 'load', 'tolerant:' + name,
                                '%s: loaded with the tolerant parser - %d row(s) re-joined after a line break inside a field, %d row(s) skipped'
                                % (name, r['joined'], r['skipped']), r['error'], name)
+            if self.resumable:
+                self.committed_tables += len(results)
             done = min((b + 1) * BATCH, total)
             el = time.monotonic() - t0
             eta = el / done * (total - done) if done else 0
@@ -1007,6 +1087,29 @@ class Run:
                 r.read()
 
 
+def connect(dsn):
+    """An autocommit session without time limits. TCP keepalives: a long-idle COPY/INSERT session behind the pooler is
+    kept open and a dead link is noticed in about a minute."""
+    c = psycopg.connect(dsn, autocommit=True, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=6)
+    c.execute('set statement_timeout = 0')
+    c.execute('set idle_in_transaction_session_timeout = 0')
+    return c
+
+
+def connection_lost(e):
+    """True when the exception (or one it was raised from) is a lost database connection, not a data problem."""
+    seen = set()
+    while e is not None and id(e) not in seen:
+        seen.add(id(e))
+        if isinstance(e, Terminated):
+            return True
+        if isinstance(e, (psycopg.OperationalError, psycopg.InterfaceError)) and \
+                not isinstance(e, (psycopg.errors.DiskFull, psycopg.errors.OutOfMemory, psycopg.errors.QueryCanceled)):
+            return True
+        e = e.__cause__ or e.__context__
+    return False
+
+
 def claim(con, run_id=None):
     """Take one queued run (or the given one). Returns its run_id or None."""
     with con.transaction():
@@ -1038,7 +1141,12 @@ def process(con, bk, run_id, a):
         st = getattr(storage_download, 'stats', {})
         print('downloaded %d objects from %s/%s (%d downloaded, %d reused from %s)' % (
             n, BUCKET, run.prefix, st.get('downloaded', 0), st.get('reused', 0), cache), flush=True)
-    except Exception as e:
+    except (Exception, Terminated) as e:
+        shutil.rmtree(work, ignore_errors=True)
+        if isinstance(e, Terminated) and run.resumable:
+            run.set_status('queued', started_at=None, finished_at=None)
+            print('run %s: worker stopped during the download - re-queued' % run_id, flush=True)
+            return 'requeued'
         run.init_steps(DATA_STEPS)
         run.bk.execute("update erp.migration_step set status = 'failed', message = %s where run_id = %s and code = 'validate'", ['download: %s' % e, run_id])
         run.issue('critical', 'worker', 'download', 'Could not download the upload from Storage', str(e))
@@ -1059,7 +1167,9 @@ def process(con, bk, run_id, a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--dsn', required=True, help='database owner connection (direct or session pooler)')
+    ap.add_argument('--dsn', default=os.environ.get('DATABASE_URL'),
+                    help='database owner connection (direct or session pooler). Default: env DATABASE_URL - prefer that, '
+                         'a password on the command line is visible to every process on the machine')
     ap.add_argument('--source', choices=['local', 'storage'], default='storage')
     ap.add_argument('--folder', help='--source local: folder holding the upload')
     ap.add_argument('--run', help='process this run once')
@@ -1070,6 +1180,9 @@ def main():
     ap.add_argument('--interval', type=int, default=30, help='seconds between polls')
     ap.add_argument('--scripts', help='folder of 02/03/04/04z/06 (default: next to this file)')
     ap.add_argument('--workdir', help='--source storage: where downloads go (default: system temp)')
+    ap.add_argument('--resumable', action='store_true', default=os.environ.get('MIG_RESUMABLE') == '1',
+                    help='commit after every cast batch; a re-run of the same run skips the tables already loaded, and a lost '
+                         'connection re-queues the run by itself (env MIG_RESUMABLE=1)')
     ap.add_argument('--keep', action='store_true', help='--source storage: keep the downloaded files after the run')
     ap.add_argument('--attachments-root', help='A12: the SAP attachments folder (mounted read only); without it the attachments step is skipped')
     ap.add_argument('--attachments-map', action='append', metavar='SAP_PREFIX=LOCAL_DIR',
@@ -1077,12 +1190,10 @@ def main():
     ap.add_argument('--attachments-dest', default='storage', help="'storage' (bucket attachments) or local:<dir> for tests")
     ap.add_argument('--attachments-only', metavar='RUN', help='copy the attachments of an existing run again (no reload)')
     a = ap.parse_args()
-    # TCP keepalives: a long-idle COPY/INSERT session behind the pooler is kept open and a dead link is noticed in ~1 min
-    ka = dict(keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=6)
-    with psycopg.connect(a.dsn, autocommit=True, **ka) as con, psycopg.connect(a.dsn, autocommit=True, **ka) as bk:
-        for c in (con, bk):
-            c.execute('set statement_timeout = 0')
-            c.execute('set idle_in_transaction_session_timeout = 0')
+    if not a.dsn:
+        ap.error('set DATABASE_URL in the environment (or pass --dsn)')
+    con, bk = connect(a.dsn), connect(a.dsn)
+    with con, bk:
         if a.attachments_only:
             run = Run(con, bk, a.attachments_only, a)
             st = run.attachments_step()
@@ -1097,8 +1208,20 @@ def main():
             rid = claim(con, a.run)
             st = process(con, bk, rid, a)
             print(rid, st)
-            sys.exit({'failed': 2, 'cancelled': 3}.get(st, 0))
-        while True:
+            sys.exit({'failed': 2, 'cancelled': 3, 'requeued': 4}.get(st, 0))
+    # poll loop: a lost connection (network drop) is reopened instead of ending the worker; a resumable run that lost
+    # its connection has re-queued itself and is claimed again here
+    signal.signal(signal.SIGTERM, _on_sigterm)
+    con = bk = None
+    while True:
+        if TERMINATING:
+            print('worker stopped (SIGTERM)', flush=True)
+            return
+        try:
+            if con is None or con.closed or con.broken:
+                con = connect(a.dsn)
+            if bk is None or bk.closed or bk.broken:
+                bk = connect(a.dsn)
             rid = claim(con)
             if rid:
                 process(con, bk, rid, a)
@@ -1107,6 +1230,18 @@ def main():
                 return
             else:
                 time.sleep(a.interval)
+        except (psycopg.OperationalError, psycopg.InterfaceError) as e:
+            print('database connection lost (%s) - reconnecting in 30 s' % str(e).strip().splitlines()[0][:200], flush=True)
+            for c in (con, bk):
+                try:
+                    c and c.close()
+                except Exception:
+                    pass
+            con = bk = None
+            time.sleep(30)
+        except Terminated:
+            print('worker stopped (SIGTERM) while idle', flush=True)
+            return
 
 
 if __name__ == '__main__':

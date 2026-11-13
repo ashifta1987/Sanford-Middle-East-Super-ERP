@@ -5,13 +5,16 @@
 #   docker build -f worker/Dockerfile -t sanford-migration-worker .
 # Run (the 02/03/04/04z/06 scripts from the sanford-db-install package are mounted at /opt/sanford/sql):
 #   docker run -d --name sanford-worker --restart unless-stopped \
-#     -e DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres" \
+#     -e DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres" \
 #     -e SUPABASE_URL="https://<ref>.supabase.co" -e SUPABASE_SERVICE_ROLE_KEY="<secret key>" \
 #     -v /opt/sanford/sql:/opt/sanford/sql:ro sanford-migration-worker
 
 FROM python:3.11-slim
 
+# MIG_RESUMABLE=1: cast commits after every batch of 50 tables and a re-run continues where it stopped; a lost
+# connection re-queues the run by itself.
 ENV PYTHONUNBUFFERED=1 \
+    MIG_RESUMABLE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
@@ -26,6 +29,6 @@ COPY supabase/worker/ /app/
 USER worker
 WORKDIR /work
 
-# Logs go to stdout. DATABASE_URL must be the DIRECT session connection (port 5432), not the transaction pooler:
-# a run is one long transaction.
-CMD ["sh", "-c", "exec python /app/migration_worker.py --dsn \"$DATABASE_URL\" --source storage --poll --scripts /opt/sanford/sql --workdir /work"]
+# Logs go to stdout. DATABASE_URL (session pooler or direct connection, port 5432 - not the transaction pooler) is read
+# from the environment, never put on the command line, where every process on the machine could read the password.
+CMD ["python", "/app/migration_worker.py", "--source", "storage", "--poll", "--scripts", "/opt/sanford/sql", "--workdir", "/work"]

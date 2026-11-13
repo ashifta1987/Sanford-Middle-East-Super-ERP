@@ -3,7 +3,7 @@
 # Use as "User data" when launching the server:
 #   AWS EC2 · Region: Asia Pacific (Mumbai) ap-south-1 (same region as the Supabase project)
 #   AMI: Ubuntu Server 24.04 LTS · Type: t3.large (2 vCPU, 8 GB) · Disk: 100 GB gp3 · No inbound ports needed
-# Fill the three values below before launching. Nothing else to do: the worker starts on boot and restarts itself.
+# Fill <DB-PASSWORD> and <SUPABASE-SECRET-KEY> below before launching (SUPABASE_ACCESS_TOKEN is optional). Nothing else to do: the worker starts on boot and restarts itself.
 
 write_files:
   - path: /etc/sanford/worker.env
@@ -12,6 +12,10 @@ write_files:
       DATABASE_URL=postgresql://postgres.xhsfkbbcejgwvqxpqdgq:<DB-PASSWORD>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
       SUPABASE_URL=https://xhsfkbbcejgwvqxpqdgq.supabase.co
       SUPABASE_SERVICE_ROLE_KEY=<SUPABASE-SECRET-KEY>
+      MIG_RESUMABLE=1
+      # Optional: a Supabase personal access token lets the worker watch the database disk and stop before it is full.
+      # Create a dedicated one and revoke it after the load. Leave the line out to run without the disk guard.
+      # SUPABASE_ACCESS_TOKEN=<SUPABASE-ACCESS-TOKEN>
 
   - path: /opt/sanford/fetch-scripts.sh
     permissions: '0755'
@@ -36,7 +40,7 @@ write_files:
       [Service]
       ExecStartPre=/opt/sanford/fetch-scripts.sh
       ExecStartPre=-/usr/bin/docker rm -f sanford-worker
-      ExecStart=/usr/bin/docker run --name sanford-worker --env-file /etc/sanford/worker.env \
+      ExecStart=/usr/bin/docker run --name sanford-worker --hostname sanford-ec2 --env-file /etc/sanford/worker.env \
         -v /opt/sanford/sql:/opt/sanford/sql:ro -v /opt/sanford/work:/work sanford-migration-worker
       ExecStop=/usr/bin/docker stop -t 30 sanford-worker
       Restart=always

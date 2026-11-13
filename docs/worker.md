@@ -16,7 +16,9 @@ the Supabase project (`xhsfkbbcejgwvqxpqdgq`). It never runs on Vercel or in the
 ## Environment
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | **Direct session connection** (`db.<ref>.supabase.co:5432`), not the transaction pooler — a run is one long transaction |
+| `DATABASE_URL` | **Session pooler** (`postgres.<ref>@aws-0-ap-south-1.pooler.supabase.com:5432`, works over IPv4) or the direct connection — not the transaction pooler (6543). Read from the environment; never pass the password with `--dsn` (every process could read it) |
+| `MIG_RESUMABLE` | `1` on the cloud worker (set in the Docker image): resumable mode, see below |
+| `SUPABASE_ACCESS_TOKEN` | optional: lets the worker watch the database disk and stop before it is full |
 | `SUPABASE_URL` | `https://xhsfkbbcejgwvqxpqdgq.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | the secret key — only on this server |
 
@@ -43,7 +45,7 @@ After=network-online.target
 User=sanford
 EnvironmentFile=/etc/sanford/worker.env
 WorkingDirectory=/opt/sanford
-ExecStart=/usr/bin/python3 /opt/sanford/worker/migration_worker.py --dsn ${DATABASE_URL} --source storage --poll --scripts /opt/sanford/sql
+ExecStart=/usr/bin/python3 /opt/sanford/worker/migration_worker.py --resumable --source storage --poll --scripts /opt/sanford/sql
 Restart=always
 RestartSec=10
 
@@ -54,6 +56,15 @@ WantedBy=multi-user.target
 
 ## Before the first real load
 - `max_locks_per_transaction` raised (see `docs/setup.md`), otherwise the rebuild fails with "out of shared memory".
+## Resumable mode (`--resumable` / `MIG_RESUMABLE=1`)
+- **cast** commits after every batch of 50 tables (`MIG_BATCH`). A re-run of the **same run** skips the tables already
+  committed (read from `sap._load_log` of that run) and continues with the rest; `clean_02` → `cross_check` stay one transaction.
+- A lost database connection, or a SIGTERM (`docker stop`, `update.sh`, reboot), **re-queues the run by itself**
+  (warning issue `auto_resume_N`, at most `MIG_MAX_AUTO_RESUME` = 5); the poll loop reconnects and continues.
+- Trade-off: after a failure the company keeps the raw rows loaded so far (not its previous ones), and the links dropped by
+  04z stay dropped until the run finishes. Fine for the first load of an empty company; for a reload of a live company
+  run without `--resumable` (all-or-nothing).
+
 - One rebuild runs at a time (advisory lock). If the worker process dies, Postgres rolls the company back; the run stays
   in its running status — press **Stop run** in B7 (or re-queue).
 

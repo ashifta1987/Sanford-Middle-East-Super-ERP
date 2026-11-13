@@ -12,14 +12,16 @@
 1. AWS console → region **Asia Pacific (Mumbai)** → EC2 → **Launch instance**.
 2. Ubuntu Server 24.04 LTS · `t3.large` · 100 GB gp3 · security group with **no inbound rules** (the worker only connects out).
 3. *Advanced details → User data*: paste [`worker/cloud-init.yaml`](../worker/cloud-init.yaml) after filling `<DB-PASSWORD>` and `<SUPABASE-SECRET-KEY>`.
-4. Launch. After ~5 minutes the worker is polling; check with *EC2 → Connect → Session Manager*: `sudo journalctl -u sanford-worker -f`.
+4. Launch. After ~5 minutes the worker is polling; check with *EC2 → Connect → Session Manager*: `sudo journalctl -u sanford-worker -f`
+   (Session Manager needs an IAM instance profile with `AmazonSSMManagedInstanceCore`; progress is also visible in the migration console).
+   The cloud worker runs in **resumable mode** (see [worker.md](worker.md)): a dropped connection costs one batch, not the load.
 5. Update later: `sudo /opt/sanford/update.sh`.
 
 The scripts the worker needs from the IT package (02, 03, 04, 04z, 06) are kept in the **private** Storage bucket `worker-assets`
 (readable only with the secret key) and fetched on every start.
 
 ## Database setting still required
-`max_locks_per_transaction` must be **2048** before a real load (now 64). Needs a Supabase access token
+`max_locks_per_transaction` must be **2048** before a real load (set to 2048 on 12 Nov). Needs a Supabase access token
 (`SUPABASE_ACCESS_TOKEN` in `.env.db`) or `npx supabase login` + `npx supabase postgres-config update --config max_locks_per_transaction=2048 --project-ref xhsfkbbcejgwvqxpqdgq --experimental`.
 
 ## Moving later (if data must stay in the UAE / KSA)

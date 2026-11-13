@@ -255,11 +255,11 @@ DECLARE n bigint;
 BEGIN
   -- U_ConsolidateMasterCode ties the same product together across the 12 companies.
   INSERT INTO erp.group_item (master_item_code, name, category, subcategory)
-  SELECT DISTINCT ON (k) k, s."ItemName", s."U_Category", s."U_SubCategory"
+  SELECT DISTINCT ON (k) k, coalesce(nullif(s."ItemName", ''), k), s."U_Category", s."U_SubCategory"
     FROM (SELECT coalesce(nullif(trim("U_ConsolidateMasterCode"), ''), nullif(trim("U_MasterItemCode"), '')) AS k, *
             FROM sap."OITM" WHERE company_code = p_company) s
    WHERE k IS NOT NULL
-   ORDER BY k, s."ItemCode"
+   ORDER BY k, (nullif(s."ItemName", '') IS NULL), s."ItemCode"   -- prefer an item with a name; else the master code (AE05 SF4316EL)
   ON CONFLICT (master_item_code) DO NOTHING;
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;

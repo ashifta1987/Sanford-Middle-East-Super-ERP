@@ -958,9 +958,43 @@ class Run:
             raise StepError('raw layer still open: %d tables without RLS, API roles have schema usage: %s' % (open_, exposed))
         return ('ok', total, ran + '%d raw tables with RLS, sap schema closed to anon/authenticated' % total)
 
+    def sync_stepwise(self):
+        """Same as erp.migration_sync_company (inside the run's transaction), step by step, plus ANALYZE of the tables a big
+        step just filled: the app tables' statistics still describe them before this company was synced, and with those the
+        per-row lookups of the next steps (foreign keys, sync triggers) pick a non-unique index and read every document of the
+        type for each line - about 700 lines/s on AE05 instead of tens of thousands."""
+        con = self.con
+        src = con.execute("select prosrc from pg_proc where oid = 'erp.sync_company(varchar)'::regprocedure").fetchone()[0]
+        steps = re.findall(r'erp\.(sync_[a-z0-9_]+)\(p_company\)', src)
+        con.execute("select set_config('erp.sync', 'on', true)")
+        con.execute("""insert into erp.company (company_code, legal_name, short_name, country, currency, licence_type, sap_schema)
+                       select c.company_code, c.legal_name, c.legal_name, c.country, c.currency, c.licence_type, c.sap_schema
+                         from sap._company c where c.company_code = %s
+                       on conflict (company_code) do update set legal_name = excluded.legal_name, country = excluded.country,
+                            currency = excluded.currency, licence_type = excluded.licence_type, sap_schema = excluded.sap_schema""", [self.company])
+        t0, analyzed = time.monotonic(), 0
+        for i, f in enumerate(steps, 1):
+            started = con.execute('select clock_timestamp()').fetchone()[0]
+            t = time.monotonic()
+            n = con.execute(sql.SQL('select erp.{}(%s)').format(sql.Identifier(f)), [self.company]).fetchone()[0]
+            con.execute('insert into erp.sync_log (company_code, step, rows_written, started_at) values (%s, %s, %s, %s)', [self.company, f, n, started])
+            if (n or 0) >= 5000:
+                body = con.execute('select prosrc from pg_proc where oid = (%s)::regproc', ['erp.' + f]).fetchone()[0]
+                for tbl in dict.fromkeys(re.findall(r'INSERT INTO erp\.(\w+)', body, re.I)):
+                    con.execute(sql.SQL('analyze erp.{}').format(sql.Identifier(tbl)))
+                    analyzed += 1
+            print('  sync %2d/%d %-36s rows %9s %6.1fs' % (i, len(steps), f, n, time.monotonic() - t), flush=True)
+            self.bk.execute("update erp.migration_step set message = %s where run_id = %s and code = 'app_sync'",
+                            ['step %d/%d: %s (%d min so far)' % (i, len(steps), f, (time.monotonic() - t0) // 60), self.run_id])
+        con.execute("select set_config('erp.sync', 'off', true)")
+        return analyzed
+
     def s_app_sync(self):
         before = self.con.execute('select coalesce(max(sync_id), 0) from erp.sync_log').fetchone()[0]
-        self.con.execute('select erp.migration_sync_company(%s)', [self.company])   # all sync steps inside the run's transaction
+        if os.environ.get('MIG_SYNC_STEPWISE', '1') == '1':
+            self.sync_stepwise()                     # all sync steps inside the run's transaction, statistics kept fresh
+        else:
+            self.con.execute('select erp.migration_sync_company(%s)', [self.company])   # all sync steps inside the run's transaction
         n, steps, err = self.con.execute('select coalesce(sum(rows_written), 0), count(*), string_agg(error, \'; \') from erp.sync_log where company_code = %s and sync_id > %s',
                                          [self.company, before]).fetchone()
         if err:

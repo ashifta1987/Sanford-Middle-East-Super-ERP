@@ -830,6 +830,12 @@ class Run:
             self.bk.execute("update erp.migration_step set rows = %s, message = %s where run_id = %s and code = 'cast'",
                             [rows, 'batch %d/%d: %d of %d tables, %d rows, %d failed' % (b + 1, nb, done, total, rows, len(failed)), self.run_id])
         self.cr_rows, self.joined_rows, self.skipped_rows = cr_rows, joined_rows, skipped_rows
+        if self.resumable:      # 'could not be loaded' issues of earlier attempts for tables that are loaded now
+            self.bk.execute("""update erp.migration_issue i set status = 'fixed', resolved_at = now(),
+                                     note = concat_ws(' ', i.note, '[loaded by a later attempt of this run]')
+                                where i.run_id = %s and i.status = 'open' and i.issue_key like 'table\\_failed:%%'
+                                  and exists (select 1 from sap._load_log l where l.run_id = i.run_id and l.table_name = i.table_name
+                                                 and l.status = any(%s))""", [self.run_id, list(LOADED)])
         msg = '%s; %d CR kept in values, %d rows re-joined, %d rows skipped (tolerant parser); %d links dropped (04z); %d stale rows removed; stage %.0fs, cast %.0fs' % (
             ', '.join('%d %s' % (v, k) for k, v in sorted(st.items())), cr_rows, joined_rows, skipped_rows, existing, removed, ld.stage_seconds, ld.cast_seconds)
         if failed:

@@ -63,21 +63,42 @@ def export_tables(root):
         yield name, cols, [os.path.join(folder, f) for f in files]
 
 
+def csv_rows(path):
+    """Rows of a 05 query export as dicts with upper-case keys. Reads the plain comma CSV and also what HANA Studio saves
+    from its result grid: ';' separated, values padded with spaces, an unnamed row-number column in front."""
+    with open(path, newline='', encoding='utf-8-sig', errors='replace') as fh:
+        first = fh.readline()
+        fh.seek(0)
+        delim = ';' if first.count(';') > first.count(',') else ','
+        rd = csv.reader(fh, delimiter=delim)
+        head = [h.strip().upper() for h in next(rd, [])]
+        for r in rd:
+            vals = [v.strip() for v in r]
+            if not any(vals):
+                continue
+            yield {h: (vals[i] if i < len(vals) else '') for i, h in enumerate(head) if h}
+
+
+def csv_int(v):
+    """'1,234' / '1 234' / '12.0' -> int (HANA Studio formats numbers with thousands separators)."""
+    return int(float(re.sub(r'[,\s]', '', v or '0') or 0))
+
+
 def read_counts(path):
     expected = {}
     if path:
-        with open(path, newline='', encoding='utf-8-sig') as fh:
-            for r in csv.DictReader(fh):
-                expected[r['TABLE_NAME']] = int(float(r['RECORD_COUNT']))
+        for r in csv_rows(path):
+            if r.get('TABLE_NAME'):
+                expected[r['TABLE_NAME']] = csv_int(r['RECORD_COUNT'])
     return expected
 
 
 def read_columns(path):
     order = defaultdict(list)
     if path:
-        with open(path, newline='', encoding='utf-8-sig') as fh:
-            for r in csv.DictReader(fh):
-                order[r['TABLE_NAME']].append((int(float(r['POSITION'])), r['COLUMN_NAME']))
+        for r in csv_rows(path):
+            if r.get('TABLE_NAME'):
+                order[r['TABLE_NAME']].append((csv_int(r['POSITION']), r['COLUMN_NAME']))
     return order
 
 

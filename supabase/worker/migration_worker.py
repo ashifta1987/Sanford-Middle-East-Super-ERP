@@ -339,16 +339,19 @@ def _link_or_copy(src, dst):
 def sniff_csv(path):
     try:
         with open(path, newline='', encoding='utf-8-sig', errors='replace') as fh:
-            head = next(csv.reader(fh), [])
+            first = fh.readline()
+            fh.seek(0)
+            # HANA Studio saves its result grid ';' separated with an unnamed row-number column in front
+            head = next(csv.reader(fh, delimiter=';' if first.count(';') > first.count(',') else ','), [])
     except Exception:
         return 'other'
     h = {_norm(x) for x in head}
     if {'tablename', 'recordcount'} <= h:
         return 'row_counts_csv'
+    if {'tablename', 'constraintname', 'columnname'} <= h:     # before columns: it has POSITION too
+        return 'constraints_csv'
     if {'tablename', 'position', 'columnname'} <= h:
         return 'columns_csv'
-    if {'tablename', 'constraintname', 'columnname'} <= h:
-        return 'constraints_csv'
     if struct_header(head):
         return 'structure_csv'
     return 'other'
@@ -923,10 +926,9 @@ class Run:
         if not files:
             return ('skipped', None, 'no constraints.csv (05 query 2) in the upload')
         real = {}
-        with open(files[0], newline='', encoding='utf-8-sig') as fh:
-            for r in csv.DictReader(fh):
-                if r['IS_PRIMARY_KEY'].upper() == 'TRUE':
-                    real.setdefault(r['TABLE_NAME'], []).append((int(float(r['POSITION'])), r['COLUMN_NAME']))
+        for r in load_company.csv_rows(files[0]):
+            if r.get('TABLE_NAME') and r.get('IS_PRIMARY_KEY', '').upper() == 'TRUE':
+                real.setdefault(r['TABLE_NAME'], []).append((load_company.csv_int(r['POSITION']), r['COLUMN_NAME']))
         cur = {}
         for t, cols in self.con.execute("""select c.relname, array_agg(a.attname order by k.ord) from pg_constraint x join pg_class c on c.oid = x.conrelid
                                              cross join unnest(x.conkey) with ordinality k(att, ord) join pg_attribute a on a.attrelid = c.oid and a.attnum = k.att

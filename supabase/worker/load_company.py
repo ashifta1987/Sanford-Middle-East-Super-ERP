@@ -125,6 +125,7 @@ class Loader:
             raise SystemExit('company %s is not in sap._company - add it first' % company)
         self.coltypes = sap_coltypes(con)
         self.staged = {}          # table -> (temp table name, rows)
+        self.columns_ignored = []   # tables whose columns.csv entry did not match create.sql
         self.stage_seconds = self.cast_seconds = 0.0
 
     def plan(self):
@@ -133,7 +134,15 @@ class Loader:
         for name, ddl_cols, files in export_tables(self.export):
             if self.only and name not in self.only:
                 continue
-            cols = [c for _, c in sorted(self.order[name])] if self.order.get(name) else ddl_cols
+            cols = ddl_cols
+            if self.order.get(name):
+                listed = [c for _, c in sorted(self.order[name])]
+                # columns.csv only decides the order when it lists exactly the table's columns: a HANA Studio export cut
+                # at 1,000 rows can end in the middle of a table
+                if set(listed) == set(ddl_cols) or not ddl_cols:
+                    cols = listed
+                else:
+                    self.columns_ignored.append(name)
             out.append((name, cols, files))
         return out
 

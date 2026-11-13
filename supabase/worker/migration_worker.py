@@ -697,6 +697,12 @@ class Run:
         first = lambda k: self.files[k][0] if self.files.get(k) else None
         self.loader = load_company.Loader(con, self.company, self.root, first('columns_csv'), first('row_counts_csv'), run_id=self.run_id)
         self.plan = self.loader.plan()
+        if self.loader.columns_ignored:
+            self.issue('info', 'load', 'columns_csv_partial', 'columns.csv does not match create.sql for %d table(s) - their create.sql order was used'
+                       % len(self.loader.columns_ignored), 'Usually a HANA Studio export cut at 1,000 rows. Tables: ' + ', '.join(self.loader.columns_ignored[:40]))
+        if self.files.get('row_counts_csv') and len(self.loader.expected) in (1000, 5000, 10000):
+            self.issue('warning', 'load', 'row_counts_partial', 'row_counts.csv has exactly %d tables - probably cut by HANA Studio' % len(self.loader.expected),
+                       'Export query 4 again with no row limit; tables after the cut are not checked against SAP counts.')
         notes.insert(0, '%d files, %d tables with data' % (len(recs), len(self.plan)))
         return ('ok', len(recs), '; '.join(notes))
 

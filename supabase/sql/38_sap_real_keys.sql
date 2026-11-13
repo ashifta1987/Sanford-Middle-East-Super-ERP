@@ -1,5 +1,5 @@
 -- sap tables whose primary key was stricter than SAP's (approved 13 Nov 2026): SAP key from the HANA export create.sql.
--- No link (04_foreign_keys.sql) references these tables. Applied to xhsfkbbcejgwvqxpqdgq by the migration team.
+-- One link references one of these tables: ukd1_keyid_fkey (UKD1 -> OUKD), updated in 04_foreign_keys.sql to (company_code, TableName, KeyId). Applied to xhsfkbbcejgwvqxpqdgq by the migration team.
 -- ADG1: was (company_code, AbsEntry, LogInstanc)
 alter table sap."ADG1" drop constraint "adg1_pkey", add constraint "adg1_pkey" primary key (company_code, "AbsEntry", "ObjType", "ObjKey", "LogInstanc");
 -- ADOC: was (company_code, DocEntry, LogInstanc)

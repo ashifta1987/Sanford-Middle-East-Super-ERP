@@ -51,7 +51,7 @@ BEGIN
   INSERT INTO erp.cost_centre AS t (company_code, code, name, dimension, active)
   SELECT s.company_code AS company_code,
          s."PrcCode" AS code,
-         s."PrcName" AS name,
+         coalesce(nullif(s."PrcName", ''), s."PrcCode") AS name,   -- SAP allows a cost centre without a name (AE05 ABUDHABI)
          s."DimCode"::smallint AS dimension,
          (coalesce(s."Active", 'Y') = 'Y') AS active
     FROM sap."OPRC" s
@@ -68,7 +68,7 @@ BEGIN
   SELECT s.company_code AS company_code,
          s."Code" AS code,
          s."Name" AS name,
-         s."Rate" AS rate,
+         coalesce(s."Rate", 0) AS rate,   -- SAP allows a tax group without a rate (AE05 VATIn); reported by the worker
          s."Category" AS category,
          (coalesce(s."Inactive", 'N') <> 'Y') AS active
     FROM sap."OVTG" s

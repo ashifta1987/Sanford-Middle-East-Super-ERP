@@ -1096,6 +1096,17 @@ def connect(dsn):
     return c
 
 
+def recover_own_runs(bk):
+    """Resumable: a run this worker process was running when the database went away (restart, compute upgrade) and could
+    not be re-queued at the time is re-queued once the connection is back, so it resumes instead of staying 'loading'."""
+    me = '%s:%d' % (socket.gethostname(), os.getpid())
+    for (rid,) in bk.execute("""update erp.migration_run set status = 'queued', started_at = null, finished_at = null
+                                 where worker = %s and status in ('validating', 'loading', 'rebuilding', 'checking')
+                             returning run_id""", [me]).fetchall():
+        bk.execute("update erp.migration_step set status = 'skipped', message = 'connection lost - re-queued' where run_id = %s and status = 'running'", [rid])
+        print('run %s: re-queued after the database connection came back' % rid, flush=True)
+
+
 def connection_lost(e):
     """True when the exception (or one it was raised from) is a lost database connection, not a data problem."""
     seen = set()
@@ -1222,6 +1233,8 @@ def main():
                 con = connect(a.dsn)
             if bk is None or bk.closed or bk.broken:
                 bk = connect(a.dsn)
+            if a.resumable:
+                recover_own_runs(bk)
             rid = claim(con)
             if rid:
                 process(con, bk, rid, a)

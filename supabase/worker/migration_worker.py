@@ -366,11 +366,17 @@ class Run:
     # --- bookkeeping
     def set_status(self, status, **kw):
         sets = [sql.SQL('status = %s')] + [sql.SQL('{} = %s').format(sql.Identifier(k)) for k in kw]
-        self.bk.execute(sql.SQL('update erp.migration_run set {} where run_id = %s').format(sql.SQL(', ').join(sets)),
+        self.bk_ok().execute(sql.SQL('update erp.migration_run set {} where run_id = %s').format(sql.SQL(', ').join(sets)),
                          [status, *kw.values(), self.run_id])
 
+    def bk_ok(self):
+        """Reconnect the progress session if a network drop closed it, so failures can still be recorded."""
+        if self.bk.closed or self.bk.info.transaction_status == psycopg.pq.TransactionStatus.UNKNOWN:
+            self.bk = psycopg.connect(self.a.dsn, autocommit=True, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=6)
+        return self.bk
+
     def issue(self, severity, area, key, title, detail=None, table=None):
-        self.bk.execute('select erp.migration_add_issue(%s,%s,%s,%s,%s,%s,%s,%s)',
+        self.bk_ok().execute('select erp.migration_add_issue(%s,%s,%s,%s,%s,%s,%s,%s)',
                          [self.run_id, self.company, severity, area, key, title, detail, table])
 
     def check(self, area, name, sap=None, raw=None, app=None, ok=True, detail=None):
@@ -478,7 +484,7 @@ class Run:
             return 'cancelled'
         except Exception as e:
             note = self.roll_back()
-            self.bk.execute("update erp.migration_step set status = 'skipped' where run_id = %s and status in ('pending', 'running')", [self.run_id])
+            self.bk_ok().execute("update erp.migration_step set status = 'skipped' where run_id = %s and status in ('pending', 'running')", [self.run_id])
             msg = str(e) if isinstance(e, StepError) else traceback.format_exc()[-1500:]
             self.issue('critical', 'worker', 'run_failed', 'Run failed: ' + str(e)[:180], msg + ' ' + note)
             self.set_status('failed', finished_at=self.now())
@@ -487,19 +493,34 @@ class Run:
         finally:
             if self.in_tx:
                 self.roll_back()
-            self.drop_staging()
-            if locked:
-                self.con.execute('select pg_advisory_unlock(%s)', [LOCK_KEY])
+            if not self.con.closed:
+                self.drop_staging()
+                if locked:
+                    try:
+                        self.con.execute('select pg_advisory_unlock(%s)', [LOCK_KEY])
+                    except psycopg.Error:
+                        pass
 
     def roll_back(self):
         """Undo everything the run did to the database (raw rows, links, 02, app layer, checks)."""
         if not self.in_tx:
             return '%s was not changed (the run stopped before any company data was written).' % self.company
-        self.con.rollback()
-        self.con.autocommit = True
         self.in_tx = False
-        self.bk.execute("update erp.migration_step set message = concat_ws(' ', message, '[rolled back]') "
-                        "where run_id = %s and code = any(%s) and status in ('ok', 'warning', 'failed')", [self.run_id, TX_STEPS])
+        try:
+            self.con.rollback()
+            self.con.autocommit = True
+        except (psycopg.ProgrammingError, psycopg.OperationalError, psycopg.InterfaceError):
+            # the data connection is gone (network drop): the server rolls the open transaction back by itself
+            try:
+                self.con.close()
+            except Exception:
+                pass
+            return '%s is exactly as before the run: the database connection was lost, so the server rolled the open transaction back (nothing was committed).' % self.company
+        try:
+            self.bk.execute("update erp.migration_step set message = concat_ws(' ', message, '[rolled back]') "
+                            "where run_id = %s and code = any(%s) and status in ('ok', 'warning', 'failed')", [self.run_id, TX_STEPS])
+        except psycopg.Error:
+            pass
         return '%s is exactly as before the run: the transaction holding its new rows, links and app sync was rolled back.' % self.company
 
     def drop_staging(self):

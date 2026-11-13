@@ -783,6 +783,10 @@ class Run:
                 "select table_name, max(rows_loaded) from sap._load_log where run_id = %s and status = any(%s) group by 1",
                 [self.run_id, list(LOADED)]).fetchall()}
             con.execute('delete from sap._load_log where run_id = %s and status <> all(%s)', [self.run_id, list(LOADED)])
+            if done and ld.expected:    # a row_counts.csv added after those tables were loaded: compare them too
+                with con.cursor() as cur:
+                    cur.executemany('update sap._load_log set rows_expected = %s where run_id = %s and table_name = %s and status = any(%s)',
+                                    [(ld.expected[t], self.run_id, t, list(LOADED)) for t in done if t in ld.expected])
         names = {c for _, c in self.fk_names()}
         with self.batch_tx():
             existing = con.execute("select count(*) from pg_constraint where contype = 'f' and connamespace = 'sap'::regnamespace and conname = any(%s)", [list(names)]).fetchone()[0]

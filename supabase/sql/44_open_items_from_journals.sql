@@ -55,7 +55,7 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
   WITH k AS (SELECT CASE WHEN 13 = ANY (p_objs) THEN 'customer' ELSE 'supplier' END AS kind, CASE WHEN 13 = ANY (p_objs) THEN 1 ELSE -1 END AS sgn),
   o AS (
     -- SAP history: open part of the partner's journal lines (as SAP's own aging)
-    SELECT l.short_name AS cc, bp.name AS cn, round(k.sgn * l.bal_due, 2) AS amt,
+    SELECT l.short_name AS cc, bp.name AS cn, k.sgn * l.bal_due AS amt,
            p_as_of - coalesce(l.due_date, l.ref_date) AS late
       FROM erp.journal_line l
       JOIN erp.journal_entry e ON e.company_code = l.company_code AND e.trans_id = l.trans_id AND e.source = 'sap'
@@ -64,15 +64,15 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = erp, pg_temp AS $$
      WHERE l.company_code = p_company AND bp.kind = k.kind AND coalesce(l.bal_due, 0) <> 0 AND l.ref_date <= p_as_of
     UNION ALL
     -- documents created in Super ERP
-    SELECT d.card_code, d.card_name, round(d.sign * (coalesce(d.total, 0) - coalesce(d.paid, 0)), 2),
+    SELECT d.card_code, d.card_name, d.sign * (coalesce(d.total, 0) - coalesce(d.paid, 0)),
            p_as_of - coalesce(d.due_date, d.doc_date)
       FROM erp.document d
      WHERE d.company_code = p_company AND d.obj_type = ANY (p_objs) AND d.status = 'open' AND d.doc_date <= p_as_of
        AND coalesce(d.source, 'sap') <> 'sap' AND coalesce(d.total, 0) - coalesce(d.paid, 0) <> 0)
   SELECT o.cc, max(o.cn), count(*),
-         coalesce(sum(o.amt) FILTER (WHERE o.late <= 0), 0), coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 1 AND 30), 0),
-         coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 31 AND 60), 0), coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 61 AND 90), 0),
-         coalesce(sum(o.amt) FILTER (WHERE o.late > 90), 0), sum(o.amt)
-    FROM o GROUP BY o.cc ORDER BY sum(o.amt) DESC, o.cc
+         round(coalesce(sum(o.amt) FILTER (WHERE o.late <= 0), 0), 2), round(coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 1 AND 30), 0), 2),
+         round(coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 31 AND 60), 0), 2), round(coalesce(sum(o.amt) FILTER (WHERE o.late BETWEEN 61 AND 90), 0), 2),
+         round(coalesce(sum(o.amt) FILTER (WHERE o.late > 90), 0), 2), round(sum(o.amt), 2)
+    FROM o GROUP BY o.cc HAVING round(sum(o.amt), 2) <> 0 ORDER BY sum(o.amt) DESC, o.cc
 $$;
 COMMIT;

@@ -6,6 +6,7 @@
 -- open amount. A sync step in erp.sync_company fills it, so re-runs and every company (AE02-AE04) get the same.
 --   open_amt: open amount in the document's own terms (like total - paid; a credit note's open credit is positive)
 --   settled : SAP DocStatus = 'C', or open amount 0
+-- Runs for every company in erp.sync_company, also companies marked live in erp.company_cutover (parallel run with SAP).
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS erp.doc_settlement (

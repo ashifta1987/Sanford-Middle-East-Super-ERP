@@ -43,10 +43,12 @@ BEGIN
              UNION ALL SELECT 19, -1, "DocEntry", "CardCode", "DocStatus", "TransId" FROM sap."ORPC" WHERE company_code = p_company
              UNION ALL SELECT 204,-1, "DocEntry", "CardCode", "DocStatus", "TransId" FROM sap."ODPO" WHERE company_code = p_company)
   SELECT d.company_code, d.obj_type, d.doc_entry, h.st, h.tid,
-         h.side * coalesce(d.sign, 1) * coalesce(j.bd, 0),
-         coalesce(h.st, 'O') = 'C' OR round(coalesce(j.bd, 0), 2) = 0
+         h.side * coalesce(d.sign, 1) * coalesce(jj.bd, 0),
+         coalesce(h.st, 'O') = 'C' OR round(coalesce(jj.bd, 0), 2) = 0
     FROM h JOIN erp.document d ON d.company_code = p_company AND d.obj_type = h.o AND d.doc_entry = h.e AND d.source = 'sap'
-    LEFT JOIN j ON j.tid = h.tid AND j.sn = h.cc
+    LEFT JOIN sap."OCRD" f ON f.company_code = p_company AND f."CardCode" = h.cc
+    -- SAP posts a branch's document to its consolidating partner (OCRD.FatherCard): the open amount is on that partner's line
+    LEFT JOIN LATERAL (SELECT sum(j.bd) AS bd FROM j WHERE j.tid = h.tid AND j.sn IN (h.cc, f."FatherCard")) jj ON true
   ON CONFLICT (company_code, obj_type, doc_entry) DO UPDATE SET sap_status = EXCLUDED.sap_status, trans_id = EXCLUDED.trans_id,
        open_amt = EXCLUDED.open_amt, settled = EXCLUDED.settled, synced_at = now()
    WHERE (t.sap_status, t.trans_id, t.open_amt, t.settled) IS DISTINCT FROM (EXCLUDED.sap_status, EXCLUDED.trans_id, EXCLUDED.open_amt, EXCLUDED.settled);

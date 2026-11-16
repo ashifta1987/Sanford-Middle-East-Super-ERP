@@ -96,29 +96,33 @@ async function callSana(body: Record<string, unknown>, onEvent: OnEvent): Promis
   }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
-  let buf = '';
-  let done: AskReply | null = null;
-  let failure: string | null = null;
-  for (;;) {
-    const { value, done: end } = await reader.read();
-    if (end) break;
-    buf += dec.decode(value, { stream: true });
-    let i: number;
-    while ((i = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
-      const ev = chunk.match(/^event: (.+)$/m)?.[1] ?? 'message';
-      const raw = chunk.match(/^data: (.*)$/m)?.[1];
-      if (!raw) continue;
-      let d: Record<string, unknown>;
-      try { d = JSON.parse(raw); } catch { continue; }
-      if (ev === 'done') done = d as unknown as AskReply;
-      else if (ev === 'error') failure = String(d.error ?? '');
-      else onEvent(ev, d);
-    }
-  }
-  if (failure !== null) throw new Error(failure || i18n.t('sana.err.generic'));
-  if (!done) throw new Error(i18n.t('sana.err.generic'));
-  return done;
+  // S4 step 3: the reply resolves at 'done'; the stream stays open for 'logged' (stored ids), which arrives through onEvent
+  return new Promise<AskReply>((resolve, reject) => {
+    let buf = '';
+    let settled = false;
+    let failure: string | null = null;
+    const finish = (r: AskReply | null) => { if (settled) return; settled = true; if (r) resolve(r); else reject(new Error(failure || i18n.t('sana.err.generic'))); };
+    (async () => {
+      for (;;) {
+        const { value, done: end } = await reader.read();
+        if (end) break;
+        buf += dec.decode(value, { stream: true });
+        let i: number;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+          const ev = chunk.match(/^event: (.+)$/m)?.[1] ?? 'message';
+          const raw = chunk.match(/^data: (.*)$/m)?.[1];
+          if (!raw) continue;
+          let d: Record<string, unknown>;
+          try { d = JSON.parse(raw); } catch { continue; }
+          if (ev === 'done') finish(d as unknown as AskReply);
+          else if (ev === 'error') { failure = String(d.error ?? ''); finish(null); }
+          else onEvent(ev, d);
+        }
+      }
+      finish(null);
+    })().catch(() => { failure = failure ?? i18n.t('sana.err.network'); finish(null); onEvent('logged', { error: true }); });
+  });
 }
 
 export function SanaProvider({ children }: { children: ReactNode }) {
@@ -134,6 +138,8 @@ export function SanaProvider({ children }: { children: ReactNode }) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversation = useRef<string | null>(null);
   const pending = useRef<{ text: string; via: 'text' | 'voice' } | null>(null);
+  // S4 step 3: the previous answer's 'logged' event (conversation id) — the next question waits for it, briefly
+  const lastLogged = useRef<Promise<void>>(Promise.resolve());
   const co = company === 'GRP' ? null : company;
   const status = useSanaStatusQuery(open);
   // the home hero shares this cache: re-read the settings whenever the panel opens (an admin may have just changed them)
@@ -158,6 +164,10 @@ export function SanaProvider({ children }: { children: ReactNode }) {
     const dropQueued = () => { if (frame) cancelAnimationFrame(frame); frame = 0; pendingText = ''; };
     let streamed = '';   // the whole answer so far, for read-aloud (not batched per frame)
     const said = (t: string) => { streamed = t; opts?.onText?.(streamed); };
+    let markLogged: () => void = () => {};
+    const waitLogged = lastLogged.current;
+    lastLogged.current = new Promise<void>((res) => { markLogged = res; setTimeout(res, 5000); });
+    await Promise.race([waitLogged, new Promise((res) => setTimeout(res, 3000))]);
     try {
       const r = await callSana({ message: q, conversation_id: conversation.current, company: co ?? context?.company ?? null, language, via, context, stream: true }, (ev, d) => {
         if (ev === 'meta') { setMode(d.mode as 'ai' | 'basic'); if (d.language) opts?.onLanguage?.(String(d.language)); }
@@ -169,12 +179,21 @@ export function SanaProvider({ children }: { children: ReactNode }) {
         if (ev === 'reset') { dropQueued(); patch((m) => ({ ...m, text: '' })); said(''); }
         if (ev === 'tool') { ensure(); patch((m) => ({ ...m, tool: String(d.name ?? ''), streaming: true })); }
         if (ev === 'sources') patch((m) => ({ ...m, sources: (d.sources as SanaSource[]) ?? [] }));
+        if (ev === 'logged') {
+          if (d.conversation_id) setConv(String(d.conversation_id));
+          if (d.message_id != null) patch((m) => ({ ...m, messageId: Number(d.message_id) }));
+          markLogged();
+          qc.invalidateQueries({ queryKey: ['sana-status'] });
+          qc.invalidateQueries({ queryKey: ['sana-history'] });
+        }
       });
       dropQueued();
-      setConv(r.conversation_id);
+      if (r.conversation_id) setConv(r.conversation_id);
+      if (!(r as { logging?: boolean }).logging) markLogged();   // the JSON reply (no stream) is already logged
       setMode(r.mode);
       const msg: SanaMessage = { id: answerId, messageId: r.message_id, role: 'assistant', text: r.reply, sources: r.sources, denied: r.denied, mode: r.mode, fallback: r.fallback, via, language: r.language };
-      setMessages((list) => (list.some((x) => x.id === answerId) ? list.map((x) => (x.id === answerId ? msg : x)) : [...list, msg]));
+      // keep a message id that 'logged' may already have set
+      setMessages((list) => (list.some((x) => x.id === answerId) ? list.map((x) => (x.id === answerId ? { ...msg, messageId: msg.messageId ?? x.messageId } : x)) : [...list, msg]));
       qc.invalidateQueries({ queryKey: ['sana-status'] });
       qc.invalidateQueries({ queryKey: ['sana-history'] });
       return msg;

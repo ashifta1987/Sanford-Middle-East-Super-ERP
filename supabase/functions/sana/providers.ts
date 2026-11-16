@@ -20,6 +20,8 @@ export interface ProviderEnv {
   GEMINI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   SANA_THINKING_BUDGET?: string;
+  /** S4 step 4: the model for Ask (default the fastest Gemini flash-class model; checked once per cold start, falls back to SANA_MODEL) */
+  SANA_MODEL_FAST?: string;
   SANA_STT_MODEL?: string;
   SANA_VOICE_MODEL?: string;
   SANA_TTS_VOICE?: string;
@@ -64,4 +66,37 @@ export function providerConfig(env: ProviderEnv) {
     /** true only in the local stack, when the gateway points Sana at the LOCAL-ONLY provider mock (not AI) */
     local_mock: Boolean(env.SANA_GEMINI_BASE_URL || env.SANA_ANTHROPIC_BASE_URL),
   };
+}
+
+// ---------- S4 step 4: a faster model for Ask ----------
+// SANA_MODEL_FAST (default GEMINI_DEFAULT_FAST_MODEL) is checked once per function instance with a tiny request (a few output
+// tokens). If the key does not have it (404 / 400 / 403) Ask uses SANA_MODEL; a network error or timeout is not cached, so the next
+// request checks again. The `now` mode (S3) keeps SANA_MODEL. Anthropic: no fast model, SANA_MODEL is used.
+export const GEMINI_DEFAULT_FAST_MODEL = 'gemini-3.8-flash-lite';
+let fastProbe: { name: string; ok: Promise<boolean> } | null = null;
+export function fastModelName(env: ProviderEnv): string {
+  const m = (env.SANA_MODEL_FAST || '').trim();
+  return /^gemini-[A-Za-z0-9._-]{1,60}$/.test(m) ? m : GEMINI_DEFAULT_FAST_MODEL;
+}
+/** Start the check early (in parallel with the profile lookups); resolve to the Ask model and the main model. */
+export function pickAskModel(env: ProviderEnv): Promise<{ ask: SanaModel | null; main: SanaModel | null }> {
+  const main = pickModel(env);
+  if (!main || providerName(env) !== 'gemini' || !env.GEMINI_API_KEY) return Promise.resolve({ ask: main, main });
+  const name = fastModelName(env);
+  if (name === main.model) return Promise.resolve({ ask: main, main });
+  const fast = gemini(env.GEMINI_API_KEY, name, { baseUrl: env.SANA_GEMINI_BASE_URL, thinkingBudget: budget(env.SANA_THINKING_BUDGET) });
+  if (!fastProbe || fastProbe.name !== name) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 4000);
+    const ok = fast.ask({ system: 'Reply with OK.', messages: [{ role: 'user', content: 'ping' }], tools: [], maxTokens: 8, signal: ac.signal })
+      .then(() => true)
+      .catch((e: { status?: number }) => {
+        if ([400, 403, 404].includes(e?.status ?? 0)) { console.error('sana fast model not available, using SANA_MODEL', e?.status); return false; }
+        fastProbe = null;   // network / timeout: check again next time, use the main model now
+        return false;
+      })
+      .finally(() => clearTimeout(timer));
+    fastProbe = { name, ok };
+  }
+  return fastProbe.ok.then((yes) => ({ ask: yes ? fast : main, main }));
 }

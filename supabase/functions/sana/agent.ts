@@ -11,7 +11,7 @@ import { makeRpc, redact, type Env } from './core.ts';
 import { pickModel, type SanaModel } from './providers.ts';
 import { maskDeep } from './mask.ts';
 
-export const AGENT_LIMITS = { modelMs: 2000, maxModelFindings: 3, maxCards: 8, maxTokens: 600 };
+export const AGENT_LIMITS = { modelMs: 2000, deadlineMs: 2500, maxModelFindings: 3, maxCards: 8, maxTokens: 600 };
 const RECORD_TYPES = ['document', 'payment', 'partner', 'item', 'home'];
 const SEVERITY_RANK: Record<string, number> = { law: 0, risk: 1, info: 2 };
 const CONFIDENCE = ['likely', 'possible', 'check_this'];
@@ -75,9 +75,9 @@ function agentPrompt(language: string): string {
   ].join('\n');
 }
 
-async function askModel(model: SanaModel, facts: unknown, language: string): Promise<{ cards: Card[]; ok: boolean }> {
+async function askModel(model: SanaModel, facts: unknown, language: string, budgetMs: number): Promise<{ cards: Card[]; ok: boolean }> {
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), AGENT_LIMITS.modelMs);
+  const timer = setTimeout(() => ac.abort(), budgetMs);
   try {
     const turn = await model.ask({ system: agentPrompt(language), messages: [{ role: 'user', content: `FACTS:\n${JSON.stringify(facts)}` }], tools: [],
       maxTokens: AGENT_LIMITS.maxTokens, signal: ac.signal });
@@ -128,7 +128,8 @@ export async function handleAgent(auth: string | null, body: unknown, env: Env):
       const facts = maskDeep({ record_type: recordType, record_id: recordId, record: checks?.record ?? null, checked: checks?.checked ?? [],
         rule_findings: rules.map((c) => ({ code: c.code, severity: c.severity, title: c.title, evidence: c.evidence.map((e) => ({ table: e.table, id: e.id })) })),
         record_evidence: recordType === 'home' ? [] : [{ table: recordType, id: recordId }] });
-      const m = await askModel(model, facts, language);
+      // the model gets what is left of a 2.5 s deadline (checks included), at most 2 s, so `now` stays under 3 s end to end
+      const m = await askModel(model, facts, language, Math.max(300, Math.min(AGENT_LIMITS.modelMs, AGENT_LIMITS.deadlineMs - (Date.now() - t0))));
       extra = m.cards; modelOk = m.ok;
     }
 

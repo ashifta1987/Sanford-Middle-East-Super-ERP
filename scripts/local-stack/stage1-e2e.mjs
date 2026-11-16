@@ -286,9 +286,16 @@ const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gestur
     await page.fill('#sana-input', 'How many open sales orders do we have?'); await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.querySelector('aside[role=dialog] [data-testid=sana-answer] button') && !document.querySelector('aside[role=dialog] .animate-pulse'), null, { timeout: 15000 });
     ok('provider voice: the panel offers "Always use Sana\'s voice"', saved.ok && (await page.locator('[data-testid=sana-force-gemini]').count()) === 1, String(saved.status));
+    // voice policy: the device voice by default (headless Chromium may have none → the panel says so and points to the tick)
+    await page.locator('[data-testid=sana-answer] button:has-text("Listen")').last().click();
+    const dev = await page.waitForFunction(() => document.querySelector('[data-testid=sana-answer][data-voice-engine=device]')
+      || /Always use Sana/.test(document.querySelector('[data-testid=sana-no-voice]')?.textContent ?? ''), null, { timeout: 8000 }).then(() => true, () => false);
+    ok('voice policy: without the tick the device voice is used (never Gemini)', dev && (await page.locator('[data-voice-engine=gemini]').count()) === 0);
+    await page.locator('[data-testid=sana-answer] button:has-text("Stop")').last().click().catch(() => {});
+    await page.check('[data-testid=sana-force-gemini]');
     await page.locator('[data-testid=sana-answer] button:has-text("Listen")').last().click();
     const spoke = await page.waitForSelector('[data-testid=sana-answer][data-voice-engine=gemini][data-speaking]', { timeout: 10000 }).then(() => true, () => false);
-    ok('Listen reads the answer with Gemini sentence by sentence (Web Audio queue)', spoke);
+    ok('with "Always use Sana\'s voice" ticked, Gemini reads the answer sentence by sentence (Web Audio queue)', spoke);
     await page.locator('[data-testid=sana-answer] button:has-text("Stop")').last().click().catch(() => {});
     ok('Stop clears the queue', await page.waitForFunction(() => !document.querySelector('[data-testid=sana-answer][data-speaking]'), null, { timeout: 5000 }).then(() => true, () => false));
     await ctx.close();
@@ -316,13 +323,22 @@ await browser.close();
     const s1 = await streamAsk(tok, 'How many open sales orders do we have?');
     const order = s1.events.map((e) => e.ev);
     ok('stream: true (no Accept header) answers as Server-Sent Events', s1.type.includes('text/event-stream'), s1.type);
-    ok('stream: meta first, done last, sources just before done', order[0] === 'meta' && order.at(-1) === 'done' && order.at(-2) === 'sources', order.join(','));
+    ok('stream: meta first, then sources, done, and logged last (logging after the reply)', order[0] === 'meta' && order.at(-1) === 'logged' && order.at(-2) === 'done' && order.at(-3) === 'sources', order.join(','));
+    ok('stream: meta names the Ask model and the main model', 'model_main' in (s1.events[0]?.d ?? {}), JSON.stringify(s1.events[0]?.d));
     ok('stream: a lookup sends a tool event with the name only', s1.events.some((e) => e.ev === 'tool' && Object.keys(e.d).join() === 'name' && /^sana_/.test(e.d.name)),
       JSON.stringify(s1.events.filter((e) => e.ev === 'tool').map((e) => e.d)));
     ok('stream: the streamed text equals the final reply', s1.done && s1.shown.trim() === s1.done.reply.trim(), `${s1.shown.slice(0, 60)} | ${s1.done?.reply?.slice(0, 60)}`);
     const s2 = await streamAsk(tok, 'Show me the profit and the journal entries');
     ok('stream: a refused question ends with done.denied and no sources', s2.done?.denied === true && (s2.events.find((e) => e.ev === 'sources')?.d.sources ?? []).length === 0, JSON.stringify(s2.done ?? {}).slice(0, 120));
-    ok('refused question still logs (has a stored message id)', Number.isInteger(s2.done?.message_id) && Number.isInteger(s1.done?.message_id), `${s1.done?.message_id} / ${s2.done?.message_id}`);
+    const lg1 = s1.events.find((e) => e.ev === 'logged')?.d, lg2 = s2.events.find((e) => e.ev === 'logged')?.d;
+    ok('refused question still logs (the logged event has a stored message id)', Number.isInteger(lg2?.message_id) && Number.isInteger(lg1?.message_id), `${lg1?.message_id} / ${lg2?.message_id}`);
+    const postgres = (await import('postgres')).default;   // LOCAL database only (the e2e runs against the local stack)
+    const db = postgres({ host: '127.0.0.1', port: 5433, user: 'postgres', database: 'erp_local', max: 1 });
+    const ids = [lg1?.conversation_id, lg2?.conversation_id].filter(Boolean);
+    const [aud] = await db`SELECT count(*) FILTER (WHERE (detail ->> 'denied')::boolean) AS refused, count(*) FILTER (WHERE NOT (detail ->> 'denied')::boolean) AS answered
+                             FROM erp.audit_log WHERE action = 'sana.ask' AND object_ref = ANY(${ids})`;
+    await db.end();
+    ok('audit: the answered and the refused question both have their audit rows', Number(aud.refused) >= 1 && Number(aud.answered) >= 1, JSON.stringify(aud));
     const { StreamRedactor } = await import('../../supabase/functions/sana/core.ts');
     const r = new StreamRedactor(); let out = '';
     for (const ch of 'Your IBAN is AE07 0331 2345 6789 0123 456. Next sentence here.'.match(/.{1,3}/gs)) out += r.push(ch);

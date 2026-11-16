@@ -6,13 +6,15 @@
 // and the role checks inside those functions decide what comes back. The model only ever sees what the user could read
 // themselves, and is offered only the tools their role allows. Nothing here can write business data (the only writes are the
 // user's own conversation log, through erp.sana_log).
-import { pickModel, providerConfig, type ProviderEnv, type ProviderMessage, type SanaModel, type ToolSpec, type Usage } from './providers.ts';
+import { pickAskModel, pickModel, providerConfig, type ProviderEnv, type ProviderMessage, type SanaModel, type ToolSpec, type Usage } from './providers.ts';
 
 /** GEMINI_API_KEY / ANTHROPIC_API_KEY (in ProviderEnv) are Supabase secrets only; never in the browser, a table, a log or a response. */
 export interface Env extends ProviderEnv {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SANA_TIMEOUT_MS?: string;
+  /** S4 step 3: lookup rounds for Ask (default 3, 1–6) */
+  SANA_MAX_ROUNDS?: string;
 }
 export interface Source { label: string; link: string }
 export interface PageContext { type: string; company?: string; kind?: string; number?: string; code?: string; label?: string }
@@ -30,7 +32,7 @@ export interface AskResult {
 }
 /** Streaming (S4): 'meta' {mode, language, provider, model}, 'delta' {text}, 'reset' (drop the text so far), 'tool' {name} (a lookup
  *  started: the tool name only, never its data), 'sources' {sources}, 'done' {AskResult: full final reply, denied}, 'error' {error}. */
-export type Emit = (event: 'meta' | 'delta' | 'reset' | 'tool' | 'sources' | 'done' | 'error', data: unknown) => void;
+export type Emit = (event: 'meta' | 'delta' | 'reset' | 'tool' | 'sources' | 'done' | 'logged' | 'error', data: unknown) => void;
 
 type Json = Record<string, unknown>;
 type Rpc = (fn: string, args: Json) => Promise<unknown>;
@@ -42,6 +44,8 @@ interface Who { profile: boolean; name?: string; position?: string; modules?: st
 interface Status { profile: boolean; enabled: boolean; voice_enabled?: boolean; daily_limit?: number; used?: number; languages?: string[]; company?: string }
 
 // ---------- Cost guard (S1 §A) ----------
+/** S4 step 3: Ask may use at most this many lookup rounds; the last allowed round has no tools, so the model answers with what it has. */
+export const maxRounds = (env: { SANA_MAX_ROUNDS?: string }) => Math.min(6, Math.max(1, Number(env.SANA_MAX_ROUNDS) || 3));
 export const LIMITS = { rounds: 6, maxTokens: 900, toolResultBytes: 12_000, timeoutMs: 25_000, historyTurns: 10, questionChars: 2000 };
 
 const DOC_KINDS = ['sales_quotation', 'sales_order', 'delivery', 'sales_return', 'ar_down_payment', 'ar_invoice', 'ar_credit_note', 'purchase_request',
@@ -434,14 +438,16 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
 // ---------- AI mode (provider adapter with tool use; streaming text) ----------
 interface AiOut extends Basic { usage: Usage; refused: boolean }
 async function aiAnswer(model: SanaModel, system: string, history: ProviderMessage[], question: string, tools: Tool[], rpc: Rpc,
-                        company: string | null, signal: AbortSignal, emit?: Emit, redactor?: StreamRedactor): Promise<AiOut> {
+                        company: string | null, signal: AbortSignal, emit?: Emit, redactor?: StreamRedactor, rounds = LIMITS.rounds): Promise<AiOut> {
   const messages: ProviderMessage[] = [...history, { role: 'user', content: question }];
   const results: unknown[] = [];
   const used: Json[] = [];
   const usage: Usage = { in: 0, out: 0 };
-  const specs = tools.map(({ name, description, input_schema }) => ({ name, description, input_schema }));
-  for (let round = 0; round < LIMITS.rounds; round++) {
-    const turn = await model.ask({ system, messages, tools: specs, maxTokens: LIMITS.maxTokens, signal,
+  // S4 step 3: short tool descriptions (first sentence); the schema says the rest. The security rules in the prompt are unchanged.
+  const specs = tools.map(({ name, description, input_schema }) => ({ name, description: description.split(/(?<=\.)\s/)[0], input_schema }));
+  for (let round = 0; round < rounds + 1; round++) {
+    // after `rounds` lookup rounds the model gets no tools: it must answer with what it has
+    const turn = await model.ask({ system, messages, tools: round < rounds ? specs : [], maxTokens: LIMITS.maxTokens, signal,
       onText: emit ? (d) => { const s = redactor!.push(d); if (s) emit('delta', { text: s }); } : undefined });
     usage.in += turn.usage?.in ?? 0; usage.out += turn.usage?.out ?? 0;
     messages.push(turn.assistant);
@@ -495,10 +501,17 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
   const rpc = makeRpc(env, auth);
 
   try {
-    const who = await rpc('sana_whoami', {}) as Who;
+    // S4 step 3: profile, settings, history and the fast-model check run in parallel (each is still checked before use)
+    const models = pickAskModel(env);
+    const [who, st, hist] = await Promise.all([
+      rpc('sana_whoami', {}) as Promise<Who>,
+      rpc('sana_status', { p_company: company }) as Promise<Status>,
+      conversationId && pickModel(env)
+        ? (rpc('sana_messages', { p_conversation: conversationId, p_limit: LIMITS.historyTurns * 2 }) as Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: string }> }>).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     if (!who?.profile) return fail(403, 'You need a Southfield profile to use Sana. Ask IT to add you.');
     if (company && !who.companies?.some((c) => c.code === company)) return fail(403, "You don't have access to that company.");
-    const st = await rpc('sana_status', { p_company: company }) as Status;
     if (!st.enabled) return fail(403, 'Sana is switched off for your company. Ask your system admin.');
     if ((st.used ?? 0) >= (st.daily_limit ?? 200)) return fail(429, `You've reached today's limit of ${st.daily_limit} questions. It resets at midnight.`);
     if (via === 'voice' && st.voice_enabled === false) return fail(403, 'Voice is switched off for your company. Type your question instead.');
@@ -507,13 +520,13 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     if (st.languages?.length && !st.languages.includes(lang)) lang = st.languages.includes('en') ? 'en' : st.languages[0];
     const cur = who.companies?.find((c) => c.code === (company ?? st.company))?.currency ?? 'AED';
     const tools = TOOLS.filter((t) => t.allowed(who.topics!));
-    const model = pickModel(env);
+    const { ask: model, main } = await models;
     let out: Basic;
     let mode: 'ai' | 'basic' = model ? 'ai' : 'basic';
     let fallback = false;
     let usage: Usage | null = null;
     let modelRefused = false;
-    emit?.('meta', { mode, language: lang, provider: model?.provider ?? null, model: model?.model ?? null });
+    emit?.('meta', { mode, language: lang, provider: model?.provider ?? null, model: model?.model ?? null, model_main: main?.model ?? null });
 
     if (SENSITIVE.test(question)) {
       out = { reply: refusalText('hr', lang), results: [{ denied: true }], used: [{ tool: 'guard', input: { rule: 'sensitive' } }] };
@@ -526,14 +539,8 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), Number(env.SANA_TIMEOUT_MS) || LIMITS.timeoutMs);
       try {
-        let history: ProviderMessage[] = [];
-        if (conversationId) {
-          try {
-            const h = await rpc('sana_messages', { p_conversation: conversationId, p_limit: LIMITS.historyTurns * 2 }) as { messages: Array<{ role: 'user' | 'assistant'; content: string }> };
-            history = h.messages.map((m) => ({ role: m.role, content: m.content }));
-          } catch { /* not mine / gone: start fresh */ }
-        }
-        const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages, detail), history, question, tools, rpc, company, ac.signal, emit, redactor);
+        const history: ProviderMessage[] = (hist?.messages ?? []).map((m) => ({ role: m.role, content: m.content }));   // not mine / gone: start fresh
+        const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages, detail), history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
         out = ai; usage = ai.usage; modelRefused = ai.refused;
         if (emit && redactor && !modelRefused) { const rest = redactor.rest(); if (rest) emit('delta', { text: rest }); }
       } catch (e) {
@@ -559,18 +566,33 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     const modelId = model?.model ?? null;
     const logArgs: Json = { p_conversation: conversationId, p_company: company, p_language: lang, p_question: question,
       p_answer: reply, p_tools: out.used, p_sources: sources, p_denied: denied, p_mode: mode, p_via: via, p_context: ctx, p_fallback: fallback };
-    let logged: { conversation_id: string; message_id: number };
-    try {
-      logged = await rpc('sana_log', { ...logArgs, p_provider: provider, p_model: modelId, p_tokens: usage }) as typeof logged;
-    } catch (e) {
-      // 37_sana_gemini.sql not applied yet (PostgREST finds no sana_log with p_provider): log as in S1.
-      if ((e as { code?: string }).code !== 'PGRST202') throw e;
-      logged = await rpc('sana_log', logArgs) as typeof logged;
+    const log = async (): Promise<{ conversation_id: string; message_id: number }> => {
+      try {
+        return await rpc('sana_log', { ...logArgs, p_provider: provider, p_model: modelId, p_tokens: usage }) as { conversation_id: string; message_id: number };
+      } catch (e) {
+        // 37_sana_gemini.sql not applied yet (PostgREST finds no sana_log with p_provider): log as in S1.
+        if ((e as { code?: string }).code !== 'PGRST202') throw e;
+        return await rpc('sana_log', logArgs) as { conversation_id: string; message_id: number };
+      }
+    };
+    const base = { reply, sources, mode, fallback, denied, language: lang, provider, model: modelId };
+    if (emit) {
+      // S4 step 3: streaming sends 'done' first, then logs (conversation, messages, audit, daily count) while the stream is still
+      // open and sends 'logged' with the ids. Logging always happens; it just no longer delays the answer.
+      emit('sources', { sources });
+      emit('done', { ...base, conversation_id: conversationId, message_id: null, logging: true });
+      try {
+        const logged = await log();
+        emit('logged', { conversation_id: logged.conversation_id, message_id: logged.message_id });
+        return { status: 200, json: { ...base, ...logged } };
+      } catch (e) {
+        console.error('sana log failed', (e as { code?: string })?.code ?? 'error');
+        emit('logged', { error: true });
+        return { status: 502, json: { error: 'log failed' } };
+      }
     }
-    const result: AskResult = { conversation_id: logged.conversation_id, message_id: logged.message_id, reply, sources, mode, fallback, denied, language: lang,
-      provider, model: modelId };
-    emit?.('sources', { sources });
-    emit?.('done', result);
+    const logged = await log();
+    const result: AskResult = { conversation_id: logged.conversation_id, message_id: logged.message_id, ...base };
     return { status: 200, json: result };
   } catch (e) {
     const err = e as { status?: number; message?: string; code?: string };

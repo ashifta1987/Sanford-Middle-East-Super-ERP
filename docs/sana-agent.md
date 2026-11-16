@@ -110,3 +110,25 @@ Branch run (s3-phase1, 16 Nov 2026): 46 and 47 applied twice (safe to rerun); `s
 `s1_sana` 61/61, `s2_sana_gemini` 64/64. `sana-agent-e2e --remote` 15/15, with `now` at p50 141 ms / p90 179 ms (no model on the
 branch, by decision). Model timing is to be measured on live after go.
 
+
+## Live (16 Nov 2026, go by Ashif)
+
+Each file was run first in a transaction that was rolled back, then committed with an `erp.audit_log` row (`action = 'sql_apply'`).
+
+| File | Dry run (rolled back) | Applied | Checks |
+|---|---|---|---|
+| 46_sana_agent.sql | 0.57 s | 1.12 s | 15 rules × AE01–AE05; 5 tables; event log: 2 triggers, no UPDATE for users; sana_feedback 0 rows, new PK (id), not readable by users |
+| 47_sana_checks.sql | 0.46 s | 0.27 s | 12 check functions |
+
+`sana` deployed with agent.ts, main pushed (5c65665), branch s3-phase1 deleted.
+
+`now` with the real model (qa.finance, AE05, 10 calls each):
+
+| Record | p50 | p90 | server p50 | checks p50 | model |
+|---|---|---|---|---|---|
+| purchase bill 18:22499 | 2,752 ms | 3,049 ms | 2,625 ms | 598 ms | timed out at the 2 s budget → rule cards only |
+| sales invoice 13:166990 | 2,147 ms | 2,279 ms | 2,067 ms | 48 ms | used (1 model note) |
+
+Follow-up (commit 99d2159, deploys with S4 steps 3–4): the model now gets what is left of a 2.5 s deadline (checks included), so
+`now` stays under 3 s end to end. The duplicate-bill check takes about 0.6 s on AE05; an index for it would be a new SQL file (48)
+and would need a go.

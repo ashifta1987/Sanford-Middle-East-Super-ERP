@@ -84,3 +84,28 @@ Same groups before → after (first audio p50): sales en 15,029 → 10,979 ms ·
 Gemini TTS is the long pole: 6.4 s (p50) to 10.6 s (p90) for one whole reply, in both languages (Malayalam 5.6–7.6 s p50). TTS
 time grows with text length, so the first piece (one sentence) should come back well before the whole reply would.
 
+
+### Voice policy (16 Nov 2026, deployed)
+
+Gemini 3.8 Flash TTS is limited to 10 requests per minute and 100 per day on the key. The rules are now:
+
+- The device voice is the default wherever `speechSynthesis` has a voice for the answer language.
+- Gemini speaks only when "Always use Sana's voice" is ticked.
+- A failed Gemini piece is retried once, then the device voice reads it, silently.
+- Each user gets at most 10 Gemini TTS calls a day (`TTS_DAILY_CAP` in sana-voice). This is counted from `sana_usage.voice_calls`,
+  which also counts provider speech-to-text; it moves to `erp.sana_settings` later.
+- Answers are read sentence by sentence with both engines.
+
+## Steps 3–4 · parallel lookups, logging after the reply, 3 rounds, fast model (commit 99d2159, NOT deployed)
+
+- `sana_whoami`, `sana_status`, the history and the fast-model check run in parallel.
+- When streaming, `done` is sent first; `sana_log` then runs while the stream is still open and a `logged` event carries the ids.
+  The JSON path still logs before it replies.
+- Ask uses at most `SANA_MAX_ROUNDS` (default 3) lookup rounds; the last round has no tools, so the model answers with what it has.
+- Tool descriptions are shortened to their first sentence. The security rules are unchanged.
+- `SANA_MODEL_FAST` (default `gemini-3.8-flash-lite`) is used for Ask. It is checked once per cold start with a tiny request and
+  falls back to `SANA_MODEL` on 400/403/404. `meta` reports `model` and `model_main`.
+
+Local (mock, 700 ms per model call): first text p50 / p90 1,467 / 1,491 ms, total 1,549 / 1,568 ms. This is unchanged, as
+expected: the mock's fixed per-call latency hides the RPC savings, and the mock has no faster model. Live baseline (Step 1): first
+text 5,803 / 15,310 ms. The live after-run follows the deploy.

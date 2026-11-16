@@ -207,8 +207,8 @@ Other numbers:
 
 | Model | tool when an answer was expected | figure right | refusal right |
 |---|---|---|---|
-| gemini-3.5-flash-lite | 31 / 31 | 40 / 40 after review (raw 37) | 40 / 40 |
-| gemini-3.8-flash | 31 / 31 | 39 / 40 after review (raw 37) | 39 / 40 |
+| gemini-3.5-flash-lite | 34 / 34 | 40 / 40 after review (raw 37) | 40 / 40 |
+| gemini-3.8-flash | 34 / 34 | 39 / 40 after review (raw 37) | 39 / 40 |
 
 Review of the raw misses, with the grader rules fixed in the script:
 

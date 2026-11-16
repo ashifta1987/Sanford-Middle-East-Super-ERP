@@ -145,3 +145,36 @@ What dominates:
    - `sana_whoami` and `sana_status` take about 50–60 ms each, so making them parallel saves only about 50 ms.
 3. **The model rounds are the rest.** The first round (deciding on a lookup) takes about 2–3 s and the second (the answer) about
    2–3 s. That gives roughly 5–6 s even when the lookup is fast.
+
+### After 50_sana_search.sql + 3 s lookup guard + EarlyDrop fix (16 Nov 22:41; 40 questions)
+
+| Run | feedback p50 / p90 | first text p50 / p90 | total p50 / p90 | errors |
+|---|---|---|---|---|
+| Step 1 baseline | 2,613 / 3,891 ms | 5,803 / 15,310 ms | 6,669 / 15,609 ms | 0 |
+| after Steps 3–4 | 2,729 / 3,725 ms | 5,870 / 16,602 ms | 6,837 / 16,602 ms | 1 |
+| after 50 + guard | 2,500 / 3,706 ms | **5,751 / 7,830 ms** | **6,458 / 8,310 ms** | 0 |
+
+On live (qa.sales), `sana_find` now takes about 0.3 s (it was cancelled at 8 s) and `sana_stock` about 0.05 s (it was 2.1 s). The p90
+tail is gone. The p50 is still two flash model rounds.
+
+"Stream ended without done" (q10, sales/en, one in 40): the function logs show the runtime dropping a worker ("EarlyDrop") while
+requests were in flight. The streaming work now runs under `EdgeRuntime.waitUntil`, so the worker stays alive until the stream is
+closed; 0 errors in this run.
+
+Fast model, from the models list of the live key (`GET /v1beta/models`, names containing "flash"):
+
+- There is no `gemini-3.8-flash-lite`. The check got 404 "not found for API version v1beta, or is not supported for
+  generateContent".
+- Text models available: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash, gemini-3.5-flash-lite,
+  gemini-3.1-flash-lite, gemini-flash-lite-latest, gemini-flash-latest, gemini-3-flash-preview, gemini-2.5-flash,
+  gemini-2.5-flash-lite.
+
+Probe: one tool, "How many open sales orders…", 3 calls each.
+
+| Model | median | tool called |
+|---|---|---|
+| gemini-3.8-flash | 2,821 ms | 1 / 3 |
+| gemini-3.7-flash | 3,313 ms | 2 / 3 |
+| gemini-3.5-flash-lite | 1,199 ms | 3 / 3 |
+| gemini-3.1-flash-lite | 801 ms | 3 / 3 |
+| gemini-flash-lite-latest | 1,103 ms | 3 / 3 |

@@ -75,6 +75,9 @@ function numbersIn(text) {
   }
   return out;
 }
+// numbers that only repeat the question (SMP-1010, C0001) do not count as figures
+const figuresIn = (reply, question) => { const qn = new Set(numbersIn(question)); return numbersIn(reply).filter((n) => n >= 10 && !qn.has(n)); };
+const ZERO = /\bno open|\bno (sales|purchase) orders|\bnone\b|\bzero\b|\b0\b|ഒന്നും|ഇല്ല|ഒന്നുമില്ല/i;
 const close = (a, b) => Math.abs(a - b) <= Math.max(0.6, Math.abs(b) * 0.006);
 
 // streamed like the panel, so the same run also gives the timing (feedback, first text, total — as sana-timing.mjs)
@@ -109,12 +112,13 @@ for (const user of ['sales', 'finance']) {
       const reply = String(a.done?.reply ?? ''), denied = a.done?.denied === true, nums = numbersIn(reply);
       const refusal_ok = tr.denied ? denied : !denied;
       let figure_ok;
-      if (tr.denied) figure_ok = denied && nums.filter((n) => n >= 10).length === 0;
-      else if (tr.none) figure_ok = !denied && nums.filter((n) => n >= 10).length === 0;
+      if (tr.denied) figure_ok = denied && figuresIn(reply, Q[lang]).length === 0;
+      else if (tr.none) figure_ok = !denied && figuresIn(reply, Q[lang]).length === 0;
       else if (tr.names) figure_ok = tr.names.some((n) => n && reply.toLowerCase().includes(String(n).toLowerCase()));
-      else if (tr.zero) figure_ok = nums.some((n) => n === 0) || /\bno open|no sales orders|none|ഇല്ല|0\b/i.test(reply);
+      else if (tr.zero) figure_ok = ZERO.test(reply);
       else { const hits = tr.figures.filter((f) => f != null && nums.some((n) => close(n, Number(f)))).length; figure_ok = hits >= (tr.need ?? 1); }
-      const row = { user, lang, q, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
+      const tool_ok = tr.denied ? true : a.tools.length > 0;   // a refusal needs no lookup
+      const row = { user, lang, q, tool_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
       rows.push(row);
       console.log(`${user} ${lang} q${q}: tool ${row.tool ? 'y' : 'n'} · figure ${figure_ok ? 'y' : 'n'} · refusal ${refusal_ok ? 'y' : 'n'}${a.error ? ' · ERROR ' + a.error : ''}`);
     }

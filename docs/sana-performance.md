@@ -178,3 +178,43 @@ Probe: one tool, "How many open sales orders…", 3 calls each.
 | gemini-3.5-flash-lite | 1,199 ms | 3 / 3 |
 | gemini-3.1-flash-lite | 801 ms | 3 / 3 |
 | gemini-flash-lite-latest | 1,103 ms | 3 / 3 |
+
+## Final · all steps side by side (live, AE05, 40 questions, qa.sales + qa.finance, en + ml)
+
+| Run | feedback p50 / p90 | first text p50 / p90 | total p50 / p90 | errors |
+|---|---|---|---|---|
+| Before S4 | 5,538 / 15,421 ms | 5,538 / 15,421 ms | 6,443 / 15,452 ms | 0 |
+| Step 1 · streaming, lookup hint | 2,613 / 3,891 ms | 5,803 / 15,310 ms | 6,669 / 15,609 ms | 0 |
+| Steps 3–4 · parallel, log after reply, 3 rounds | 2,729 / 3,725 ms | 5,870 / 16,602 ms | 6,837 / 16,602 ms | 1 |
+| + 50 search, 3 s lookup limit, waitUntil | 2,500 / 3,706 ms | 5,751 / 7,830 ms | 6,458 / 8,310 ms | 0 |
+| **Final: gemini-3.5-flash-lite for Ask, rule 1a, Step 5 live** | **916 / 1,134 ms** | **2,299 / 3,050 ms** | **2,406 / 3,394 ms** | 0 |
+| same build with gemini-3.8-flash (comparison only) | 2,280 / 3,426 ms | 5,129 / 7,273 ms | 6,365 / 8,297 ms | 0 |
+
+Against the S4 targets:
+
+- **p90 total under 6 s: met** (3.4 s).
+- **p90 first token under 1.5 s: not met.** First text p90 is 3.1 s, because two model rounds (lookup, then answer) remain;
+  the lookup hint arrives at 1.1 s p90.
+- **p90 first audio under 2.5 s:** the device voice is now the default, so the first sound follows the first sentence by tens of
+  milliseconds. Real per-user numbers now come from the Step 5 beacon (Usage › Speed).
+
+Other numbers:
+
+- `now` (agent, purchase bill): 2,350 / 2,497 ms.
+- Voice before / after Step 2 (Gemini TTS): 15,653 / 23,151 → 12,266 / 22,888 ms.
+
+### Quality gate (scripts/local-stack/sana-live-eval.mjs; truth = the same RPCs with the same user's token)
+
+| Model | tool when an answer was expected | figure right | refusal right |
+|---|---|---|---|
+| gemini-3.5-flash-lite | 31 / 31 | 40 / 40 after review (raw 37) | 40 / 40 |
+| gemini-3.8-flash | 31 / 31 | 39 / 40 after review (raw 37) | 39 / 40 |
+
+Review of the raw misses, with the grader rules fixed in the script:
+
+- "No stock records were found for SMP-1010" was counted as a figure (1010 comes from the question).
+- The Malayalam "ഒന്നും … ഇല്ല" (none) was not recognised.
+- Refusals were counted as "no tool", but a refusal needs no lookup.
+
+The one real difference is finance / ml / q6 (balance of C0001). gemini-3.8-flash refused it; the right answer is "not found",
+and the lite model gave that. The lite model is not worse on any question.

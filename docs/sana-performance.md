@@ -29,7 +29,10 @@ round; Steps 3–4 (parallel RPCs, logging after the response, round cap, fast m
 | Run | feedback p50 / p90 | first text p50 / p90 | total p50 / p90 | errors |
 |---|---|---|---|---|
 | live-before (16 Nov 20:50, function as deployed before Step 1) | 5,538 / 15,421 ms | 5,538 / 15,421 ms | 6,443 / 15,452 ms | 0 / 40 |
-| live-after Step 1 | _pending: function deploy_ | | | |
+| live-after Step 1 (16 Nov 21:23) | **2,613 / 3,891 ms** | 5,803 / 15,310 ms | 6,669 / 15,609 ms | 0 / 40 |
+
+Step 1 live: the first sign of progress (lookup hint) comes 2.9 s earlier at p50 and 11.5 s earlier at p90; first text and total are
+unchanged within noise (they still wait for the lookup round plus the answer round, every question used 1 tool round).
 
 Per group (before): sales en 5,084 / 16,050 · sales ml 5,500 / 15,440 · finance en 5,587 / 7,574 · finance ml 5,538 / 6,707 (first
 text p50 / p90). The p90 tail comes from two questions (customer balance C0001 and, for sales in Malayalam, the stock question),

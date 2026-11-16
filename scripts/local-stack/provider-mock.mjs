@@ -114,6 +114,12 @@ const readBody = (req) => new Promise((r) => { const c = []; req.on('data', (d) 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const sleep = (ms, req) => new Promise((r) => { const t = setTimeout(r, ms); req.on('close', () => { clearTimeout(t); r(); }); });
 const words = (t) => t.match(/\S+\s*/g) ?? [t];
+// Optional latency profile for timing runs (scripts/local-stack/sana-timing.mjs): MOCK_TTFT_MS waits before every model
+// reply, MOCK_CHUNK_MS between streamed chunks (default 15). SYNTHETIC - real model latency comes only from a live/branch run.
+const MOCK_TTFT_MS = Number(process.env.MOCK_TTFT_MS || 0);
+const MOCK_CHUNK_MS = Number(process.env.MOCK_CHUNK_MS || 15);
+// waits unless the client went away (the response closes; the request 'close' fires as soon as its body is read)
+const pause = (ms, res) => new Promise((r) => { const t = setTimeout(r, ms); res.on('close', () => { clearTimeout(t); r(); }); });
 const sse = (res, data, event) => res.write(`${event ? `event: ${event}\n` : ''}data: ${JSON.stringify(data)}\n\n`);
 function tone(seconds, rate = 24000) {
   const n = Math.max(1, Math.round(seconds * rate));
@@ -216,6 +222,7 @@ async function gemini(req, res, url) {
     else parts = [{ text: refusalFrom(system) }];
   }
   const outTokens = estimateTokens(JSON.stringify(parts));
+  if (MOCK_TTFT_MS) await pause(MOCK_TTFT_MS, res);
   const usageMetadata = { promptTokenCount: promptTokens, candidatesTokenCount: outTokens, totalTokenCount: promptTokens + outTokens };
   record({ ...base, kind: 'text', est_output_tokens: outTokens, function_call: parts.find((p) => p.functionCall)?.functionCall.name ?? null });
   if (!stream) {
@@ -225,7 +232,7 @@ async function gemini(req, res, url) {
   const textPart = parts.find((p) => typeof p.text === 'string');
   if (textPart) {
     const w = words(textPart.text);
-    for (let i = 0; i < w.length; i += 3) { sse(res, { candidates: [{ content: { role: 'model', parts: [{ text: w.slice(i, i + 3).join('') }] }, index: 0 }], modelVersion: model }); await sleep(15, req); }
+    for (let i = 0; i < w.length; i += 3) { sse(res, { candidates: [{ content: { role: 'model', parts: [{ text: w.slice(i, i + 3).join('') }] }, index: 0 }], modelVersion: model }); await pause(MOCK_CHUNK_MS, res); }
     sse(res, { candidates: [{ content: { role: 'model', parts: [{ text: '' }] }, finishReason: finish, index: 0 }], usageMetadata, modelVersion: model });
   } else {
     sse(res, { candidates: [{ content: { role: 'model', parts }, finishReason: finish, index: 0 }], usageMetadata, modelVersion: model });

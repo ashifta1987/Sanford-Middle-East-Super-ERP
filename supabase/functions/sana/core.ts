@@ -28,8 +28,9 @@ export interface AskResult {
   provider: string | null; // S2: 'gemini' | 'anthropic' when a model is configured (also on fallback), null in basic mode
   model: string | null;
 }
-/** Streaming: 'meta' {mode}, 'delta' {text}, 'reset' (drop the text so far), 'done' {AskResult}, 'error' {error}. */
-export type Emit = (event: 'meta' | 'delta' | 'reset' | 'done' | 'error', data: unknown) => void;
+/** Streaming (S4): 'meta' {mode, language, provider, model}, 'delta' {text}, 'reset' (drop the text so far), 'tool' {name} (a lookup
+ *  started: the tool name only, never its data), 'sources' {sources}, 'done' {AskResult: full final reply, denied}, 'error' {error}. */
+export type Emit = (event: 'meta' | 'delta' | 'reset' | 'tool' | 'sources' | 'done' | 'error', data: unknown) => void;
 
 type Json = Record<string, unknown>;
 type Rpc = (fn: string, args: Json) => Promise<unknown>;
@@ -148,18 +149,22 @@ export function redact(text: string): string {
 /** Spoken answers: no markdown, tables or code (S1 §A, rule 7). */
 export const plainForVoice = (t: string) => t.replace(/```[\s\S]*?```/g, '').replace(/[*_#`>|]+/g, '').replace(/^\s*[-•]\s+/gm, '').replace(/\n{2,}/g, '\n').trim();
 
-// Streaming redaction: only text that can no longer become part of a hidden number is sent (64 characters held back).
-class StreamRedactor {
+// Streaming redaction (S4): the whole text so far is filtered again on every chunk, and only text that can no longer become
+// part of a hidden number is sent: everything up to the last finished sentence, or else all but the last 48 characters (the
+// longest hidden pattern, an IBAN written with spaces, is 48 characters) cut at a space. The final reply is filtered again
+// as a whole at 'done' (safety net).
+const SENTENCE_END = /[.!?؟।۔](?=\s)|\n/g;
+export class StreamRedactor {
   full = '';
   sent = 0;
   push(delta: string): string {
     this.full += delta;
     const red = redact(this.full);
-    let cut = red.length - 64;
+    let cut = -1;
+    for (const m of red.matchAll(SENTENCE_END)) if (m.index! + 1 > this.sent) cut = m.index! + 1;
+    const tail = red.length - 48;
+    if (tail > cut) { const ws = red.lastIndexOf(' ', tail); if (ws > cut) cut = ws; }
     if (cut <= this.sent) return '';
-    const ws = red.lastIndexOf(' ', cut);
-    cut = ws > this.sent ? ws : -1;
-    if (cut < 0) return '';
     const out = red.slice(this.sent, cut);
     this.sent = cut;
     return out;
@@ -444,6 +449,7 @@ async function aiAnswer(model: SanaModel, system: string, history: ProviderMessa
     const out: Array<{ id: string; content: string }> = [];
     for (const call of turn.toolCalls) {
       const tool = tools.find((t) => t.name === call.name);
+      emit?.('tool', { name: tool?.rpc ?? call.name });   // the name only, so the panel can say what it is looking up
       const r = tool ? await runTool(rpc, tool.rpc, tool.args(call.input ?? {}, company)) : { denied: true }; // a tool this role was not offered
       used.push({ tool: tool?.rpc ?? call.name, input: call.input });
       results.push(r);
@@ -560,6 +566,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     }
     const result: AskResult = { conversation_id: logged.conversation_id, message_id: logged.message_id, reply, sources, mode, fallback, denied, language: lang,
       provider, model: modelId };
+    emit?.('sources', { sources });
     emit?.('done', result);
     return { status: 200, json: result };
   } catch (e) {

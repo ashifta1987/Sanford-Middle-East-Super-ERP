@@ -5191,6 +5191,26 @@
     "left_many": "بقي {{count}} سؤالاً اليوم.",
     "transcribing": "جارٍ تحويل الكلام إلى نص…",
     "listeningProvider": "أستمع… اضغط الميكروفون مرة أخرى عند الانتهاء",
-    "voiceProviderNote": "يتم تحويل الصوت إلى نص وقراءة الإجابات بواسطة Gemini عبر Southfield؛ لا يتم الاحتفاظ بالتسجيلات."
+    "voiceProviderNote": "يتم تحويل الصوت إلى نص وقراءة الإجابات بواسطة Gemini عبر Southfield؛ لا يتم الاحتفاظ بالتسجيلات.",
+    "lookingUp": "جارٍ البحث في {{what}}…",
+    "tool": {
+      "sana_alerts": "التنبيهات",
+      "sana_banking": "أرصدة البنوك",
+      "sana_document": "المستند",
+      "sana_documents": "المستندات",
+      "sana_finance_summary": "الملخص المالي",
+      "sana_find": "السجلات",
+      "sana_inventory_summary": "المخزون",
+      "sana_my_approvals": "موافقاتك",
+      "sana_my_employee": "سجلك الوظيفي",
+      "sana_partner": "العميل أو المورد",
+      "sana_payables": "الذمم الدائنة",
+      "sana_people": "الموظفين",
+      "sana_purchase_summary": "المشتريات",
+      "sana_receivables": "الذمم المدينة",
+      "sana_sales_summary": "المبيعات",
+      "sana_stock": "المخزون",
+      "default": "البيانات"
+    }
   }
 }

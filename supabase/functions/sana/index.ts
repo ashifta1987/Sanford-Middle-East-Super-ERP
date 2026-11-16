@@ -1,5 +1,6 @@
 // Supabase Edge Function "sana": POST { message, conversation_id?, company?, language?, via?, context? } with the user's session token.
-// Accept: text/event-stream → the answer streams as Server-Sent Events (meta, delta, reset, done, error); otherwise one JSON reply.
+// { stream: true } or Accept: text/event-stream → the answer streams as Server-Sent Events (meta, delta, reset, tool, sources, done,
+// error); otherwise one JSON reply (unchanged, e.g. the home-page box).
 // POST { action: 'config', company } → admin-only provider config for the settings screen (names and yes/no, never a key).
 // Deploy:  supabase functions deploy sana
 // Secrets (S2, decision 11 Nov 2026 — Gemini is the provider; the key values are set by IT and never written anywhere else):
@@ -38,7 +39,8 @@ Deno.serve(async (req: Request) => {
     const { status, json } = await handleConfig(auth, body, env());
     return Response.json(json, { status, headers: cors });
   }
-  if ((req.headers.get('Accept') ?? '').includes('text/event-stream')) {
+  // S4: stream when the body says stream: true (or, as before, when the client accepts text/event-stream)
+  if ((body as { stream?: unknown } | null)?.stream === true || (req.headers.get('Accept') ?? '').includes('text/event-stream')) {
     const enc = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {

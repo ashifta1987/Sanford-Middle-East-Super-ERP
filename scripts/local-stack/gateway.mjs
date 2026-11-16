@@ -149,7 +149,7 @@ http.createServer(async (req, res) => {
     try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON → 400 from handleAsk */ }
     const env = sanaEnv();
     if (body && body.action === 'config') { const r = await handleConfig(req.headers.authorization ?? null, body, env); return send(res, r.status, r.json); }
-    if ((req.headers.accept ?? '').includes('text/event-stream')) {
+    if (body?.stream === true || (req.headers.accept ?? '').includes('text/event-stream')) {   // S4: { stream: true } like index.ts
       res.writeHead(200, { ...cors, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
       await handleAsk(req.headers.authorization ?? null, body, env, (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       return res.end();

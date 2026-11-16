@@ -44,6 +44,11 @@ function Bubble({ m, onSpeak, speaking, voiceNote }: { m: SanaMessage; onSpeak: 
           {m.denied && <Lock className="me-1.5 inline h-3.5 w-3.5 text-muted" aria-label={t('sana.deniedLabel')} />}
           {m.error && <AlertTriangle className="me-1.5 inline h-3.5 w-3.5" aria-hidden />}
           {m.text}
+          {m.streaming && m.tool && !m.text && (
+            <span className="block text-[13px] text-muted" data-testid="sana-tool-hint">
+              {t('sana.lookingUp', { what: t(`sana.tool.${m.tool}`, { defaultValue: t('sana.tool.default') }) })}
+            </span>
+          )}
           {m.streaming && <span className="ms-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle motion-reduce:animate-none" aria-hidden />}
         </div>
         {!!m.sources?.length && (

@@ -230,10 +230,13 @@ const browser = await chromium.launch();
 
 // ---------- Sana assistant: answers by role, refuses the rest ----------
 {
+  await fetch(`${process.env.GATEWAY_URL ?? 'http://127.0.0.1:54321'}/local/sana-provider`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'basic' }) });   // these checks are for basic mode
   const ask = async (page, q) => {
     const before = await page.locator('aside[role=dialog] .rounded-ss-md').count();
     await page.fill('#sana-input', q); await page.keyboard.press('Enter');
-    await page.waitForFunction((n) => document.querySelectorAll('aside[role=dialog] .rounded-ss-md').length > n, before, { timeout: 15000 });
+    // S4: answers stream; wait until the new bubble exists and nothing is streaming any more (no cursor, no lookup hint)
+    await page.waitForFunction((n) => document.querySelectorAll('aside[role=dialog] .rounded-ss-md').length > n
+      && !document.querySelector('aside[role=dialog] .rounded-ss-md .animate-pulse, aside[role=dialog] [data-testid=sana-tool-hint]'), before, { timeout: 15000 });
     return (await page.locator('aside[role=dialog] .rounded-ss-md').last().innerText()).trim();
   };
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -266,6 +269,43 @@ const browser = await chromium.launch();
 }
 
 await browser.close();
+
+// ---- S4 · streaming API checks (gateway, LOCAL-ONLY provider mock) ----
+{
+  const GW = process.env.GATEWAY_URL ?? 'http://127.0.0.1:54321';
+  const setProvider = (provider) => fetch(`${GW}/local/sana-provider`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) });
+  const token = async (email, password) => (await (await fetch(`${GW}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: 'local', 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) })).json()).access_token;
+  const streamAsk = async (tok, message) => {
+    const res = await fetch(`${GW}/functions/v1/sana`, { method: 'POST', headers: { apikey: 'local', authorization: `Bearer ${tok}`, 'content-type': 'application/json' }, body: JSON.stringify({ message, company: 'ZZ99', stream: true }) });
+    const text = await res.text();
+    const events = text.split('\n\n').filter(Boolean).map((c) => ({ ev: c.match(/^event: (.+)$/m)?.[1], d: JSON.parse(c.match(/^data: (.*)$/m)?.[1] ?? '{}') }));
+    let shown = '';
+    for (const { ev, d } of events) { if (ev === 'reset') shown = ''; if (ev === 'delta') shown = d.replace ? d.text : shown + d.text; }
+    return { type: res.headers.get('content-type') ?? '', events, shown, done: events.find((e) => e.ev === 'done')?.d };
+  };
+  await setProvider('gemini-mock');
+  try {
+    const tok = await token('qa.sales@sample.test', 'local-only-2');
+    const s1 = await streamAsk(tok, 'How many open sales orders do we have?');
+    const order = s1.events.map((e) => e.ev);
+    ok('stream: true (no Accept header) answers as Server-Sent Events', s1.type.includes('text/event-stream'), s1.type);
+    ok('stream: meta first, done last, sources just before done', order[0] === 'meta' && order.at(-1) === 'done' && order.at(-2) === 'sources', order.join(','));
+    ok('stream: a lookup sends a tool event with the name only', s1.events.some((e) => e.ev === 'tool' && Object.keys(e.d).join() === 'name' && /^sana_/.test(e.d.name)),
+      JSON.stringify(s1.events.filter((e) => e.ev === 'tool').map((e) => e.d)));
+    ok('stream: the streamed text equals the final reply', s1.done && s1.shown.trim() === s1.done.reply.trim(), `${s1.shown.slice(0, 60)} | ${s1.done?.reply?.slice(0, 60)}`);
+    const s2 = await streamAsk(tok, 'Show me the profit and the journal entries');
+    ok('stream: a refused question ends with done.denied and no sources', s2.done?.denied === true && (s2.events.find((e) => e.ev === 'sources')?.d.sources ?? []).length === 0, JSON.stringify(s2.done ?? {}).slice(0, 120));
+    ok('refused question still logs (has a stored message id)', Number.isInteger(s2.done?.message_id) && Number.isInteger(s1.done?.message_id), `${s1.done?.message_id} / ${s2.done?.message_id}`);
+    const { StreamRedactor } = await import('../../supabase/functions/sana/core.ts');
+    const r = new StreamRedactor(); let out = '';
+    for (const ch of 'Your IBAN is AE07 0331 2345 6789 0123 456. Next sentence here.'.match(/.{1,3}/gs)) out += r.push(ch);
+    out += r.rest();
+    ok('stream: an IBAN split across chunks never leaks', !/0331|6789/.test(out) && out.includes('[hidden]'), out);
+  } finally {
+    await setProvider('basic');
+  }
+}
+
 fs.writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1));
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

@@ -17,6 +17,8 @@ export interface SanaMessage {
   fallback?: boolean;
   error?: boolean;
   streaming?: boolean;
+  /** S4: the lookup running right now (tool name only, from the 'tool' event), shown as a small grey line */
+  tool?: string | null;
   via?: 'text' | 'voice';
   language?: string;
   feedback?: 1 | -1 | null;
@@ -145,15 +147,26 @@ export function SanaProvider({ children }: { children: ReactNode }) {
     setMessages((m) => [...m, { id: uid(), role: 'user', text: q, via }]);
     setBusy(true);
     const patch = (fn: (m: SanaMessage) => SanaMessage) => setMessages((list) => list.map((x) => (x.id === answerId ? fn(x) : x)));
+    const ensure = () => setMessages((list) => (list.some((x) => x.id === answerId) ? list : [...list, { id: answerId, role: 'assistant', text: '', streaming: true }]));
+    // S4: streamed text is added once per animation frame (not one list update per chunk), so long answers type smoothly
+    let pendingText = '';
+    let frame = 0;
+    const flush = () => { frame = 0; const add = pendingText; pendingText = ''; if (add) patch((m) => ({ ...m, text: m.text + add, tool: null, streaming: true })); };
+    const queue = (t: string) => { pendingText += t; if (!frame) frame = requestAnimationFrame(flush); };
+    const dropQueued = () => { if (frame) cancelAnimationFrame(frame); frame = 0; pendingText = ''; };
     try {
-      const r = await callSana({ message: q, conversation_id: conversation.current, company: co ?? context?.company ?? null, language, via, context }, (ev, d) => {
+      const r = await callSana({ message: q, conversation_id: conversation.current, company: co ?? context?.company ?? null, language, via, context, stream: true }, (ev, d) => {
         if (ev === 'meta') setMode(d.mode as 'ai' | 'basic');
         if (ev === 'delta') {
-          setMessages((list) => (list.some((x) => x.id === answerId) ? list : [...list, { id: answerId, role: 'assistant', text: '', streaming: true }]));
-          patch((m) => ({ ...m, text: d.replace ? String(d.text) : m.text + String(d.text), streaming: true }));
+          ensure();
+          if (d.replace) { dropQueued(); patch((m) => ({ ...m, text: String(d.text), tool: null, streaming: true })); }
+          else queue(String(d.text));
         }
-        if (ev === 'reset') patch((m) => ({ ...m, text: '' }));
+        if (ev === 'reset') { dropQueued(); patch((m) => ({ ...m, text: '' })); }
+        if (ev === 'tool') { ensure(); patch((m) => ({ ...m, tool: String(d.name ?? ''), streaming: true })); }
+        if (ev === 'sources') patch((m) => ({ ...m, sources: (d.sources as SanaSource[]) ?? [] }));
       });
+      dropQueued();
       setConv(r.conversation_id);
       setMode(r.mode);
       const msg: SanaMessage = { id: answerId, messageId: r.message_id, role: 'assistant', text: r.reply, sources: r.sources, denied: r.denied, mode: r.mode, fallback: r.fallback, via, language: r.language };

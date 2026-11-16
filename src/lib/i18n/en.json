@@ -5103,6 +5103,26 @@
     },
     "transcribing": "Transcribing…",
     "listeningProvider": "Listening… tap the microphone again when you finish",
-    "voiceProviderNote": "Voice is transcribed and read aloud by Gemini through Southfield; recordings are not kept."
+    "voiceProviderNote": "Voice is transcribed and read aloud by Gemini through Southfield; recordings are not kept.",
+    "lookingUp": "Looking up {{what}}…",
+    "tool": {
+      "sana_alerts": "alerts",
+      "sana_banking": "bank balances",
+      "sana_document": "the document",
+      "sana_documents": "documents",
+      "sana_finance_summary": "the finance summary",
+      "sana_find": "records",
+      "sana_inventory_summary": "inventory",
+      "sana_my_approvals": "your approvals",
+      "sana_my_employee": "your employee record",
+      "sana_partner": "the customer or supplier",
+      "sana_payables": "payables",
+      "sana_people": "people",
+      "sana_purchase_summary": "purchasing",
+      "sana_receivables": "receivables",
+      "sana_sales_summary": "sales",
+      "sana_stock": "stock",
+      "default": "data"
+    }
   }
 }

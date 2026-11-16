@@ -5125,6 +5125,7 @@
       "default": "data"
     },
     "forceGemini": "Always use Sana's voice",
-    "forceGeminiHint": "Read answers with Sana's voice even when this phone has its own voice for the language"
+    "forceGeminiHint": "Read answers with Sana's own voice (Gemini) instead of this device's voice. Limited to a few answers a day.",
+    "tryGeminiVoice": "Tick “Always use Sana's voice” below to hear it."
   }
 }

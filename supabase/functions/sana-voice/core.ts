@@ -11,6 +11,11 @@ import { detectLanguage, LANGS, makeRpc, plainForVoice, redact, type Env } from 
 import { voiceModels } from '../sana/providers.ts';
 import { geminiSpeak, geminiTranscribe, pcmToWav } from '../sana/providers/gemini.ts';
 
+// S4 voice policy (16 Nov 2026): Gemini TTS is 10 requests/minute and 100/day on the key, so the device voice is the default and
+// Gemini speaks only when the user ticks "Always use Sana's voice". Per user per day at most TTS_DAILY_CAP Gemini calls (a cache hit
+// costs nothing and is still served). Counted from sana_usage.voice_calls (provider speech-to-text calls count too); this becomes a
+// per-company setting in erp.sana_settings later (needs SQL).
+export const TTS_DAILY_CAP = 10;
 export const VOICE_LIMITS = { audioBytes: 1_500_000, seconds: 60, ttsChars: 1500, timeoutMs: 25_000 };
 const AUDIO_TYPES = ['audio/wav', 'audio/x-wav', 'audio/wave', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/aac', 'audio/flac'];
 
@@ -110,6 +115,9 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
       const key = ttsKey(m.tts, m.voice, lang, text);
       let hit = ttsCache.get(key);
       const cached = Boolean(hit);
+      if (!hit && (st.voice_calls ?? 0) >= TTS_DAILY_CAP) {
+        return fail(429, "Sana's own voice is used up for today. Your device's voice reads the answers instead.");
+      }
       if (!hit) {
         try {
           const r = await geminiSpeak({ apiKey: env.GEMINI_API_KEY, model: m.tts, voice: m.voice, baseUrl: env.SANA_GEMINI_BASE_URL, text, signal: ac.signal });

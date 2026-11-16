@@ -10,9 +10,11 @@ import { languageLabel, speechLocale, voiceFor } from './voice';
  * comes back as raw 16-bit PCM and is played with the Web Audio API, each buffer scheduled at the previous one's end time, so
  * pieces play back to back with no gap. Requests run in parallel; playback keeps the order.
  *
- * Engines: 'gemini' (sana-voice, the company's voice mode is "provider") or 'device' (speechSynthesis). On a phone that has a
- * system voice for the answer language, answers under 200 characters use the device voice (instant, no network) and longer ones
- * Gemini; the user can force Gemini in the panel. Companies on voice mode "browser" always use the device voice, as before.
+ * Engines: 'device' (speechSynthesis) or 'gemini' (sana-voice). Voice policy (16 Nov 2026; Gemini TTS is 10 RPM / 100 RPD on the
+ * key): the device voice is the default on every platform that has a system voice for the answer language. Gemini speaks only when
+ * the user ticks "Always use Sana's voice" (and the company's voice mode is "provider"). A Gemini piece that fails is retried once,
+ * then the device voice says it and the rest, silently. Over the per-user daily cap (sana-voice answers 429) → device voice.
+ * Without a device voice and without the tick, nothing is spoken and the panel says why (never the wrong accent).
  * Which engine spoke is reported through onEngine (the panel marks the bubble; Gemini calls are also counted in
  * erp.sana_voice_use). Nothing is stored: audio lives in memory until it has played.
  */
@@ -31,7 +33,6 @@ export interface SpeakerOpts {
   onFirstAudio?: (ms: number) => void;
   t0?: number;
 }
-export const SHORT_ANSWER = 200;
 const SENTINEL_LEAD = 0.03;   // seconds between "now" and the first buffer, so it is never scheduled in the past
 
 let ctx: AudioContext | null = null;
@@ -49,7 +50,6 @@ export function primeAudio() { try { audioCtx(); } catch { /* no Web Audio: devi
 /** Stop whatever Sana is saying and drop the queue (new message, stop button, panel closed). */
 export function stopAllSpeech() { current?.stop(); current = null; }
 
-const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 const langOf = (text: string, asked: string) => {
   if (asked && asked !== 'auto') return asked;
   if (/[ഀ-ൿ]/.test(text)) return 'ml';
@@ -131,14 +131,9 @@ export class SentenceSpeaker {
 
   private locale() { return speechLocale(this.lang, this.o.uiLanguage); }
 
-  /** Pick the engine. Before the answer is complete, a phone with a device voice waits until it knows the answer is short. */
-  private decide(final: boolean) {
-    const deviceVoice = voiceFor(this.locale());
-    if (!this.o.providerMode) this.engine = 'device';
-    else if (this.o.forceGemini || !isPhone() || !deviceVoice) this.engine = 'gemini';
-    else if (this.heldChars >= SHORT_ANSWER) this.engine = 'gemini';
-    else if (final) this.engine = 'device';
-    else return;
+  /** Pick the engine once the first piece (and so the answer language) is known. */
+  private decide(_final: boolean) {
+    this.engine = this.o.providerMode && this.o.forceGemini ? 'gemini' : 'device';
     this.o.onEngine?.(this.engine);
     const held = this.held; this.held = []; this.heldChars = 0;
     held.forEach((p) => this.play(p));
@@ -172,9 +167,13 @@ export class SentenceSpeaker {
     const audio = this.fetchPiece(piece);
     this.chain = this.chain.then(async () => {
       let buf: AudioBuffer;
-      try { buf = await audio; } catch (e) {
+      try { buf = await audio.catch((e: Error & { status?: number }) => {
+        // one retry for a provider hiccup (502/503/network); a 429 (daily cap / quota) goes straight to the device voice
+        if (e.name === 'AbortError' || e.status === 429 || this.stopped || gen !== this.gen) throw e;
+        return this.fetchPiece(piece);
+      }); } catch (e) {
         if (this.stopped || gen !== this.gen || (e as Error).name === 'AbortError') return;
-        // provider failed for this piece: the device voice says the rest when it can, else the panel shows why
+        // Gemini could not say it: the device voice says this piece and the rest, silently; without one the panel shows why
         if (voiceFor(this.locale())) { this.engine = 'device'; this.o.onEngine?.('device'); this.playDevice(piece); return; }
         this.o.onError?.((e as Error).message); this.stop(); return;
       }
@@ -202,7 +201,7 @@ export class SentenceSpeaker {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({})) as { error?: string };
-      throw new Error(j.error || i18n.t('sana.err.generic'));
+      throw Object.assign(new Error(j.error || i18n.t('sana.err.generic')), { status: res.status });
     }
     const bytes = await res.arrayBuffer();
     const c = audioCtx();
@@ -216,7 +215,8 @@ export class SentenceSpeaker {
     const voice = voiceFor(this.locale());
     if (!voice || !('speechSynthesis' in window)) {
       this.pending--;
-      this.o.onError?.('speechSynthesis' in window ? i18n.t('sana.noVoice', { language: languageLabel(this.lang) }) : i18n.t('sana.noSpeech'));
+      const why = 'speechSynthesis' in window ? i18n.t('sana.noVoice', { language: languageLabel(this.lang) }) : i18n.t('sana.noSpeech');
+      this.o.onError?.(this.o.providerMode && !this.o.forceGemini ? `${why} ${i18n.t('sana.tryGeminiVoice')}` : why);
       this.stop(); return;
     }
     const u = new SpeechSynthesisUtterance(piece);

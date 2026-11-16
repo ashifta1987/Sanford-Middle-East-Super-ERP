@@ -62,3 +62,13 @@ most of the p50 gain is the cache (27 of 45 pieces were repeats: refusals and id
 is the same as before (3,045 ms, n = 16). The real gain from splitting depends on Gemini's answer length and TTS speed and will
 come from the live run (`sana-timing.mjs --remote --voice --voice-mode whole|sentence`).
 
+### Live voice (real Gemini TTS, AE05)
+
+| Run | first text p50 / p90 | total p50 / p90 | first audio p50 / p90 | TTS per piece p50 / p90 |
+|---|---|---|---|---|
+| live-voice-before (16 Nov 21:07, whole reply after `done`, WAV) | 6,571 / 15,219 ms | 6,746 / 15,256 ms | **15,653 / 23,151 ms** | 6,408 / 10,599 ms |
+| live-voice-after Step 2 | _pending: deploy of sana-voice + panel_ | | | |
+
+Gemini TTS is the long pole: 6.4 s (p50) to 10.6 s (p90) for one whole reply, in both languages (Malayalam 5.6–7.6 s p50). TTS
+time grows with text length, so the first piece (one sentence) should come back well before the whole reply would.
+

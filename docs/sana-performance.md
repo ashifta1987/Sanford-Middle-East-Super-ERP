@@ -70,7 +70,16 @@ come from the live run (`sana-timing.mjs --remote --voice --voice-mode whole|sen
 | Run | first text p50 / p90 | total p50 / p90 | first audio p50 / p90 | TTS per piece p50 / p90 |
 |---|---|---|---|---|
 | live-voice-before (16 Nov 21:07, whole reply after `done`, WAV) | 6,571 / 15,219 ms | 6,746 / 15,256 ms | **15,653 / 23,151 ms** | 6,408 / 10,599 ms |
-| live-voice-after Step 2 | _pending: deploy of sana-voice + panel_ | | | |
+| live-voice-after Step 2 (16 Nov 21:29, sentences while streaming, pcm16, cache) | 6,066 / 17,968 ms | 6,881 / 18,221 ms | **12,266 / 22,888 ms** | 4,392 / 6,414 ms |
+
+Same groups before → after (first audio p50): sales en 15,029 → 10,979 ms · sales ml 14,101 → 12,414 ms · finance en 15,528 → 9,890 ms.
+2.08 TTS pieces per answer; 4 cache hits.
+
+> [!WARNING]
+> 15 of 40 after-run questions failed with `tts 502` from 16:05 UTC on, after about 100 successful Gemini TTS calls today
+> (erp.audit_log `sana.voice*`: all ok before, all failed after). That pattern looks like a daily request cap on the Gemini TTS
+> model for this key. Sentence-by-sentence voice makes about 2 TTS calls per answer instead of 1, so it reaches such a cap sooner.
+> Check the key's TTS quota in Google AI Studio before relying on provider voice for many users.
 
 Gemini TTS is the long pole: 6.4 s (p50) to 10.6 s (p90) for one whole reply, in both languages (Malayalam 5.6–7.6 s p50). TTS
 time grows with text length, so the first piece (one sentence) should come back well before the whole reply would.

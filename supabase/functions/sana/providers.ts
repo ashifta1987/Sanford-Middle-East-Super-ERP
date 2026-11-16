@@ -73,7 +73,7 @@ export function providerConfig(env: ProviderEnv) {
 // tokens). If the key does not have it (404 / 400 / 403) Ask uses SANA_MODEL; a network error or timeout is not cached, so the next
 // request checks again. The `now` mode (S3) keeps SANA_MODEL. Anthropic: no fast model, SANA_MODEL is used.
 export const GEMINI_DEFAULT_FAST_MODEL = 'gemini-3.8-flash-lite';
-let fastProbe: { name: string; ok: Promise<boolean> } | null = null;
+let fastProbe: { name: string; ok: Promise<SanaModel | null> } | null = null;
 export function fastModelName(env: ProviderEnv): string {
   const m = (env.SANA_MODEL_FAST || '').trim();
   return /^gemini-[A-Za-z0-9._-]{1,60}$/.test(m) ? m : GEMINI_DEFAULT_FAST_MODEL;
@@ -84,21 +84,30 @@ export function pickAskModel(env: ProviderEnv): Promise<{ ask: SanaModel | null;
   if (!main || providerName(env) !== 'gemini' || !env.GEMINI_API_KEY) return Promise.resolve({ ask: main, main });
   const name = fastModelName(env);
   if (name === main.model) return Promise.resolve({ ask: main, main });
-  const fast = gemini(env.GEMINI_API_KEY, name, { baseUrl: env.SANA_GEMINI_BASE_URL, thinkingBudget: budget(env.SANA_THINKING_BUDGET) });
+  const opts = { baseUrl: env.SANA_GEMINI_BASE_URL, thinkingBudget: budget(env.SANA_THINKING_BUDGET) };
   if (!fastProbe || fastProbe.name !== name) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 4000);
-    const ok = fast.ask({ system: 'Reply with OK.', messages: [{ role: 'user', content: 'ping' }], tools: [], maxTokens: 8, signal: ac.signal })
-      .then(() => true)
+    const ping = (m: SanaModel) => m.ask({ system: 'Reply with OK.', messages: [{ role: 'user', content: 'ping' }], tools: [], maxTokens: 8, signal: ac.signal });
+    const log = (e: { status?: number; message?: string; name?: string }, how: string) =>
+      // the provider's own status and message (never the key) go to the function logs, so a fallback can be explained
+      console.error('sana fast model check failed', name, how, e?.status ?? e?.name ?? 'error', String(e?.message ?? '').slice(0, 300));
+    // 1st try as configured; a 400 can mean the model has no thinking switch → 2nd try without thinkingConfig
+    const ok: Promise<SanaModel | null> = ping(gemini(env.GEMINI_API_KEY, name, opts)).then(() => gemini(env.GEMINI_API_KEY!, name, opts))
       .catch((e: { status?: number; message?: string; name?: string }) => {
-        // the provider's own status and message (never the key) go to the function logs, so a fallback can be explained
-        console.error('sana fast model check failed', name, e?.status ?? e?.name ?? 'error', String(e?.message ?? '').slice(0, 300));
-        if ([400, 403, 404].includes(e?.status ?? 0)) return false;
-        fastProbe = null;   // network / timeout: check again next time, use the main model now
-        return false;
+        log(e, 'with thinkingConfig');
+        if (e?.status !== 400) throw e;
+        const plain = gemini(env.GEMINI_API_KEY!, name, { ...opts, noThinkingConfig: true });
+        return ping(plain).then(() => plain);
+      })
+      .catch((e: { status?: number; message?: string; name?: string }) => {
+        if (e?.status !== undefined && e.status !== 400) log(e, 'final');
+        if (e?.status === 400) log(e, 'without thinkingConfig');
+        if (![400, 403, 404].includes(e?.status ?? 0)) fastProbe = null;   // network / timeout: check again next time
+        return null;
       })
       .finally(() => clearTimeout(timer));
     fastProbe = { name, ok };
   }
-  return fastProbe.ok.then((yes) => ({ ask: yes ? fast : main, main }));
+  return fastProbe.ok.then((m) => ({ ask: m ?? main, main }));
 }

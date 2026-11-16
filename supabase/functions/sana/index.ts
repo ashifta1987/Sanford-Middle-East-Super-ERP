@@ -6,6 +6,7 @@
 // Deploy:  supabase functions deploy sana
 // Secrets (S2, decision 11 Nov 2026 — Gemini is the provider; the key values are set by IT and never written anywhere else):
 //   supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-3.8-flash      (GEMINI_API_KEY is already a secret on live)
+//   S4: supabase secrets set SANA_MODEL_FAST=gemini-3.5-flash-lite (Ask); optional SANA_MAX_ROUNDS (default 3).
 //   Fallback: SANA_PROVIDER=anthropic with ANTHROPIC_API_KEY (SANA_MODEL=claude-…). Without a key for the chosen provider Sana
 //   runs in basic mode. Optional: SANA_THINKING_BUDGET (default 0 on Flash).
 // SUPABASE_URL and SUPABASE_ANON_KEY are provided by Supabase automatically. The service role key is NOT used.
@@ -24,6 +25,8 @@ const env = (): Env => ({
   SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
   SANA_PROVIDER: get('SANA_PROVIDER'),
   SANA_MODEL: get('SANA_MODEL'),
+  SANA_MODEL_FAST: get('SANA_MODEL_FAST'),   // S4: the Ask model (gemini-3.5-flash-lite since 16 Nov); `now`, `line` and detail answers use SANA_MODEL
+  SANA_MAX_ROUNDS: get('SANA_MAX_ROUNDS'),
   GEMINI_API_KEY: get('GEMINI_API_KEY'),
   ANTHROPIC_API_KEY: get('ANTHROPIC_API_KEY'),
   SANA_THINKING_BUDGET: get('SANA_THINKING_BUDGET'),

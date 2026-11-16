@@ -64,14 +64,14 @@ async function post(url: string, apiKey: string, body: unknown, signal: AbortSig
   return res;
 }
 
-export interface GeminiOptions { baseUrl?: string; thinkingBudget?: number | null }
+export interface GeminiOptions { baseUrl?: string; thinkingBudget?: number | null; /** S4: models without a thinking switch (e.g. gemini-3.5-flash-lite answer 400 to thinkingConfig) */ noThinkingConfig?: boolean }
 
 /** baseUrl exists for the LOCAL provider mock only (the local gateway passes it; the Edge Function never does). */
 export function gemini(apiKey: string, model: string, opts: GeminiOptions = {}): SanaModel {
   const base = (opts.baseUrl || GEMINI_BASE).replace(/\/+$/, '');
   // Gemini Flash models think by default and thinking tokens count as output: Sana's answers are lookups, so thinking is off
   // (budget 0) unless SANA_THINKING_BUDGET says otherwise. Models that cannot switch it off (Pro) get no thinkingConfig.
-  const budget = opts.thinkingBudget ?? (/flash/.test(model) ? 0 : null);
+  const budget = opts.noThinkingConfig ? null : opts.thinkingBudget ?? (/flash/.test(model) ? 0 : null);
   const ids = new Map<string, { name: string; gid?: string }>();
   let seq = 0;
   const toContents = (messages: Array<{ role: string; content: unknown }>) => messages.map((m) => ({

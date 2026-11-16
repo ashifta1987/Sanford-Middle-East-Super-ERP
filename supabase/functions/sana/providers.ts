@@ -90,8 +90,10 @@ export function pickAskModel(env: ProviderEnv): Promise<{ ask: SanaModel | null;
     const timer = setTimeout(() => ac.abort(), 4000);
     const ok = fast.ask({ system: 'Reply with OK.', messages: [{ role: 'user', content: 'ping' }], tools: [], maxTokens: 8, signal: ac.signal })
       .then(() => true)
-      .catch((e: { status?: number }) => {
-        if ([400, 403, 404].includes(e?.status ?? 0)) { console.error('sana fast model not available, using SANA_MODEL', e?.status); return false; }
+      .catch((e: { status?: number; message?: string; name?: string }) => {
+        // the provider's own status and message (never the key) go to the function logs, so a fallback can be explained
+        console.error('sana fast model check failed', name, e?.status ?? e?.name ?? 'error', String(e?.message ?? '').slice(0, 300));
+        if ([400, 403, 404].includes(e?.status ?? 0)) return false;
         fastProbe = null;   // network / timeout: check again next time, use the main model now
         return false;
       })

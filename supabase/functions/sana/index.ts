@@ -50,12 +50,16 @@ Deno.serve(async (req: Request) => {
   // S4: stream when the body says stream: true (or, as before, when the client accepts text/event-stream)
   if ((body as { stream?: unknown } | null)?.stream === true || (req.headers.get('Accept') ?? '').includes('text/event-stream')) {
     const enc = new TextEncoder();
+    // The work runs inside EdgeRuntime.waitUntil: without it the runtime may drop the worker ("EarlyDrop" in the function logs)
+    // while the stream is still being written, and the client sees the stream end without `done` (seen once in the S4 timing run).
+    let work: Promise<void> = Promise.resolve();
     const stream = new ReadableStream({
-      async start(controller) {
+      start(controller) {
         const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-        try { await handleAsk(auth, body, env(), send); } finally { controller.close(); }
+        work = (async () => { try { await handleAsk(auth, body, env(), send); } finally { controller.close(); } })();
       },
     });
+    (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(work);
     return new Response(stream, { headers: { ...cors, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
   }
   const { status, json } = await handleAsk(auth, body, env());

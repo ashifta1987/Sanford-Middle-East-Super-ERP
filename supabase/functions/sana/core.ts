@@ -221,12 +221,16 @@ export function makeRpc(env: Env, auth: string): Rpc {
   };
 }
 /** A tool lookup: a refused lookup (42501) becomes {denied: true}; other failures never leak details. */
+/** S4: a lookup that takes longer than this is treated as "no match" (the answer does not wait for the 8 s database limit). */
+export const TOOL_TIMEOUT_MS = 3000;
 async function runTool(rpc: Rpc, fn: string, args: Json): Promise<unknown> {
-  try { return await rpc(fn, args); } catch (e) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<unknown>((res) => { timer = setTimeout(() => res({ found: false, no_match: true, note: 'The lookup took too long; treat it as no match.' }), TOOL_TIMEOUT_MS); });
+  try { return await Promise.race([rpc(fn, args), slow]); } catch (e) {
     const err = e as { code?: string; status?: number };
     if (err.code === '42501' || err.status === 403) return { denied: true };
     return { error: 'lookup failed' };
-  }
+  } finally { clearTimeout(timer); }
 }
 
 const SAFE = (s: unknown) => String(s ?? '').replace(/[^\p{L}\p{N} ._/\-·]/gu, '').slice(0, 60);

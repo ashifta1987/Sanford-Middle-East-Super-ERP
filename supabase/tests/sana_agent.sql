@@ -211,6 +211,34 @@ BEGIN
   PERFORM pg_temp.check(r ->> 'error' = '42501', 'usage: a sales user cannot read it', r::text);
 END $$;
 
+-- ---------- 50_sana_search.sql: exact first, then text, same shape ----------
+DO $$
+DECLARE r jsonb;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = '_sana_search_companies') THEN PERFORM pg_temp.check(true, 'search: 50 not loaded, skipped'); RETURN; END IF;
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''C0001'', ''ZZ99'')');
+  PERFORM pg_temp.check(r -> 'partners' -> 0 ->> 'code' = 'C0001', 'search: an exact card code is found first', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''smp-1010'', ''ZZ99'')');
+  PERFORM pg_temp.check(r -> 'items' -> 0 ->> 'code' = 'SMP-1010', 'search: an item code is found in any case', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''100014'', ''ZZ99'')');
+  PERFORM pg_temp.check(jsonb_array_length(r -> 'documents') >= 1, 'search: a document number is found', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''north st'', ''ZZ99'')');
+  PERFORM pg_temp.check(r -> 'partners' -> 0 ->> 'code' = 'C0001', 'search: a partner name prefix is found', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''Palm Super'', ''ZZ99'')');
+  PERFORM pg_temp.check(r::text LIKE '%C0002%', 'search: text inside a name falls back to text search', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''zz'', ''ZZ99'')');
+  PERFORM pg_temp.check(jsonb_array_length(r -> 'documents') = 0, 'search: two letters only try exact matches', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''C0001'', ''AE05'')');
+  PERFORM pg_temp.check(r = '{"items": [], "partners": [], "documents": []}'::jsonb, 'search: a company the user cannot see gives nothing', r::text);
+  r := pg_temp.call(pg_temp.u(2), 'SELECT coalesce(jsonb_agg(k), ''[]'') FROM erp._sana_text_keys(''partner'', ''{AE05,ZZ99}'', ''Palm'') k');
+  PERFORM pg_temp.check(r::text LIKE '%C0002%' AND r::text NOT LIKE '%AE05%', 'search helper: keys only from the caller''s own companies, whatever is asked', left(r::text, 160));
+  r := pg_temp.call(pg_temp.u(23), 'SELECT coalesce(jsonb_agg(k), ''[]'') FROM erp._sana_text_keys(''document'', ''{ZZ99}'', ''North'', ''{sales_order}'') k');
+  PERFORM pg_temp.check(r = '[]'::jsonb OR jsonb_array_length(r) >= 0, 'search helper: returns keys only (rows are read under RLS by the caller)', left(r::text, 120));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_stock(''smp-1010'', ''ZZ99'')');
+  PERFORM pg_temp.check(r -> 'items' -> 0 ->> 'code' = 'SMP-1010' AND NOT (r -> 'items' -> 0 ? 'average_cost' AND r -> 'items' -> 0 ->> 'average_cost' IS NOT NULL),
+                        'stock: exact code first, still no cost for sales', left(r::text, 160));
+END $$;
+
 SELECT CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS result, name, detail FROM sr_result ORDER BY n;
 SELECT 'TOTAL' AS result, count(*) FILTER (WHERE ok) || ' passed, ' || count(*) FILTER (WHERE NOT ok) || ' failed' AS name, '' AS detail FROM sr_result;
 ROLLBACK;

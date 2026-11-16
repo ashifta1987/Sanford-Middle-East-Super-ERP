@@ -126,6 +126,8 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
         } catch (e) {
           console.error('sana tts failed', (e as { status?: number })?.status ?? 'network', (e as Error)?.message ?? '');
           await record(lang, 0, m.tts, false).catch(() => {});
+          // the provider's quota (429) is passed on as 429, so the browser goes straight to the device voice without a retry
+          if ((e as { status?: number })?.status === 429) return fail(429, "Sana's own voice is busy right now. Your device's voice reads the answer instead.");
           return fail(502, "Sana couldn't read that aloud right now. Try again in a moment.");
         }
       } else { ttsCache.delete(key); ttsCache.set(key, hit); }   // most recently used last

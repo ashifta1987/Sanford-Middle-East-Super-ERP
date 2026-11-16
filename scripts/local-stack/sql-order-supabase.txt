@@ -35,3 +35,4 @@ supabase/sql/46_sana_agent.sql
 supabase/sql/47_sana_checks.sql
 supabase/sql/48_sana_indexes.sql
 supabase/sql/49_sana_timing.sql
+supabase/sql/50_sana_search.sql

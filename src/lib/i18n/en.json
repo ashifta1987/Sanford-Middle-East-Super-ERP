@@ -3453,7 +3453,13 @@
         "questions": "Questions",
         "refused": "Refused",
         "voice": "By voice",
-        "users": "People"
+        "users": "People",
+        "answers": "Answers",
+        "firstText": "First text",
+        "total": "Whole answer",
+        "firstAudio": "First sound",
+        "rounds": "Lookups",
+        "voices": "Voices"
       },
       "refusalRate": "Refusal rate",
       "voiceShare": "Voice share",
@@ -3487,7 +3493,12 @@
         "body": "The provider, models and key are server settings that IT keeps as Supabase secrets. They are never stored in the database, never shown here and never reach the browser.",
         "unavailable": "The server settings could not be read right now. Sana still works; try again later.",
         "mock": "Local test mock — not AI"
-      }
+      },
+      "speed": "Speed (p50 / p90)",
+      "noSpeed": "No timings yet",
+      "noSpeedBody": "Answers given after the speed update show here.",
+      "speedBody": "Seconds from sending a question: first text, whole answer and first sound (p50 / p90). Voices: device / Sana (Gemini) / on phones. Numbers only, never the questions.",
+      "voicesCell": "{{device}} / {{gemini}} / {{phone}}"
     }
   },
   "rpt": {

@@ -27,6 +27,8 @@ export interface AskResult {
   fallback: boolean;     // AI mode failed and basic mode answered
   denied: boolean;
   language: string;
+  /** S4 step 5: ms_first_token, ms_total, tool_rounds, model, model_main */
+  timing?: Record<string, unknown>;
   provider: string | null; // S2: 'gemini' | 'anthropic' when a model is configured (also on fallback), null in basic mode
   model: string | null;
 }
@@ -436,7 +438,7 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
 }
 
 // ---------- AI mode (provider adapter with tool use; streaming text) ----------
-interface AiOut extends Basic { usage: Usage; refused: boolean }
+interface AiOut extends Basic { usage: Usage; refused: boolean; rounds?: number }
 async function aiAnswer(model: SanaModel, system: string, history: ProviderMessage[], question: string, tools: Tool[], rpc: Rpc,
                         company: string | null, signal: AbortSignal, emit?: Emit, redactor?: StreamRedactor, rounds = LIMITS.rounds): Promise<AiOut> {
   const messages: ProviderMessage[] = [...history, { role: 'user', content: question }];
@@ -451,8 +453,8 @@ async function aiAnswer(model: SanaModel, system: string, history: ProviderMessa
       onText: emit ? (d) => { const s = redactor!.push(d); if (s) emit('delta', { text: s }); } : undefined });
     usage.in += turn.usage?.in ?? 0; usage.out += turn.usage?.out ?? 0;
     messages.push(turn.assistant);
-    if (turn.refused) return { reply: '', results: [...results, { denied: true }], used: [...used, { tool: 'provider', input: { rule: 'refusal' } }], usage, refused: true };
-    if (!turn.toolCalls.length) return { reply: turn.text, results, used, usage, refused: false };
+    if (turn.refused) return { reply: '', results: [...results, { denied: true }], used: [...used, { tool: 'provider', input: { rule: 'refusal' } }], usage, refused: true, rounds: round };
+    if (!turn.toolCalls.length) return { reply: turn.text, results, used, usage, refused: false, rounds: round };
     if (emit && redactor) { if (redactor.full) emit('reset', {}); redactor.reset(); }
     const out: Array<{ id: string; content: string }> = [];
     for (const call of turn.toolCalls) {
@@ -465,7 +467,7 @@ async function aiAnswer(model: SanaModel, system: string, history: ProviderMessa
     }
     messages.push(model.toolResults(out));
   }
-  return { reply: 'That needed too many lookups. Please ask a narrower question.', results, used, usage, refused: false };
+  return { reply: 'That needed too many lookups. Please ask a narrower question.', results, used, usage, refused: false, rounds };
 }
 
 /** S2 · admin-only config (Administration › Add-Ons › AI Assistant (Sana)): provider, models and "key configured" yes/no.
@@ -486,7 +488,14 @@ export async function handleConfig(auth: string | null, body: unknown, env: Env)
 }
 
 // ---------- Entry point ----------
-export async function handleAsk(auth: string | null, body: unknown, env: Env, emit?: Emit): Promise<{ status: number; json: unknown }> {
+export async function handleAsk(auth: string | null, body: unknown, env: Env, emitRaw?: Emit): Promise<{ status: number; json: unknown }> {
+  // S4 step 5: timing — ms to the first text sent, ms to `done`
+  const t0 = Date.now();
+  let msFirstToken: number | null = null;
+  const emit: Emit | undefined = emitRaw && ((event, data) => {
+    if (msFirstToken === null && event === 'delta' && String((data as { text?: unknown })?.text ?? '').trim()) msFirstToken = Date.now() - t0;
+    emitRaw(event, data);
+  });
   const fail = (status: number, error: string) => { emit?.('error', { error, status }); return { status, json: { error } }; };
   if (!auth || !/^Bearer\s+\S+/i.test(auth)) return fail(401, 'Sign in to use Sana.');
   const b = (body ?? {}) as Json;
@@ -526,6 +535,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     let fallback = false;
     let usage: Usage | null = null;
     let modelRefused = false;
+    let toolRounds = 0;
     emit?.('meta', { mode, language: lang, provider: model?.provider ?? null, model: model?.model ?? null, model_main: main?.model ?? null });
 
     if (SENSITIVE.test(question)) {
@@ -541,7 +551,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       try {
         const history: ProviderMessage[] = (hist?.messages ?? []).map((m) => ({ role: m.role, content: m.content }));   // not mine / gone: start fresh
         const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages, detail), history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
-        out = ai; usage = ai.usage; modelRefused = ai.refused;
+        out = ai; usage = ai.usage; modelRefused = ai.refused; toolRounds = ai.rounds ?? 0;
         if (emit && redactor && !modelRefused) { const rest = redactor.rest(); if (rest) emit('delta', { text: rest }); }
       } catch (e) {
         // The model failed or timed out: answer in basic mode and say so (S1 rule 8). Log status + provider message only, never the question.
@@ -575,7 +585,11 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
         return await rpc('sana_log', logArgs) as { conversation_id: string; message_id: number };
       }
     };
-    const base = { reply, sources, mode, fallback, denied, language: lang, provider, model: modelId };
+    const msTotal = Date.now() - t0;
+    const timing = { ms_first_token: msFirstToken ?? msTotal, ms_total: msTotal, tool_rounds: toolRounds, model: modelId, model_main: main?.model ?? null };
+    const base = { reply, sources, mode, fallback, denied, language: lang, provider, model: modelId, timing };
+    // stored with the answer (49_sana_timing.sql); before 49 is applied the RPC is missing and this is skipped
+    const saveTiming = (messageId: number) => rpc('sana_timing_set', { p_message: messageId, p_timing: { ...timing, model_fast: modelId } }).catch(() => null);
     if (emit) {
       // S4 step 3: streaming sends 'done' first, then logs (conversation, messages, audit, daily count) while the stream is still
       // open and sends 'logged' with the ids. Logging always happens; it just no longer delays the answer.
@@ -584,6 +598,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       try {
         const logged = await log();
         emit('logged', { conversation_id: logged.conversation_id, message_id: logged.message_id });
+        await saveTiming(logged.message_id);
         return { status: 200, json: { ...base, ...logged } };
       } catch (e) {
         console.error('sana log failed', (e as { code?: string })?.code ?? 'error');
@@ -592,6 +607,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       }
     }
     const logged = await log();
+    await saveTiming(logged.message_id);
     const result: AskResult = { conversation_id: logged.conversation_id, message_id: logged.message_id, ...base };
     return { status: 200, json: result };
   } catch (e) {

@@ -11,6 +11,7 @@ import { sanaContextSuggestions, sanaSuggestions, useSana, useSanaHistory, type 
 import { SANA_LANGUAGES, speechLocale, stopSpeaking as stopBrowserSpeaking, useSpeechInput, useVoicesReady } from './voice';
 import { stopProviderAudio, useProviderSpeechInput } from './providerVoice';
 import { primeAudio, SentenceSpeaker, stopAllSpeech, type VoiceEngine } from './speechQueue';
+import { erp } from '@/lib/supabase';
 
 const stopSpeaking = () => { stopAllSpeech(); stopBrowserSpeaking(); stopProviderAudio(); };
 
@@ -173,9 +174,9 @@ export function SanaPanel() {
   const langs = SANA_LANGUAGES.filter((l) => l.code === 'auto' || !s.status?.languages || s.status.languages.includes(l.code));
 
   /** S4: one speaker per answer. `target.id` is 'live' while the answer streams, then the answer's id. */
-  function makeSpeaker(target: { id: string; engine?: VoiceEngine }, language: string) {
+  function makeSpeaker(target: { id: string; engine?: VoiceEngine }, language: string, t0?: number, onFirstAudio?: (ms: number) => void) {
     return new SentenceSpeaker({
-      providerMode: providerVoice, forceGemini, company: s.status?.company ?? null, language, uiLanguage: i18n.language,
+      providerMode: providerVoice, forceGemini, company: s.status?.company ?? null, language, uiLanguage: i18n.language, t0, onFirstAudio,
       onStart: () => setSpeakingId(target.id),
       onEnd: () => setSpeakingId((id) => (id === target.id ? null : id)),
       onEngine: (e) => { target.engine = e; setEngines((x) => ({ ...x, [target.id]: e })); },
@@ -189,9 +190,17 @@ export function SanaPanel() {
     const live = s.autoSpeak && via === 'voice' && voiceOn;
     if (live) primeAudio();
     const target: { id: string; engine?: VoiceEngine } = { id: 'live' };
-    const sp = live ? makeSpeaker(target, s.language) : null;
+    // S4 step 5: ms from sending to the first sound + which voice spoke on which device, sent once the answer has its stored id
+    const beacon: { ms?: number; messageId?: number; sent?: boolean } = {};
+    const sendBeacon = () => {
+      if (beacon.sent || beacon.ms == null || beacon.messageId == null || !target.engine) return;
+      beacon.sent = true;
+      const device = window.matchMedia?.('(pointer: coarse)').matches ? 'phone' : 'desktop';
+      void erp().rpc('sana_audio_beacon', { p_message: beacon.messageId, p_ms_first_audio: Math.round(beacon.ms), p_engine: target.engine, p_device: device });
+    };
+    const sp = live ? makeSpeaker(target, s.language, performance.now(), (ms) => { beacon.ms = ms; sendBeacon(); }) : null;
     // read aloud sentence by sentence while the answer streams
-    const reply = await s.ask(q, via, sp ? { onText: (full) => sp.push(full), onLanguage: (l) => sp.setLanguage(l) } : undefined);
+    const reply = await s.ask(q, via, sp ? { onText: (full) => sp.push(full), onLanguage: (l) => sp.setLanguage(l), onLogged: (id) => { beacon.messageId = id; sendBeacon(); } } : undefined);
     if (!sp) return;
     if (!reply || reply.error) { sp.stop(); return; }
     target.id = reply.id;

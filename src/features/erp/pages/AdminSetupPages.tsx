@@ -13,7 +13,7 @@ import { Dialog } from '../components/Dialog';
 import { todayIso } from '../journal';
 import {
   adminSettingSave, sanaSave, companyCancel, companyDecide, companySubmit, fxImport, fxSave, parseRatesCsv, ruleDelete, ruleSave,
-  uploadLogo, useSanaConfig, useSanaSetup, useCompanyInfo, useFxSetup, useTemplates,
+  uploadLogo, useSanaConfig, useSanaSetup, useSanaTiming, useCompanyInfo, useFxSetup, useTemplates,
   type ApprovalRule, type FxRow, type LimitKind, type Profile, type RuleSpec,
 } from '../admin';
 import { AdminFrame, AuditCard, CompanyPicker, ErrorBox, Flash, ReadOnlyNote, useAdminCompany } from './AdminPages';
@@ -471,6 +471,7 @@ export function AiAssistantPage() {
   const sc = useAdminCompany();
   const { company } = sc;
   const q = useSanaSetup(company);
+  const speed = useSanaTiming(company);
   const cfg = useSanaConfig(company);
   const [f, setF] = useState<Record<string, unknown>>({});
   const [err, setErr] = useState<string | null>(null);
@@ -482,6 +483,7 @@ export function AiAssistantPage() {
   const langs = v<string[]>('languages', []);
   const tot = q.data?.usage.total_30_days;
   const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)} %` : '—');
+  const secs = (ms: number | null) => (ms == null ? '—' : (ms / 1000).toFixed(1));
 
   async function save() {
     setErr(null); setFlash(null); setBusy(true);
@@ -557,6 +559,33 @@ export function AiAssistantPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </SectionCard>
+            <SectionCard title={t('adm.ai.speed')}>
+              {!speed.data?.length ? <EmptyState title={t('adm.ai.noSpeed')} body={t('adm.ai.noSpeedBody')} /> : (
+                <div className="relative overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-[14px]" data-testid="adm-ai-speed">
+                    <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                      <th className="px-4 py-2.5 text-start">{t('adm.ai.col.day')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.answers')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.firstText')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.total')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.firstAudio')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.rounds')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.voices')}</th>
+                    </tr></thead>
+                    <tbody className="[&>tr]:border-t [&>tr]:border-line [&_td]:px-4 [&_td]:py-2.5">
+                      {speed.data.map((d) => (
+                        <tr key={d.day}>
+                          <td>{fmtDay(d.day)}</td><td className="num text-end">{d.answers}</td>
+                          <td className="num text-end">{secs(d.first_token_p50)} / {secs(d.first_token_p90)}</td>
+                          <td className="num text-end">{secs(d.total_p50)} / {secs(d.total_p90)}</td>
+                          <td className="num text-end">{secs(d.first_audio_p50)} / {secs(d.first_audio_p90)}</td>
+                          <td className="num text-end">{d.tool_rounds_avg ?? '—'}</td>
+                          <td className="num text-end">{t('adm.ai.voicesCell', { device: d.voice_device, gemini: d.voice_gemini, phone: d.voice_phone })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="border-t border-line px-4 py-2 text-xs text-muted">{t('adm.ai.speedBody')}</p>
                 </div>
               )}
             </SectionCard>

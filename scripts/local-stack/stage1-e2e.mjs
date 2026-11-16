@@ -324,6 +324,9 @@ await browser.close();
     const order = s1.events.map((e) => e.ev);
     ok('stream: true (no Accept header) answers as Server-Sent Events', s1.type.includes('text/event-stream'), s1.type);
     ok('stream: meta first, then sources, done, and logged last (logging after the reply)', order[0] === 'meta' && order.at(-1) === 'logged' && order.at(-2) === 'done' && order.at(-3) === 'sources', order.join(','));
+    const tm = s1.done?.timing ?? {};
+    ok('step 5: done carries ms_first_token, ms_total, tool_rounds and the model', Number.isInteger(tm.ms_first_token) && Number.isInteger(tm.ms_total) && tm.ms_first_token <= tm.ms_total
+      && Number.isInteger(tm.tool_rounds) && 'model' in tm && 'model_main' in tm, JSON.stringify(tm));
     ok('stream: meta names the Ask model and the main model', 'model_main' in (s1.events[0]?.d ?? {}), JSON.stringify(s1.events[0]?.d));
     ok('stream: a lookup sends a tool event with the name only', s1.events.some((e) => e.ev === 'tool' && Object.keys(e.d).join() === 'name' && /^sana_/.test(e.d.name)),
       JSON.stringify(s1.events.filter((e) => e.ev === 'tool').map((e) => e.d)));

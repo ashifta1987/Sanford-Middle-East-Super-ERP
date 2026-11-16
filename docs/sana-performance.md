@@ -109,3 +109,39 @@ Gemini 3.8 Flash TTS is limited to 10 requests per minute and 100 per day on the
 Local (mock, 700 ms per model call): first text p50 / p90 1,467 / 1,491 ms, total 1,549 / 1,568 ms. This is unchanged, as
 expected: the mock's fixed per-call latency hides the RPC savings, and the mock has no faster model. Live baseline (Step 1): first
 text 5,803 / 15,310 ms. The live after-run follows the deploy.
+
+### Steps 3–4 live (deployed 16 Nov 22:07; 40 questions)
+
+| Run | feedback p50 / p90 | first text p50 / p90 | total p50 / p90 | errors |
+|---|---|---|---|---|
+| Step 1 baseline | 2,613 / 3,891 ms | 5,803 / 15,310 ms | 6,669 / 15,609 ms | 0 |
+| after Steps 3–4 | 2,729 / 3,725 ms | 5,870 / 16,602 ms | 6,837 / 16,602 ms | 1 (stream ended without done) |
+
+The first text did not come down. Per question (median): feedback = profile checks + first model round; tool→text = lookup + second
+model round; text→done = rest of the stream.
+
+| q | question | before: feedback / tool→text / text→done | after |
+|---|---|---|---|
+| 1 | open sales orders | 3,585 / 2,306 / 58 | 3,624 / 2,212 / 12 |
+| 2 | net sales this month | 3,315 / 2,767 / 253 | 3,805 / 2,968 / 511 |
+| 3 | overdue invoices | 3,524 / 3,725 / 1,993 | 2,155 / 4,392 / 1,884 |
+| 4 | stock of SMP-1010 | 3,285 / **14,585** / 170 | 3,418 / **14,914** / 46 |
+| 5 | customers who owe most | 2,194 / 3,780 / 1,404 | 2,371 / 4,062 / 1,282 |
+| 6 | balance of C0001 | 2,606 / **12,783** / 58 | 3,175 / **13,427** / 17 |
+| 7 | owed to suppliers | 2,547 / 2,557 / 579 | 3,041 / 2,898 / 365 |
+| 8 | open purchase orders | 2,768 / 1,862 / 1,309 | 3,072 / 2,291 / 1,288 |
+| 9 | top items this month | 2,984 / 3,000 / 1,312 | 2,865 / 2,680 / 1,196 |
+| 10 | receivables ageing | 2,329 / 3,181 / 1,348 | 2,517 / 3,269 / 1,182 |
+
+What dominates:
+
+1. **The fast model was not used.** All 40 answers were stored with `gemini-3.8-flash`, so the check for `gemini-3.8-flash-lite`
+   fell back. Either the key does not have that model or the check failed; the name for this key is needed (`SANA_MODEL_FAST`).
+2. **Two lookups hit the 8 s statement limit.** Measured as qa.sales / qa.finance on live (read-only):
+   - `sana_find('SMP-1010')` and `sana_find('C0001')` are cancelled after 8,1 s: ILIKE over 651k documents with a per-row
+     can_see / sana_doc_allowed. This is the 13–15 s on q4 and q6.
+   - `sana_stock('SMP-1010')` takes 2,133 ms (name ILIKE '%…%' over items). `sana_receivables` takes 819–881 ms;
+     `sana_partner('C0001')` takes 363 ms.
+   - `sana_whoami` and `sana_status` take about 50–60 ms each, so making them parallel saves only about 50 ms.
+3. **The model rounds are the rest.** The first round (deciding on a lookup) takes about 2–3 s and the second (the answer) about
+   2–3 s. That gives roughly 5–6 s even when the lookup is fast.

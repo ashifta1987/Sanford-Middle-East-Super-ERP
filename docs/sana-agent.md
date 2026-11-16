@@ -132,3 +132,21 @@ Each file was run first in a transaction that was rolled back, then committed wi
 Follow-up (commit 99d2159, deploys with S4 steps 3–4): the model now gets what is left of a 2.5 s deadline (checks included), so
 `now` stays under 3 s end to end. The duplicate-bill check takes about 0.6 s on AE05; an index for it would be a new SQL file (48)
 and would need a go.
+
+## Track B · what S4 leaves in place for Gemini Live (agreed 16 Nov 2026)
+
+Gemini Live (ephemeral tokens) will be the main voice path. Steps 3–5 keep these six things in place for it:
+
+1. **Checks stay separate from the model call.** The per-request server step (profile and role, the allowed tool list, settings and
+   limits) stays apart from the model call. A Live session token is minted only after exactly these checks.
+2. **Tools stay user-JWT RPCs.** Every tool stays an `erp.*` RPC called with the user's own token through the same allowed list.
+   Live tool calls go through a small server relay, never straight from the browser to the database.
+3. **Masking and filtering stay standalone.** The input masker (`mask.ts`) and the output filter (`redact` / `StreamRedactor` in
+   core.ts) stay standalone functions, so the relay can apply them to Live transcripts.
+4. **Logging stays after the reply.** `done` then `logged`, `sana_log`, the audit rows and `sana_timing_set` stay the same. A Live
+   turn is logged the same way: the transcript is logged after the turn.
+5. **The browser audio queue stays.** `speechQueue.ts` (Web Audio, buffers scheduled back to back, stop and clear) is the output
+   layer, and it plays Live's 16-bit PCM like `pcm16`.
+6. **Timing and quota stay per turn.** The Step 5 fields (ms_first_token, ms_first_audio, ms_total, model, voice engine and device)
+   are recorded per Live turn. The voice budget (`TTS_DAILY_CAP`, moving to `erp.sana_settings`) becomes a Live-minutes budget per
+   user.

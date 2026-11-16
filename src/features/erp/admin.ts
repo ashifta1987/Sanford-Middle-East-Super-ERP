@@ -148,6 +148,13 @@ export const fxImport = (company: string, rows: Array<{ date: string; currency: 
 export const useSanaSetup = (company: string) => useQuery({
   queryKey: ['adm-sana', company], enabled: Boolean(company), queryFn: () => rpc<SanaSetup>('sana_setup', { p_company: company }),
 });
+/** S4 step 5 · Usage › speed: p50 / p90 per day (numbers only; 49_sana_timing.sql). Empty when 49 is not applied yet. */
+export interface SanaTimingDay { day: string; answers: number; first_token_p50: number | null; first_token_p90: number | null; total_p50: number | null; total_p90: number | null;
+  first_audio_p50: number | null; first_audio_p90: number | null; tool_rounds_avg: number | null; voice_device: number; voice_gemini: number; voice_phone: number }
+export const useSanaTiming = (company: string) => useQuery({
+  queryKey: ['adm-sana-timing', company], enabled: Boolean(company), retry: false,
+  queryFn: () => rpc<SanaTimingDay[]>('sana_timing_usage', { p_company: company, p_days: 14 }).catch(() => [] as SanaTimingDay[]),
+});
 export const sanaSave = (company: string, p: Record<string, unknown>) => rpc<{ enabled: boolean }>('sana_settings_save', { p_company: company, p });
 
 /** S2 · what the sana Edge Function runs on (admin-only; names and yes/no only — the function never returns a key). */

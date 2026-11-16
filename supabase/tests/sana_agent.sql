@@ -185,6 +185,32 @@ BEGIN
   PERFORM pg_temp.check(ok, 'feedback: it points at an answer or a finding, never neither');
 END $$;
 
+-- ---------- S4 step 5 (49_sana_timing.sql): timing, audio beacon, usage speed ----------
+DO $$
+DECLARE r jsonb; mid bigint;
+BEGIN
+  IF to_regprocedure('erp.sana_timing_set(bigint, jsonb)') IS NULL THEN PERFORM pg_temp.check(true, 'timing: 49 not loaded, skipped'); RETURN; END IF;
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_log(NULL, ''ZZ99'', ''en'', ''How many open sales orders?'', ''Twelve.'', ''[]'', ''[]'', false, ''basic'', ''text'')');
+  mid := (r ->> 'message_id')::bigint;
+  r := pg_temp.call(pg_temp.u(4), format('SELECT erp.sana_timing_set(%s, ''{"ms_first_token": 900, "ms_total": 1500, "tool_rounds": 1}'')', mid));
+  PERFORM pg_temp.check(r ->> 'error' = 'P0002', 'timing: another user cannot write timings on my answer', r::text);
+  r := pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_timing_set(%s, ''{"ms_first_token": 900, "ms_total": 1500, "tool_rounds": 1, "model_fast": "gemini-3.8-flash-lite"}'')', mid));
+  PERFORM pg_temp.check((r ->> 'set')::boolean AND (SELECT ms_total FROM erp.sana_message WHERE message_id = mid) = 1500
+                        AND EXISTS (SELECT 1 FROM erp.audit_log WHERE action = 'sana.timing' AND object_ref = mid::text), 'timing: stored once with an audit row', r::text);
+  r := pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_timing_set(%s, ''{"ms_total": 1}'')', mid));
+  PERFORM pg_temp.check(r ->> 'set' = 'false' AND (SELECT ms_total FROM erp.sana_message WHERE message_id = mid) = 1500, 'timing: a second write is ignored', r::text);
+  r := pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_audio_beacon(%s, 1800, ''loud'', ''phone'')', mid));
+  PERFORM pg_temp.check(r ->> 'error' = 'P0001', 'beacon: engine must be device or gemini', r::text);
+  r := pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_audio_beacon(%s, 1800, ''device'', ''phone'')', mid));
+  PERFORM pg_temp.check((r ->> 'set')::boolean AND (SELECT voice_engine || '/' || voice_device || '/' || ms_first_audio FROM erp.sana_message WHERE message_id = mid) = 'device/phone/1800',
+                        'beacon: first audio, engine and device are stored (phone-voice tracking)', r::text);
+  r := pg_temp.call(pg_temp.u(1), 'SELECT erp.sana_timing_usage(''ZZ99'', 14)');
+  PERFORM pg_temp.check((r -> 0 ->> 'answers')::integer >= 1 AND (r -> 0 ->> 'voice_phone')::integer >= 1 AND NOT (r::text ILIKE '%open sales orders%'),
+                        'usage: admin sees p50 / p90 per day and voice counts, never the question', left(r::text, 200));
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_timing_usage(''ZZ99'', 14)');
+  PERFORM pg_temp.check(r ->> 'error' = '42501', 'usage: a sales user cannot read it', r::text);
+END $$;
+
 SELECT CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS result, name, detail FROM sr_result ORDER BY n;
 SELECT 'TOTAL' AS result, count(*) FILTER (WHERE ok) || ' passed, ' || count(*) FILTER (WHERE NOT ok) || ' failed' AS name, '' AS detail FROM sr_result;
 ROLLBACK;

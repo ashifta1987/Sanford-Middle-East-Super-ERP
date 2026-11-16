@@ -29,7 +29,7 @@ export interface SanaContext { type: 'document' | 'partner' | 'item' | 'report' 
 export interface SanaStatus { profile: boolean; enabled: boolean; voice_enabled?: boolean; voice_mode?: 'browser' | 'provider'; daily_limit?: number; used?: number; voice_calls?: number; languages?: string[]; company?: string }
 export interface SanaConversation { conversation_id: string; title: string; company: string | null; started_at: string; last_at: string; messages: number }
 
-export interface AskOpts { onText?: (full: string) => void; onLanguage?: (language: string) => void }
+export interface AskOpts { onText?: (full: string) => void; onLanguage?: (language: string) => void; /** S4 step 5: the stored answer id (for the audio beacon) */ onLogged?: (messageId: number) => void }
 interface OpenOpts { context?: SanaContext | null; question?: string; via?: 'text' | 'voice' }
 interface SanaCtx {
   open: boolean;
@@ -181,7 +181,7 @@ export function SanaProvider({ children }: { children: ReactNode }) {
         if (ev === 'sources') patch((m) => ({ ...m, sources: (d.sources as SanaSource[]) ?? [] }));
         if (ev === 'logged') {
           if (d.conversation_id) setConv(String(d.conversation_id));
-          if (d.message_id != null) patch((m) => ({ ...m, messageId: Number(d.message_id) }));
+          if (d.message_id != null) { patch((m) => ({ ...m, messageId: Number(d.message_id) })); opts?.onLogged?.(Number(d.message_id)); }
           markLogged();
           qc.invalidateQueries({ queryKey: ['sana-status'] });
           qc.invalidateQueries({ queryKey: ['sana-history'] });
@@ -189,7 +189,7 @@ export function SanaProvider({ children }: { children: ReactNode }) {
       });
       dropQueued();
       if (r.conversation_id) setConv(r.conversation_id);
-      if (!(r as { logging?: boolean }).logging) markLogged();   // the JSON reply (no stream) is already logged
+      if (!(r as { logging?: boolean }).logging) { markLogged(); if (r.message_id != null) opts?.onLogged?.(r.message_id); }   // the JSON reply (no stream) is already logged
       setMode(r.mode);
       const msg: SanaMessage = { id: answerId, messageId: r.message_id, role: 'assistant', text: r.reply, sources: r.sources, denied: r.denied, mode: r.mode, fallback: r.fallback, via, language: r.language };
       // keep a message id that 'logged' may already have set

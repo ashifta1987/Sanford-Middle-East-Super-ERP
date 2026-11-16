@@ -33,3 +33,5 @@ supabase/sql/37_sana_gemini.sql
 # S3 phase 1 (branch first; live only after Ashif's go). 38–44 are live already (applied by hand); 45 is review-only.
 supabase/sql/46_sana_agent.sql
 supabase/sql/47_sana_checks.sql
+supabase/sql/48_sana_indexes.sql
+supabase/sql/49_sana_timing.sql

@@ -110,6 +110,8 @@ function ModuleRoute() {
   return <ModulePage key={key} moduleKey={key} />;
 }
 
+const LiveTestPage = lazy(() => import('@/features/sana/LiveTestPage').then((m) => ({ default: m.LiveTestPage })));
+
 export default function App() {
   return (
     <Suspense fallback={<PageLoading />}>
@@ -133,6 +135,7 @@ export default function App() {
         <Route path="m/:key" element={<ModuleRoute />} />
         <Route path="preview/:key" element={<PreviewPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="sana/live-test" element={<Suspense fallback={null}><LiveTestPage /></Suspense>} />   {/* S5 M1 · hidden, Administration only */}
         <Route path="control" element={<ControlTowerPage />} />
 
         {/* Working screens on live data (Stage 1: read, search, filter, export) */}

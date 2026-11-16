@@ -175,6 +175,22 @@ BEGIN
   PERFORM pg_temp.check(r ? 'waiting_count' AND (r ->> 'list_link') = '/approvals', 'approvals: waiting count and inbox link', left(r::text, 200));
 END $$;
 
+-- S3 rule 3: import cost and supplier for ANY item only for purchase, finance, inventory (QC) and the owner. No tool returns a cost
+-- or supplier field to sales, HR, staff or IT, whatever they ask (the 50 phrasings run through the function: sana-agent-e2e.mjs).
+DO $$
+DECLARE n integer; r text; hit text;
+BEGIN
+  FOREACH n IN ARRAY ARRAY[2, 18, 20, 23] LOOP
+    r := pg_temp.tools(n)::text;
+    hit := substring(r FROM '"(average_cost|cost|unit_cost|landed_cost|purchase_price|last_purchase_price|gross_buy_price|stock_price|preferred_supplier|supplier_part_no|supplier_country|supplier_terms)":\s*[^n\s]');
+    PERFORM pg_temp.check(hit IS NULL, format('cost/supplier: user %s gets no cost or supplier field from any tool', n), coalesce(hit, ''));
+  END LOOP;
+  FOREACH n IN ARRAY ARRAY[4, 5, 10, 13] LOOP
+    r := pg_temp.call(pg_temp.u(n), 'SELECT erp.sana_stock(''SMP-1010'', ''ZZ99'')')::text;
+    PERFORM pg_temp.check(r LIKE '%"cost_visible": true%' OR r LIKE '%"denied": true%', format('cost: user %s (finance/owner/purchase/inventory) may see cost', n), left(r, 120));
+  END LOOP;
+END $$;
+
 SELECT CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS result, name, detail FROM sr_result ORDER BY n;
 SELECT 'TOTAL' AS result, count(*) FILTER (WHERE ok) || ' passed, ' || count(*) FILTER (WHERE NOT ok) || ' failed' AS name, '' AS detail FROM sr_result;
 ROLLBACK;

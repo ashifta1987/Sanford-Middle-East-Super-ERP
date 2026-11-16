@@ -2,6 +2,7 @@
 // { stream: true } or Accept: text/event-stream → the answer streams as Server-Sent Events (meta, delta, reset, tool, sources, done,
 // error); otherwise one JSON reply (unchanged, e.g. the home-page box).
 // POST { action: 'config', company } → admin-only provider config for the settings screen (names and yes/no, never a key).
+// S3: POST { mode: 'now'|'line', company, record_type, record_id, screen?, language?, draft? } → agent cards / one line (agent.ts).
 // Deploy:  supabase functions deploy sana
 // Secrets (S2, decision 11 Nov 2026 — Gemini is the provider; the key values are set by IT and never written anywhere else):
 //   supabase secrets set SANA_PROVIDER=gemini SANA_MODEL=gemini-3.8-flash      (GEMINI_API_KEY is already a secret on live)
@@ -10,6 +11,7 @@
 // SUPABASE_URL and SUPABASE_ANON_KEY are provided by Supabase automatically. The service role key is NOT used.
 // The test-only base-URL variables of the local provider mock are deliberately NOT read here.
 import { handleAsk, handleConfig, type Env } from './core.ts';
+import { handleAgent } from './agent.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +39,12 @@ Deno.serve(async (req: Request) => {
   const auth = req.headers.get('Authorization');
   if (body && typeof body === 'object' && (body as { action?: unknown }).action === 'config') {
     const { status, json } = await handleConfig(auth, body, env());
+    return Response.json(json, { status, headers: cors });
+  }
+  // S3: the agent modes (one JSON reply; the deterministic checks come back even without a model)
+  const mode = (body as { mode?: unknown } | null)?.mode;
+  if (mode === 'now' || mode === 'line') {
+    const { status, json } = await handleAgent(auth, body, env());
     return Response.json(json, { status, headers: cors });
   }
   // S4: stream when the body says stream: true (or, as before, when the client accepts text/event-stream)

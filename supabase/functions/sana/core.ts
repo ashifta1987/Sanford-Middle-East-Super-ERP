@@ -235,7 +235,7 @@ export function cleanContext(c: unknown): PageContext | null {
   return out;
 }
 
-export function systemPrompt(who: Who, company: string | null, lang: string, via: string, ctx: PageContext | null, languages?: string[]): string {
+export function systemPrompt(who: Who, company: string | null, lang: string, via: string, ctx: PageContext | null, languages?: string[], detail = false): string {
   const t = who.topics!;
   const allowed = Object.entries(t).filter(([, v]) => v).map(([k]) => k.replace(/_/g, ' '));
   const notAllowed = Object.entries(t).filter(([, v]) => !v).map(([k]) => k.replace(/_/g, ' '));
@@ -260,7 +260,9 @@ export function systemPrompt(who: Who, company: string | null, lang: string, via
     '4. You can only read. You cannot create, change, approve, post, send or delete anything. When asked to, say which Southfield screen does it (for example Sales › Sales Order) and stop.',
     '5. Never output passport, Emirates ID or other ID numbers, birth dates, bank account or IBAN, card numbers, passwords, or salaries — not even the user\'s own.',
     `6. Reply in ${LANGS[lang] ?? 'the language the user wrote in'}. Keep document numbers, item codes and amounts in Western digits (0-9); show amounts with their currency, e.g. 12,500.00 AED. Keep SAP document names (Sales Order, A/R Invoice) in English when there is no common translation. You can understand and answer in any of these languages switched on for this company: ${enabled.join(', ')}. If the user asks which languages you speak, or asks you to switch, say so and answer in the language they choose (from that list).`,
-    via === 'voice'
+    via !== 'voice' && detail
+      ? '7. The user asked for the detailed answer (S3). Inside this role\'s topics answer in five short parts with these headings: Answer (one sentence); Facts (each with its link); Rule or SOP (name the section only if a tool returned it, else write "none found"); What you can do now (which Southfield screen); Check this (what to verify, using the words likely / possible / check this). Outside the role\'s topics give only the refusal in rule 2.'
+      : via === 'voice'
       ? '7. This answer will be spoken aloud: plain sentences only — no markdown, no tables, no bullet lists, no lists of codes; at most three short sentences; round amounts sensibly.'
       : '7. Be brief: one to four sentences, or a short list for several records. No raw JSON, no tables wider than three columns.',
     '8. Short general business questions (what VAT is, how aging works) may be answered from general knowledge; start with "In general," so it is clearly not company data.',
@@ -489,6 +491,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
   const via = b.via === 'voice' ? 'voice' : 'text';
   const conversationId = typeof b.conversation_id === 'string' && /^[0-9a-f-]{36}$/i.test(b.conversation_id) ? b.conversation_id : null;
   const ctx = cleanContext(b.context);
+  const detail = b.detail === true;   // S3: "Explain more" (phase 2 panel) asks for the five-part answer
   const rpc = makeRpc(env, auth);
 
   try {
@@ -530,7 +533,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
             history = h.messages.map((m) => ({ role: m.role, content: m.content }));
           } catch { /* not mine / gone: start fresh */ }
         }
-        const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages), history, question, tools, rpc, company, ac.signal, emit, redactor);
+        const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages, detail), history, question, tools, rpc, company, ac.signal, emit, redactor);
         out = ai; usage = ai.usage; modelRefused = ai.refused;
         if (emit && redactor && !modelRefused) { const rest = redactor.rest(); if (rest) emit('delta', { text: rest }); }
       } catch (e) {

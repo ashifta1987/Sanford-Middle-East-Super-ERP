@@ -29,6 +29,23 @@ function wavSeconds(b64: string): number | null {
   } catch { return null; }
 }
 
+// S4: text-to-speech cache, in memory for the life of the function instance only (never written anywhere). Key = model, voice,
+// language and the already-filtered text, so repeated sentences ("Good morning.") are free. Least recently used entries go
+// first; capped at 200 entries and 16 MB of PCM. Only text the caller sent is matched, so a hit never reveals anything new.
+const ttsCache = new Map<string, { pcm: Uint8Array; rate: number }>();
+let ttsBytes = 0;
+const TTS_CACHE = { entries: 200, bytes: 16_000_000 };
+const ttsKey = (model: string, voice: string, lang: string, text: string) => `${model}\u0000${voice}\u0000${lang}\u0000${text}`;
+function ttsPut(key: string, v: { pcm: Uint8Array; rate: number }) {
+  if (v.pcm.length > TTS_CACHE.bytes / 4) return;
+  ttsCache.set(key, v); ttsBytes += v.pcm.length;
+  for (const [k, old] of ttsCache) {
+    if (ttsCache.size <= TTS_CACHE.entries && ttsBytes <= TTS_CACHE.bytes) break;
+    ttsCache.delete(k); ttsBytes -= old.pcm.length;
+  }
+}
+export const ttsCacheClear = () => { ttsCache.clear(); ttsBytes = 0; };
+
 export async function handleVoice(auth: string | null, body: unknown, env: Env): Promise<VoiceResult> {
   const fail = (status: number, error: string): VoiceResult => ({ status, json: { error } });
   if (!auth || !/^Bearer\s+\S+/i.test(auth)) return fail(401, 'Sign in to use Sana.');
@@ -88,19 +105,29 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
       if (!text) return fail(400, 'There is nothing to read aloud.');
       let lang = asked ?? detectLanguage(text);
       if (!langs.includes(lang)) lang = fallbackLang;
-      let wav: Uint8Array; let seconds = 0;
-      try {
-        const r = await geminiSpeak({ apiKey: env.GEMINI_API_KEY, model: m.tts, voice: m.voice, baseUrl: env.SANA_GEMINI_BASE_URL, text, signal: ac.signal });
-        seconds = (r.isWav ? Math.max(0, r.pcm.length - 44) : r.pcm.length) / (r.rate * 2);
-        wav = r.isWav ? r.pcm : pcmToWav(r.pcm, r.rate);
-      } catch (e) {
-        console.error('sana tts failed', (e as { status?: number })?.status ?? 'network', (e as Error)?.message ?? '');
-        await record(lang, 0, m.tts, false).catch(() => {});
-        return fail(502, "Sana couldn't read that aloud right now. Try again in a moment.");
-      }
-      await record(lang, seconds, m.tts, true);
-      return { status: 200, audio: wav, headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store', 'X-Sana-Provider': 'gemini', 'X-Sana-Model': m.tts,
-        'X-Sana-Language': lang, 'X-Sana-Seconds': String(Math.round(seconds * 10) / 10) } };
+      // S4: 'pcm16' = raw 16-bit little-endian mono PCM (rate in X-Sana-Rate) for the browser's Web Audio queue; default WAV.
+      const pcm16 = b.format === 'pcm16';
+      const key = ttsKey(m.tts, m.voice, lang, text);
+      let hit = ttsCache.get(key);
+      const cached = Boolean(hit);
+      if (!hit) {
+        try {
+          const r = await geminiSpeak({ apiKey: env.GEMINI_API_KEY, model: m.tts, voice: m.voice, baseUrl: env.SANA_GEMINI_BASE_URL, text, signal: ac.signal });
+          hit = { pcm: r.isWav ? r.pcm.subarray(44) : r.pcm, rate: r.rate };
+          ttsPut(key, hit);
+        } catch (e) {
+          console.error('sana tts failed', (e as { status?: number })?.status ?? 'network', (e as Error)?.message ?? '');
+          await record(lang, 0, m.tts, false).catch(() => {});
+          return fail(502, "Sana couldn't read that aloud right now. Try again in a moment.");
+        }
+      } else { ttsCache.delete(key); ttsCache.set(key, hit); }   // most recently used last
+      const seconds = hit.pcm.length / (hit.rate * 2);
+      // every call is still counted (daily voice limit); a cache hit is marked in the model name
+      await record(lang, seconds, cached ? `${m.tts}:cache` : m.tts, true);
+      return { status: 200, audio: pcm16 ? hit.pcm : pcmToWav(hit.pcm, hit.rate),
+        headers: { 'Content-Type': pcm16 ? `audio/L16; rate=${hit.rate}; channels=1` : 'audio/wav', 'Cache-Control': 'no-store', 'X-Sana-Provider': 'gemini',
+          'X-Sana-Model': m.tts, 'X-Sana-Language': lang, 'X-Sana-Seconds': String(Math.round(seconds * 10) / 10), 'X-Sana-Rate': String(hit.rate),
+          'X-Sana-Format': pcm16 ? 'pcm16' : 'wav', 'X-Sana-Cache': cached ? 'hit' : 'miss' } };
     } finally { clearTimeout(timer); }
   } catch (e) {
     const err = e as { status?: number; message?: string; code?: string };

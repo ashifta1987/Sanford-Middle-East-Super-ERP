@@ -5123,6 +5123,8 @@
       "sana_sales_summary": "sales",
       "sana_stock": "stock",
       "default": "data"
-    }
+    },
+    "forceGemini": "Always use Sana's voice",
+    "forceGeminiHint": "Read answers with Sana's voice even when this phone has its own voice for the language"
   }
 }

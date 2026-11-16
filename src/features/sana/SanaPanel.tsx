@@ -8,10 +8,11 @@ import { useAuth } from '@/auth/AuthProvider';
 import { errorMessage } from '@/lib/format';
 import { SanaMark } from './SanaMark';
 import { sanaContextSuggestions, sanaSuggestions, useSana, useSanaHistory, type SanaContext, type SanaMessage } from './SanaProvider';
-import { SANA_LANGUAGES, languageLabel, speak, speechLocale, stopSpeaking as stopBrowserSpeaking, useSpeechInput, useVoicesReady } from './voice';
-import { speakProvider, stopProviderAudio, useProviderSpeechInput } from './providerVoice';
+import { SANA_LANGUAGES, speechLocale, stopSpeaking as stopBrowserSpeaking, useSpeechInput, useVoicesReady } from './voice';
+import { stopProviderAudio, useProviderSpeechInput } from './providerVoice';
+import { primeAudio, SentenceSpeaker, stopAllSpeech, type VoiceEngine } from './speechQueue';
 
-const stopSpeaking = () => { stopBrowserSpeaking(); stopProviderAudio(); };
+const stopSpeaking = () => { stopAllSpeech(); stopBrowserSpeaking(); stopProviderAudio(); };
 
 const fmtWhen = (iso: string, lang: string) => new Date(iso).toLocaleString(lang === 'ar' ? 'ar-AE' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', numberingSystem: 'latn' });
 
@@ -21,7 +22,7 @@ export function contextLabel(c: SanaContext, t: TFunction) {
   return `${c.code ?? ''}`;
 }
 
-function Bubble({ m, onSpeak, speaking, voiceNote }: { m: SanaMessage; onSpeak: (m: SanaMessage) => void; speaking: boolean; voiceNote: string | null }) {
+function Bubble({ m, onSpeak, speaking, voiceNote, engine }: { m: SanaMessage; onSpeak: (m: SanaMessage) => void; speaking: boolean; voiceNote: string | null; engine?: VoiceEngine }) {
   const { t } = useTranslation();
   const s = useSana();
   const [fbErr, setFbErr] = useState<string | null>(null);
@@ -36,7 +37,7 @@ function Bubble({ m, onSpeak, speaking, voiceNote }: { m: SanaMessage; onSpeak: 
   }
   const vote = async (v: 1 | -1) => { setFbErr(null); try { await s.feedback(m, v); } catch (e) { setFbErr(errorMessage(e)); } };
   return (
-    <div className="flex items-start gap-2.5" data-testid={m.denied ? 'sana-refusal' : m.error ? 'sana-error' : 'sana-answer'}>
+    <div className="flex items-start gap-2.5" data-testid={m.denied ? 'sana-refusal' : m.error ? 'sana-error' : 'sana-answer'} data-voice-engine={engine} data-speaking={speaking || undefined}>
       <SanaMark className="mt-1 h-7 w-7" />
       <div className="min-w-0 max-w-[88%]">
         <div dir="auto" className={clsx('whitespace-pre-wrap rounded-[18px] rounded-ss-md border px-4 py-2.5 text-[15px] leading-relaxed',
@@ -150,6 +151,9 @@ export function SanaPanel() {
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [voiceNote, setVoiceNote] = useState<{ id: string; text: string } | null>(null);
+  // S4: which engine read each answer (data-voice-engine on the bubble; Gemini calls are also counted in erp.sana_voice_use)
+  const [engines, setEngines] = useState<Record<string, VoiceEngine>>({});
+  const [forceGemini, setForceGemini] = useState(() => { try { return localStorage.getItem('sana-voice-gemini') === '1'; } catch { return false; } });
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -168,30 +172,38 @@ export function SanaPanel() {
   const off = s.status && !s.status.enabled;
   const langs = SANA_LANGUAGES.filter((l) => l.code === 'auto' || !s.status?.languages || s.status.languages.includes(l.code));
 
+  /** S4: one speaker per answer. `target.id` is 'live' while the answer streams, then the answer's id. */
+  function makeSpeaker(target: { id: string; engine?: VoiceEngine }, language: string) {
+    return new SentenceSpeaker({
+      providerMode: providerVoice, forceGemini, company: s.status?.company ?? null, language, uiLanguage: i18n.language,
+      onStart: () => setSpeakingId(target.id),
+      onEnd: () => setSpeakingId((id) => (id === target.id ? null : id)),
+      onEngine: (e) => { target.engine = e; setEngines((x) => ({ ...x, [target.id]: e })); },
+      onError: (msg) => setVoiceNote({ id: target.id, text: msg }),
+    });
+  }
   async function send(q: string, via: 'text' | 'voice' = 'text') {
     if (!q.trim()) return;
-    setText(''); setView('chat');
-    const reply = await s.ask(q, via);
-    if (reply && !reply.error && s.autoSpeak && via === 'voice') playSpeech(reply);
+    setText(''); setView('chat'); setVoiceNote(null);
+    stopSpeaking();                              // a new message stops and clears what Sana was saying
+    const live = s.autoSpeak && via === 'voice' && voiceOn;
+    if (live) primeAudio();
+    const target: { id: string; engine?: VoiceEngine } = { id: 'live' };
+    const sp = live ? makeSpeaker(target, s.language) : null;
+    // read aloud sentence by sentence while the answer streams
+    const reply = await s.ask(q, via, sp ? { onText: (full) => sp.push(full), onLanguage: (l) => sp.setLanguage(l) } : undefined);
+    if (!sp) return;
+    if (!reply || reply.error) { sp.stop(); return; }
+    target.id = reply.id;
+    if (target.engine) setEngines((x) => ({ ...x, [reply.id]: target.engine! }));
+    setSpeakingId((id) => (id === 'live' ? reply.id : id));
+    sp.finish(reply.text, reply.language);
   }
   function playSpeech(m: SanaMessage) {
     setVoiceNote(null);
     if (speakingId === m.id) { stopSpeaking(); setSpeakingId(null); return; }
-    const loc = m.language ? speechLocale(m.language, i18n.language) : locale;
-    if (providerVoice) {
-      stopSpeaking();
-      setSpeakingId(m.id);
-      speakProvider(m.text, m.language, s.status?.company ?? null, () => setSpeakingId((id) => (id === m.id ? null : id))).catch((e: Error) => {
-        setSpeakingId(null);
-        // the provider is not reachable: fall back to the device's voice when it has one for the language, else say why
-        const r = speak(m.text, loc, () => setSpeakingId(null));
-        if (r === 'ok') setSpeakingId(m.id); else setVoiceNote({ id: m.id, text: e.message });
-      });
-      return;
-    }
-    const r = speak(m.text, loc, () => setSpeakingId(null));
-    if (r === 'ok') setSpeakingId(m.id);
-    else setVoiceNote({ id: m.id, text: r === 'no-voice' ? t('sana.noVoice', { language: languageLabel(m.language ?? loc) }) : t('sana.noSpeech') });
+    stopSpeaking(); primeAudio();
+    makeSpeaker({ id: m.id }, m.language ?? s.language).speakAll(m.text, m.language);
   }
   function onSubmit(e: FormEvent) { e.preventDefault(); void send(text); }
 
@@ -292,7 +304,7 @@ export function SanaPanel() {
                 </div>
               </div>
             )}
-            {s.messages.map((m) => <Bubble key={m.id} m={m} speaking={speakingId === m.id} onSpeak={playSpeech} voiceNote={voiceNote?.id === m.id ? voiceNote.text : null} />)}
+            {s.messages.map((m) => <Bubble key={m.id} m={m} speaking={speakingId === m.id} onSpeak={playSpeech} engine={engines[m.id]} voiceNote={voiceNote?.id === m.id ? voiceNote.text : null} />)}
             {s.busy && !s.messages.some((m) => m.streaming) && (
               <div className="flex items-center gap-2.5" role="status" aria-label={t('sana.thinking')}>
                 <SanaMark className="h-7 w-7" />
@@ -323,7 +335,7 @@ export function SanaPanel() {
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(text); } }}
               placeholder={t('sana.placeholder')}
               className="max-h-32 min-h-[48px] flex-1 resize-none rounded-[14px] border border-line-strong bg-page px-4 py-3 text-[15px] text-ink outline-none placeholder:text-muted focus:border-primary" />
-            <button type="button" onClick={() => (mic.listening ? mic.stop() : (stopSpeaking(), mic.start(locale)))} disabled={s.busy || off || !voiceOn || mic.transcribing} data-testid="sana-mic" data-voice-mode={providerVoice ? 'provider' : 'browser'}
+            <button type="button" onClick={() => (mic.listening ? mic.stop() : (stopSpeaking(), primeAudio(), mic.start(locale)))} disabled={s.busy || off || !voiceOn || mic.transcribing} data-testid="sana-mic" data-voice-mode={providerVoice ? 'provider' : 'browser'}
               aria-pressed={mic.listening} aria-label={mic.listening ? t('sana.stopListening') : t('sana.speak')}
               title={!voiceOn ? t('sana.voiceOff') : mic.supported ? (mic.listening ? t('sana.stopListening') : t('sana.speak')) : t('sana.mic.unsupported')}
               className={clsx('grid h-12 w-12 shrink-0 place-items-center rounded-full border transition',
@@ -339,6 +351,13 @@ export function SanaPanel() {
             <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-brand-teal" aria-hidden />
             <span>{t('sana.privacy')}{providerVoice && voiceOn ? ` ${t('sana.voiceProviderNote')}` : ''}{left != null && left <= 20 ? ` ${t('sana.left', { count: left })}` : ''}</span>
           </p>
+          {providerVoice && voiceOn && (
+            <label className="mt-1.5 flex min-h-[32px] items-center gap-2 text-[12px] text-muted" title={t('sana.forceGeminiHint')}>
+              <input type="checkbox" checked={forceGemini} data-testid="sana-force-gemini" className="h-4 w-4 accent-primary"
+                onChange={(e) => { setForceGemini(e.target.checked); try { localStorage.setItem('sana-voice-gemini', e.target.checked ? '1' : '0'); } catch { /* storage blocked */ } }} />
+              {t('sana.forceGemini')}
+            </label>
+          )}
         </form>
       </aside>
     </>

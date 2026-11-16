@@ -133,12 +133,18 @@ http.createServer(async (req, res) => {
     }
     return send(res, 200, { ...sanaLocal, note: sanaLocal.provider.endsWith('-mock') ? 'LOCAL-ONLY provider mock — not AI' : undefined });
   }
+  // timing runs only: empty the sana-voice TTS cache (sana-timing.mjs --no-tts-cache imitates sana-voice before S4 step 2)
+  if (url.pathname === '/local/tts-cache-clear' && req.method === 'POST') {
+    const { ttsCacheClear } = await import('../../supabase/functions/sana-voice/core.ts');
+    ttsCacheClear();
+    return send(res, 200, { cleared: true });
+  }
   if (url.pathname === '/functions/v1/sana-voice' && req.method === 'POST') {
     const { handleVoice } = await import('../../supabase/functions/sana-voice/core.ts');
     let body = null;
     try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON → 400 */ }
     const r = await handleVoice(req.headers.authorization ?? null, body, sanaEnv());
-    if (r.audio) { res.writeHead(r.status, { ...cors, 'access-control-expose-headers': 'x-sana-provider, x-sana-model, x-sana-language, x-sana-seconds', ...r.headers }); return res.end(Buffer.from(r.audio)); }
+    if (r.audio) { res.writeHead(r.status, { ...cors, 'access-control-expose-headers': 'x-sana-provider, x-sana-model, x-sana-language, x-sana-seconds, x-sana-rate, x-sana-format, x-sana-cache', ...r.headers }); return res.end(Buffer.from(r.audio)); }
     return send(res, r.status, r.json);
   }
   // Sana: the same code as the Supabase Edge Function (supabase/functions/sana/core.ts), run by Node. U0+S1 replaced A11's

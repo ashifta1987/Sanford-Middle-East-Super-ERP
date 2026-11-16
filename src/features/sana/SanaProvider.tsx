@@ -29,6 +29,7 @@ export interface SanaContext { type: 'document' | 'partner' | 'item' | 'report' 
 export interface SanaStatus { profile: boolean; enabled: boolean; voice_enabled?: boolean; voice_mode?: 'browser' | 'provider'; daily_limit?: number; used?: number; voice_calls?: number; languages?: string[]; company?: string }
 export interface SanaConversation { conversation_id: string; title: string; company: string | null; started_at: string; last_at: string; messages: number }
 
+export interface AskOpts { onText?: (full: string) => void; onLanguage?: (language: string) => void }
 interface OpenOpts { context?: SanaContext | null; question?: string; via?: 'text' | 'voice' }
 interface SanaCtx {
   open: boolean;
@@ -44,7 +45,8 @@ interface SanaCtx {
   setContext: (c: SanaContext | null) => void;
   status: SanaStatus | undefined;
   conversationId: string | null;
-  ask: (text: string, via?: 'text' | 'voice') => Promise<SanaMessage | null>;
+  /** onText gets the whole streamed answer so far (S4: read aloud while it streams); onLanguage the answer language from 'meta' */
+  ask: (text: string, via?: 'text' | 'voice', opts?: AskOpts) => Promise<SanaMessage | null>;
   newChat: () => void;
   /** open the panel and ask straight away (home page prompt box, suggestion chips) */
   openAndAsk: (text: string, via?: 'text' | 'voice') => void;
@@ -140,7 +142,7 @@ export function SanaProvider({ children }: { children: ReactNode }) {
 
   const setConv = (id: string | null) => { conversation.current = id; setConversationId(id); };
 
-  const ask = useCallback(async (text: string, via: 'text' | 'voice' = 'text') => {
+  const ask = useCallback(async (text: string, via: 'text' | 'voice' = 'text', opts?: AskOpts) => {
     const q = text.trim();
     if (!q || busy) return null;
     const answerId = uid();
@@ -154,15 +156,17 @@ export function SanaProvider({ children }: { children: ReactNode }) {
     const flush = () => { frame = 0; const add = pendingText; pendingText = ''; if (add) patch((m) => ({ ...m, text: m.text + add, tool: null, streaming: true })); };
     const queue = (t: string) => { pendingText += t; if (!frame) frame = requestAnimationFrame(flush); };
     const dropQueued = () => { if (frame) cancelAnimationFrame(frame); frame = 0; pendingText = ''; };
+    let streamed = '';   // the whole answer so far, for read-aloud (not batched per frame)
+    const said = (t: string) => { streamed = t; opts?.onText?.(streamed); };
     try {
       const r = await callSana({ message: q, conversation_id: conversation.current, company: co ?? context?.company ?? null, language, via, context, stream: true }, (ev, d) => {
-        if (ev === 'meta') setMode(d.mode as 'ai' | 'basic');
+        if (ev === 'meta') { setMode(d.mode as 'ai' | 'basic'); if (d.language) opts?.onLanguage?.(String(d.language)); }
         if (ev === 'delta') {
           ensure();
-          if (d.replace) { dropQueued(); patch((m) => ({ ...m, text: String(d.text), tool: null, streaming: true })); }
-          else queue(String(d.text));
+          if (d.replace) { dropQueued(); patch((m) => ({ ...m, text: String(d.text), tool: null, streaming: true })); streamed = String(d.text); }   // the final text: read-aloud finishes from 'done'
+          else { queue(String(d.text)); said(streamed + String(d.text)); }
         }
-        if (ev === 'reset') { dropQueued(); patch((m) => ({ ...m, text: '' })); }
+        if (ev === 'reset') { dropQueued(); patch((m) => ({ ...m, text: '' })); said(''); }
         if (ev === 'tool') { ensure(); patch((m) => ({ ...m, tool: String(d.name ?? ''), streaming: true })); }
         if (ev === 'sources') patch((m) => ({ ...m, sources: (d.sources as SanaSource[]) ?? [] }));
       });

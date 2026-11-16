@@ -12,9 +12,15 @@
 //   users.json: { "sales": { "email": "...", "password": "..." }, "finance": { "email": "...", "password": "..." } }
 //   (--accept-only sends only the Accept: text/event-stream header, as the deployed function before S4 expects)
 // Compare two saved runs:  node scripts/local-stack/sana-timing.mjs --tables before.json after.json
+// VOICE (S4 step 2): --voice asks with via 'voice' and also measures first audio (sana-voice TTS):
+//   --voice-mode whole     = before step 2: the whole reply is sent to TTS after 'done' (WAV)
+//   --voice-mode sentence  = step 2: each finished sentence goes to TTS while the answer streams (pcm16); first audio = the
+//                            first piece's audio has arrived. Per-piece TTS times are saved (tts_ms) for the Malayalam check.
+//   --no-tts-cache (local)  = empty the TTS cache before every call (sana-voice before step 2 had no cache)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SentenceSplitter, plainForSpeech } from '../../src/features/sana/sentences.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -41,9 +47,13 @@ function table(rows, label) {
   const groups = {};
   for (const r of rows) for (const k of [`${r.user} · ${r.lang}`, 'all']) (groups[k] ??= []).push(r);
   const out = [`${label}`, `${'group'.padEnd(16)} ${'n'.padStart(3)}  ${'feedback p50'.padStart(12)} ${'p90'.padStart(6)}  ${'first text p50'.padStart(14)} ${'p90'.padStart(6)}  ${'total p50'.padStart(9)} ${'p90'.padStart(6)}  ${'tool rounds avg'.padStart(15)}  errors`];
+  const voice = rows.some((r) => r.audio_ms != null);
+  if (voice) out[1] += `  ${'first audio p50'.padStart(15)} ${'p90'.padStart(6)}  ${'tts/piece p50'.padStart(13)} ${'p90'.padStart(6)}`;
   for (const [k, g] of Object.entries(groups)) {
     const ok = g.filter((r) => !r.error);
-    out.push(`${k.padEnd(16)} ${String(g.length).padStart(3)}  ${f(pct(ok.map((r) => r.feedback_ms ?? r.first_ms), 50)).padStart(12)} ${f(pct(ok.map((r) => r.feedback_ms ?? r.first_ms), 90)).padStart(6)}  ${f(pct(ok.map((r) => r.first_ms), 50)).padStart(14)} ${f(pct(ok.map((r) => r.first_ms), 90)).padStart(6)}  ${f(pct(ok.map((r) => r.total_ms), 50)).padStart(9)} ${f(pct(ok.map((r) => r.total_ms), 90)).padStart(6)}  ${(ok.reduce((s, r) => s + r.tools, 0) / Math.max(1, ok.length)).toFixed(1).padStart(15)}  ${g.length - ok.length}`);
+    let line = `${k.padEnd(16)} ${String(g.length).padStart(3)}  ${f(pct(ok.map((r) => r.feedback_ms ?? r.first_ms), 50)).padStart(12)} ${f(pct(ok.map((r) => r.feedback_ms ?? r.first_ms), 90)).padStart(6)}  ${f(pct(ok.map((r) => r.first_ms), 50)).padStart(14)} ${f(pct(ok.map((r) => r.first_ms), 90)).padStart(6)}  ${f(pct(ok.map((r) => r.total_ms), 50)).padStart(9)} ${f(pct(ok.map((r) => r.total_ms), 90)).padStart(6)}  ${(ok.reduce((s, r) => s + r.tools, 0) / Math.max(1, ok.length)).toFixed(1).padStart(15)}  ${g.length - ok.length}`;
+    if (voice) { const tts = ok.flatMap((r) => r.tts_ms ?? []); line += `  ${f(pct(ok.map((r) => r.audio_ms), 50)).padStart(15)} ${f(pct(ok.map((r) => r.audio_ms), 90)).padStart(6)}  ${f(pct(tts, 50)).padStart(13)} ${f(pct(tts, 90)).padStart(6)}`; }
+    out.push(line);
   }
   return out.join('\n');
 }
@@ -82,7 +92,20 @@ async function signIn(u) {
 /** One streamed question: times are measured from just before the request is sent. */
 async function timed(tok, message, language) {
   const t0 = performance.now();
-  const body = { message, language, company, via: 'text', ...(has('--accept-only') ? {} : { stream: true }) };
+  const voice = has('--voice');
+  const vmode = opt('--voice-mode', 'sentence');
+  const body = { message, language, company, via: voice ? 'voice' : 'text', ...(has('--accept-only') ? {} : { stream: true }) };
+  // TTS: each request starts at once; audio_ms = when the FIRST piece's audio has fully arrived (it can start playing)
+  const ttsCalls = [];
+  const tts = (text, format) => {
+    const s0 = performance.now();
+    const clear = !remote && has('--no-tts-cache') ? fetch(`${BASE}/local/tts-cache-clear`, { method: 'POST' }) : Promise.resolve();
+    const p = clear.then(() => fetch(`${BASE}/functions/v1/sana-voice`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${tok}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'tts', text, language, company, format }) })
+      .then(async (r) => { const b = await r.arrayBuffer(); return { ok: r.ok, at: performance.now() - t0, ms: performance.now() - s0, bytes: b.byteLength, status: r.status, cache: r.headers.get('x-sana-cache') }; }));
+    ttsCalls.push(p); return p;
+  };
+  const splitter = new SentenceSplitter(); let streamed = '';
   const res = await fetch(`${BASE}/functions/v1/sana`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${tok}`, 'content-type': 'application/json', accept: 'text/event-stream' }, body: JSON.stringify(body) });
   const row = { feedback_ms: null, first_ms: null, total_ms: null, tools: 0, events: [], mode: null, denied: null, error: null };
   if (!(res.headers.get('content-type') ?? '').includes('text/event-stream')) {
@@ -103,6 +126,13 @@ async function timed(tok, message, language) {
       const d = raw ? JSON.parse(raw) : {};
       row.events.push(ev);
       if (ev === 'delta' && row.first_ms == null && String(d.text ?? '').trim()) row.first_ms = performance.now() - t0;
+      if (voice && vmode === 'sentence' && ev === 'delta' && !d.replace) { streamed += String(d.text ?? ''); for (const piece of splitter.push(streamed)) tts(piece, 'pcm16'); }
+      if (voice && ev === 'reset') streamed = '';
+      if (voice && ev === 'done') {
+        const final = String(d.reply ?? '');
+        if (vmode === 'whole') { const said = plainForSpeech(final); if (said) tts(said, 'wav'); }
+        else for (const piece of splitter.finish(final).pieces) tts(piece, 'pcm16');
+      }
       if (ev === 'tool') row.tools++;
       if (row.feedback_ms == null && ((ev === 'delta' && String(d.text ?? '').trim()) || ev === 'tool')) row.feedback_ms = performance.now() - t0;
       if (ev === 'meta') row.mode = d.mode;
@@ -111,6 +141,12 @@ async function timed(tok, message, language) {
     }
   }
   if (row.total_ms == null && !row.error) row.error = 'stream ended without done';
+  if (voice) {
+    const done = await Promise.all(ttsCalls);
+    row.pieces = done.length; row.tts_ms = done.map((x) => Math.round(x.ms)); row.tts_bytes = done.map((x) => x.bytes); row.tts_cache_hits = done.filter((x) => x.cache === 'hit').length;
+    row.audio_ms = done.length ? done[0].at : null;
+    if (done.some((x) => !x.ok)) row.error = `tts ${done.find((x) => !x.ok).status}`;
+  }
   row.events = [...new Set(row.events)];
   return row;
 }

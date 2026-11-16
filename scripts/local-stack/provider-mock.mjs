@@ -118,6 +118,9 @@ const words = (t) => t.match(/\S+\s*/g) ?? [t];
 // reply, MOCK_CHUNK_MS between streamed chunks (default 15). SYNTHETIC - real model latency comes only from a live/branch run.
 const MOCK_TTFT_MS = Number(process.env.MOCK_TTFT_MS || 0);
 const MOCK_CHUNK_MS = Number(process.env.MOCK_CHUNK_MS || 15);
+// TTS: MOCK_TTS_MS before every audio reply plus MOCK_TTS_MS_PER_CHAR per character of text (both default 0). SYNTHETIC.
+const MOCK_TTS_MS = Number(process.env.MOCK_TTS_MS || 0);
+const MOCK_TTS_MS_PER_CHAR = Number(process.env.MOCK_TTS_MS_PER_CHAR || 0);
 // waits unless the client went away (the response closes; the request 'close' fires as soon as its body is read)
 const pause = (ms, res) => new Promise((r) => { const t = setTimeout(r, ms); res.on('close', () => { clearTimeout(t); r(); }); });
 const sse = (res, data, event) => res.write(`${event ? `event: ${event}\n` : ''}data: ${JSON.stringify(data)}\n\n`);
@@ -193,6 +196,7 @@ async function gemini(req, res, url) {
     const text = last.parts.map((p) => p.text ?? '').join(' ');
     const seconds = Math.min(Math.max(text.length * 0.02, 0.4), 4);
     const pcm = tone(seconds);
+    if (MOCK_TTS_MS || MOCK_TTS_MS_PER_CHAR) await pause(MOCK_TTS_MS + MOCK_TTS_MS_PER_CHAR * text.length, res);
     record({ ...base, kind: 'tts', text_chars: text.length, est_output_tokens: Math.round(seconds * 25), audio_seconds: seconds });
     return json(res, 200, { candidates: [{ content: { role: 'model', parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] }, finishReason: 'STOP' }],
       usageMetadata: { promptTokenCount: estimateTokens(text), candidatesTokenCount: Math.round(seconds * 25), totalTokenCount: estimateTokens(text) + Math.round(seconds * 25) }, modelVersion: model });

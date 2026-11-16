@@ -1,6 +1,6 @@
 // Supabase Edge Function "sana-voice" (S2): provider voice for Sana with Gemini, for companies whose voice mode is "provider".
 //   POST { mode: 'stt', audio: <base64>, mime: 'audio/wav', language: 'auto'|'en'|'ml'|…, company? }  → { text, language, provider, model, seconds }
-//   POST { mode: 'tts', text, language?, company? }                                                → audio/wav (16-bit PCM from the Gemini TTS model)
+//   POST { mode: 'tts', text, language?, company?, format?: 'wav'|'pcm16' }                         → audio/wav, or raw 16-bit PCM (X-Sana-Rate)
 // Needs the user's session token. Audio is never stored or logged; only metadata is audited (erp.sana_voice_use).
 // Deploy:  supabase functions deploy sana-voice
 // Secrets: GEMINI_API_KEY (already set on live — never printed or written anywhere), optional SANA_STT_MODEL
@@ -13,7 +13,7 @@ const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Expose-Headers': 'x-sana-provider, x-sana-model, x-sana-language, x-sana-seconds',
+  'Access-Control-Expose-Headers': 'x-sana-provider, x-sana-model, x-sana-language, x-sana-seconds, x-sana-rate, x-sana-format, x-sana-cache',
 };
 const get = (k: string) => Deno.env.get(k) || undefined;
 const env = (): Env => ({

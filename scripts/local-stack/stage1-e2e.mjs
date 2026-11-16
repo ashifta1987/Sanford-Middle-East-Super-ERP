@@ -20,7 +20,7 @@ async function login(page, email, password) {
 const rowsCount = async (page) => page.locator('main table tbody tr').count();
 const settle = (page) => page.waitForLoadState('networkidle').catch(() => {});
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 
 // ---------- Admin: every module ----------
 {
@@ -268,6 +268,33 @@ const browser = await chromium.launch();
   await c2.close();
 }
 
+// ---------- S4 · step 2: read aloud sentence by sentence (provider voice, LOCAL-ONLY Gemini mock for TTS) ----------
+{
+  const GW = process.env.GATEWAY_URL ?? 'http://127.0.0.1:54321';
+  const tokenFor = async (email, password) => (await (await fetch(`${GW}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: 'local', 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) })).json()).access_token;
+  const adminTok = await tokenFor('qa.admin@sample.test', 'local-only-1');
+  const saveVoice = (voice_mode) => fetch(`${GW}/rest/v1/rpc/sana_settings_save`, { method: 'POST',
+    headers: { apikey: 'local', authorization: `Bearer ${adminTok}`, 'content-type': 'application/json', 'content-profile': 'erp' }, body: JSON.stringify({ p_company: 'ZZ99', p: { voice_mode } }) });
+  const setProv = (provider) => fetch(`${GW}/local/sana-provider`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) });
+  await setProv('gemini-mock');   // sana-voice needs the (mock) Gemini key
+  const saved = await saveVoice('provider');
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    await login(page, 'qa.sales@sample.test', 'local-only-2'); await settle(page);
+    await page.keyboard.press('Control+j');
+    await page.fill('#sana-input', 'How many open sales orders do we have?'); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('aside[role=dialog] [data-testid=sana-answer] button') && !document.querySelector('aside[role=dialog] .animate-pulse'), null, { timeout: 15000 });
+    ok('provider voice: the panel offers "Always use Sana\'s voice"', saved.ok && (await page.locator('[data-testid=sana-force-gemini]').count()) === 1, String(saved.status));
+    await page.locator('[data-testid=sana-answer] button:has-text("Listen")').last().click();
+    const spoke = await page.waitForSelector('[data-testid=sana-answer][data-voice-engine=gemini][data-speaking]', { timeout: 10000 }).then(() => true, () => false);
+    ok('Listen reads the answer with Gemini sentence by sentence (Web Audio queue)', spoke);
+    await page.locator('[data-testid=sana-answer] button:has-text("Stop")').last().click().catch(() => {});
+    ok('Stop clears the queue', await page.waitForFunction(() => !document.querySelector('[data-testid=sana-answer][data-speaking]'), null, { timeout: 5000 }).then(() => true, () => false));
+    await ctx.close();
+  } finally { await saveVoice('browser'); await setProv('basic'); }
+}
+
 await browser.close();
 
 // ---- S4 · streaming API checks (gateway, LOCAL-ONLY provider mock) ----
@@ -304,6 +331,43 @@ await browser.close();
   } finally {
     await setProvider('basic');
   }
+}
+
+// ---- S4 · step 2: sana-voice pcm16, TTS cache, sentence splitting ----
+{
+  const GW = process.env.GATEWAY_URL ?? 'http://127.0.0.1:54321';
+  const tokenFor = async (email, password) => (await (await fetch(`${GW}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: 'local', 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) })).json()).access_token;
+  const adminTok = await tokenFor('qa.admin@sample.test', 'local-only-1');
+  const saveVoice = (voice_mode) => fetch(`${GW}/rest/v1/rpc/sana_settings_save`, { method: 'POST',
+    headers: { apikey: 'local', authorization: `Bearer ${adminTok}`, 'content-type': 'application/json', 'content-profile': 'erp' }, body: JSON.stringify({ p_company: 'ZZ99', p: { voice_mode } }) });
+  const setProv = (provider) => fetch(`${GW}/local/sana-provider`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) });
+  await setProv('gemini-mock');
+  await saveVoice('provider');
+  try {
+    const tok = await tokenFor('qa.sales@sample.test', 'local-only-2');
+    const tts = (text, format) => fetch(`${GW}/functions/v1/sana-voice`, { method: 'POST', headers: { apikey: 'local', authorization: `Bearer ${tok}`, 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'tts', text, language: 'en', company: 'ZZ99', format }) });
+    const status = async () => (await (await fetch(`${GW}/rest/v1/rpc/sana_status`, { method: 'POST', headers: { apikey: 'local', authorization: `Bearer ${tok}`, 'content-type': 'application/json', 'content-profile': 'erp' }, body: JSON.stringify({ p_company: 'ZZ99' }) })).json());
+    const unique = `Open sales orders: ${Date.now() % 100000}.`;
+    const wav = await tts(unique, undefined); const wb = new Uint8Array(await wav.arrayBuffer());
+    ok('sana-voice: WAV stays the default', wav.ok && String.fromCharCode(...wb.slice(0, 4)) === 'RIFF' && wav.headers.get('x-sana-format') === 'wav', wav.headers.get('content-type'));
+    const before = (await status()).voice_calls;
+    const p1 = await tts(unique, 'pcm16'); const pb = new Uint8Array(await p1.arrayBuffer());
+    ok('sana-voice: format pcm16 returns raw 16-bit PCM with the rate in a header', p1.ok && p1.headers.get('x-sana-format') === 'pcm16' && Number(p1.headers.get('x-sana-rate')) > 0
+      && String.fromCharCode(...pb.slice(0, 4)) !== 'RIFF' && pb.length % 2 === 0 && pb.length === wb.length - 44, `${p1.headers.get('content-type')} ${pb.length}/${wb.length}`);
+    ok('sana-voice: the same sentence again comes from the cache', p1.headers.get('x-sana-cache') === 'hit', p1.headers.get('x-sana-cache'));
+    const after = (await status()).voice_calls;
+    ok('sana-voice: a cache hit still counts toward the daily voice limit', after === before + 1, `${before} → ${after}`);
+    const { SentenceSplitter, split } = await import('../../src/features/sana/sentences.ts');
+    const sp = new SentenceSplitter(); const got = [];
+    const text = 'Net sales this month: 12,500.00 AED from 14 invoices. Open orders: 3. The largest customer is MAF with 6,000.00 AED this month so far, which is higher than last month. Anything else?';
+    for (let i = 1; i <= text.length; i += 5) got.push(...sp.push(text.slice(0, i)));
+    const rest = sp.finish(text);
+    ok('sentences: the first sentence goes alone as soon as it ends; amounts like 12,500.00 never split', got[0] === 'Net sales this month: 12,500.00 AED from 14 invoices.', JSON.stringify(got));
+    ok('sentences: everything is said exactly once, in order', [...got, ...rest.pieces].join(' ').replace(/\s+/g, ' ') === text, JSON.stringify(rest));
+    ok('sentences: Malayalam splits at "."', split('ഈ മാസത്തെ വിൽപ്പന 12,500.00 AED. തുറന്ന ഓർഡറുകൾ 3.').length === 2);
+    const r2 = new SentenceSplitter(); r2.push('Sales this month are 5,000 AED. ');
+    ok('sentences: a replaced reply (refusal) restarts with the final text', r2.finish("That information isn't available for your role.").restart === true);
+  } finally { await saveVoice('browser'); await setProv('basic'); }
 }
 
 fs.writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1));

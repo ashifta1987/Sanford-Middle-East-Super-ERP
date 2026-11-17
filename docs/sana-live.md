@@ -20,6 +20,8 @@ Probe on 17 Nov, same 6 Malayalam turns for both models:
 
 Browser test on AE05 in Malayalam (M1): first audio p50 1,298 ms, p90 1,567 ms.
 
+**Voice verdict (Ashif, own Malayalam test on `/sana/live-test`, 17 Nov 2026):** it responded well, the Malayalam was good, no issues.
+
 ## How a session works
 
 1. **Token.** The browser calls `sana-live-token` with `{company, language}`. That function:

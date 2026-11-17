@@ -9,7 +9,7 @@ import { LIVE_TOOLS, LIVE_WS, liveModel, liveSetup, liveSystemPrompt, mintLiveTo
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (status: number, body: unknown) => Response.json(body, { status, headers: cors });
-type Who = { profile: boolean; name?: string; position?: string; companies?: Array<{ code: string }>; topics?: Record<string, boolean> };
+type Who = { profile: boolean; name?: string; position?: string; home_company?: string; companies?: Array<{ code: string }>; topics?: Record<string, boolean> };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -17,14 +17,17 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization');
   if (!auth || !/^Bearer\s+\S+/i.test(auth)) return json(401, { error: 'Sign in to use Sana.' });
   const b = await req.json().catch(() => ({})) as { company?: string; language?: string };
-  const company = typeof b.company === 'string' && /^[A-Z0-9]{2,8}$/.test(b.company) ? b.company : null;
-  if (!company) return json(400, { error: 'Choose a company first.' });
+  const asked = typeof b.company === 'string' && /^[A-Z0-9]{2,8}$/.test(b.company) && b.company !== 'GRP' ? b.company : null;
   const language = typeof b.language === 'string' && /^[a-z]{2}$/.test(b.language) ? b.language : 'en';
   const env: Env = { SUPABASE_URL: Deno.env.get('SUPABASE_URL') ?? '', SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ?? '' };
   const rpc = makeRpc(env, auth);
   try {
-    const [who, st] = await Promise.all([rpc('sana_whoami', {}) as Promise<Who>, rpc('sana_status', { p_company: company }) as Promise<{ enabled: boolean; used?: number; daily_limit?: number }>]);
+    const who = await rpc('sana_whoami', {}) as Who;
     if (!who?.profile) return json(403, { error: 'You need a Southfield profile to use Sana.' });
+    // "All companies" (GRP) or nothing chosen → the user's home company; no company at all → ask to pick one (not a 403)
+    const company = asked ?? who.home_company ?? null;
+    if (!company) return json(400, { error: 'Pick a company first.' });
+    const st = await rpc('sana_status', { p_company: company }) as { enabled: boolean; used?: number; daily_limit?: number };
     if (!who.companies?.some((c) => c.code === company)) return json(403, { error: "You don't have access to that company." });
     if (!st?.enabled) return json(403, { error: 'Sana is switched off for your company.' });
     if ((st.used ?? 0) >= (st.daily_limit ?? 200)) return json(429, { error: "You've reached today's Sana limit." });
@@ -33,7 +36,7 @@ Deno.serve(async (req) => {
     const setup = liveSetup(model, liveSystemPrompt({ name: who.name ?? 'the user', position: who.position ?? '', company, language }));
     if (!who.topics?.stock) (setup as { tools: unknown[] }).tools = [];   // the one M1 tool only for roles that see stock
     const t = await mintLiveToken(Deno.env.get('GEMINI_API_KEY') ?? '', setup);
-    return json(200, { token: t.token, expires_at: t.expireTime, ws: LIVE_WS, model, live_session_id: crypto.randomUUID(),
+    return json(200, { company, token: t.token, expires_at: t.expireTime, ws: LIVE_WS, model, live_session_id: crypto.randomUUID(),
       tools: who.topics?.stock ? LIVE_TOOLS[0].functionDeclarations.map((f) => f.name) : [] });
   } catch (e) {
     const err = e as { code?: string; status?: number; message?: string };

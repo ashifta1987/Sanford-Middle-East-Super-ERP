@@ -14,7 +14,8 @@ import { supabase, SUPABASE_URL } from '@/lib/supabase';
  */
 type Line = { who: 'you' | 'sana' | 'note'; text: string; ms?: number | null; tool?: string; unverified?: boolean };
 const LANGS: Array<[string, string]> = [['en', 'English'], ['ml', 'Malayalam'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ta', 'Tamil']];
-const WORKLET = `class Mic extends AudioWorkletProcessor { process(inputs) { const c = inputs[0] && inputs[0][0]; if (c) this.port.postMessage(c.slice(0)); return true; } } registerProcessor('sana-mic', Mic);`;
+const WORKLET_URL = '/sana-mic-worklet.js';   // same origin: passes script-src 'self'
+const SETUP_TIMEOUT_MS = 10_000;
 
 const b64 = (bytes: Uint8Array) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s: string) => { const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
@@ -30,11 +31,14 @@ async function callFn(name: string, body: unknown) {
 
 export function LiveTestPage() {
   const { profile } = useAuth();
-  const { company } = useCompany();
+  const { company: selected } = useCompany();
+  // "All companies" (GRP) is not a company Sana can answer for: use the user's home company, else ask to pick one
+  const company = selected && selected !== 'GRP' ? selected : (profile?.user?.company_code ?? null);
   const modules = profile?.modules ?? [];
   const allowed = ['admin', 'it', 'business'].some((m) => modules.includes(m));
   const [lang, setLang] = useState('en');
-  const [state, setState] = useState<'idle' | 'connecting' | 'live' | 'ended'>('idle');
+  const [state, setState] = useState<'idle' | 'connecting' | 'live' | 'ended' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [model, setModel] = useState('');
   const [typed, setTyped] = useState('');
@@ -68,18 +72,28 @@ export function LiveTestPage() {
     } catch (e) { add({ who: 'note', text: `log failed: ${(e as Error).message}` }); }
   }
 
+  function fail(msg: string) { setError(msg); setState('error'); stopMic(); stopPlayback(); try { r.current.ws?.close(); } catch { /* closed */ } }
   async function start() {
-    setState('connecting'); setLines([]); setStats([]);
+    if (!company) { fail('Pick a company first.'); return; }
+    setError(null); setState('connecting'); setLines([]); setStats([]);
+    // 1. microphone permission first, so the browser prompt comes before anything connects
+    try { await startMic(); } catch (e) {
+      const name = (e as { name?: string }).name;
+      fail(name === 'NotAllowedError' ? 'Microphone permission was refused. Allow the microphone for this site and try again.' : `Microphone could not start: ${(e as Error).message}`);
+      return;
+    }
     try {
       const t = await callFn('sana-live-token', { company, language: lang });
       setModel(String(t.model)); r.current.session = String(t.live_session_id); r.current.conv = null;
       const out = new AudioContext({ sampleRate: 24000 }); r.current.out = out;
       const ws = new WebSocket(`${t.ws}?access_token=${encodeURIComponent(String(t.token))}`); r.current.ws = ws;
-      ws.onclose = (e) => { setState('ended'); add({ who: 'note', text: `session ended (${e.code}${e.reason ? ': ' + e.reason : ''})` }); stopMic(); };
+      const setupTimer = setTimeout(() => fail('Sana Live did not answer within 10 seconds. Check the connection and try again.'), SETUP_TIMEOUT_MS);
+      ws.onerror = () => { clearTimeout(setupTimer); fail('Could not connect to Sana Live (the connection was blocked or dropped).'); };
+      ws.onclose = (e) => { clearTimeout(setupTimer); setState((st) => (st === 'error' ? st : 'ended')); add({ who: 'note', text: `session ended (${e.code}${e.reason ? ': ' + e.reason : ''})` }); stopMic(); };
       ws.onmessage = async (e) => {
         const m = JSON.parse(typeof e.data === 'string' ? e.data : await (e.data as Blob).text());
         const c = r.current;
-        if (m.setupComplete) { setState('live'); add({ who: 'note', text: `connected · ${t.model} · tools: ${(t.tools as string[]).join(', ') || 'none'}` }); await startMic(); return; }
+        if (m.setupComplete) { clearTimeout(setupTimer); setState('live'); add({ who: 'note', text: `connected · ${t.model} · tools: ${(t.tools as string[]).join(', ') || 'none'}` }); return; }
         if (m.toolCall) {
           for (const f of m.toolCall.functionCalls ?? []) {
             c.tools.push(f.name); add({ who: 'note', text: `looking up ${f.name}(${JSON.stringify(f.args)})`, tool: f.name });
@@ -102,12 +116,12 @@ export function LiveTestPage() {
         }
       };
       ws.onopen = () => ws.send(JSON.stringify({ setup: { model: `models/${t.model}` } }));   // the token's locked setup applies
-    } catch (e) { setState('idle'); add({ who: 'note', text: (e as Error).message }); }
+    } catch (e) { fail((e as Error).message); }
   }
   async function startMic() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     const ctx = new AudioContext({ sampleRate: 16000 });
-    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' })));
+    await ctx.audioWorklet.addModule(WORKLET_URL);
     const node = new AudioWorkletNode(ctx, 'sana-mic'); ctx.createMediaStreamSource(stream).connect(node);
     let pending: Float32Array[] = []; let count = 0;
     node.port.onmessage = (ev) => {
@@ -137,13 +151,14 @@ export function LiveTestPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6" data-testid="sana-live-test">
       <h1 className="text-xl font-semibold">Sana Live · test (M1)</h1>
-      <p className="text-sm text-muted">Company {company} · {model || 'model chosen on connect'} · first audio p50 {p(0.5) ?? '—'} ms / p90 {p(0.9) ?? '—'} ms ({stats.length} turns)</p>
+      {error && <p role="alert" data-testid="sana-live-error" className="rounded-btn border border-crit-fg/30 bg-crit-bg px-3 py-2 text-sm text-crit-fg">{error}</p>}
+      <p className="text-sm text-muted">Company {company ?? '—'}{selected === 'GRP' && company ? ' (your home company; "All companies" is not used here)' : ''} · {model || 'model chosen on connect'} · first audio p50 {p(0.5) ?? '—'} ms / p90 {p(0.9) ?? '—'} ms ({stats.length} turns)</p>
       <div className="flex flex-wrap items-center gap-2">
         <select value={lang} onChange={(e) => setLang(e.target.value)} disabled={state === 'live' || state === 'connecting'} className="min-h-[40px] rounded-btn border border-line px-2">
           {LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}
         </select>
         {state !== 'live'
-          ? <button type="button" onClick={() => void start()} disabled={state === 'connecting'} className="min-h-[40px] rounded-btn bg-primary px-4 font-semibold text-white">{state === 'connecting' ? 'Connecting…' : 'Start talking'}</button>
+          ? <button type="button" onClick={() => void start()} disabled={state === 'connecting'} className="min-h-[40px] rounded-btn bg-primary px-4 font-semibold text-white">{state === 'connecting' ? 'Connecting…' : state === 'error' ? 'Try again' : 'Start talking'}</button>
           : <button type="button" onClick={stop} className="min-h-[40px] rounded-btn border border-line px-4">End</button>}
         <input value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendTyped(); }} placeholder="or type a test turn" className="min-h-[40px] flex-1 rounded-btn border border-line px-3" />
       </div>

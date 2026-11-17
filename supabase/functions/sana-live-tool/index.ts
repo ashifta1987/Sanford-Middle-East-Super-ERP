@@ -22,11 +22,13 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization');
   if (!auth || !/^Bearer\s+\S+/i.test(auth)) return json(401, { error: 'Sign in to use Sana.' });
   const b = await req.json().catch(() => ({})) as Record<string, unknown>;
-  const company = typeof b.company === 'string' && /^[A-Z0-9]{2,8}$/.test(b.company) ? b.company : null;
-  if (!company) return json(400, { error: 'Choose a company first.' });
   const env: Env = { SUPABASE_URL: Deno.env.get('SUPABASE_URL') ?? '', SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ?? '' };
   const rpc = makeRpc(env, auth);
   try {
+    // "All companies" (GRP) or nothing → the user's home company (same rule as sana-live-token)
+    const asked = typeof b.company === 'string' && /^[A-Z0-9]{2,8}$/.test(b.company) && b.company !== 'GRP' ? b.company : null;
+    const company = asked ?? ((await rpc('sana_whoami', {})) as { home_company?: string }).home_company ?? null;
+    if (!company) return json(400, { error: 'Pick a company first.' });
     if (b.action === 'tool') {
       if (b.tool !== 'get_stock') return json(200, { result: { denied: true } });
       const who = await rpc('sana_whoami', {}) as { profile: boolean; topics?: Record<string, boolean> };

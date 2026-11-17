@@ -108,7 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading: Boolean(uid) && profileQ.isLoading,
       isMigrationAdmin: has('admin') || has('it'),
       signRoles: (Object.keys(ROLE_MODULES) as Array<keyof typeof ROLE_MODULES>).filter((r) => ROLE_MODULES[r].some(has)),
-      signOut: async () => { await supabase.auth.signOut(); },
+      // Sign out of THIS browser only. The default (scope=global) also ends the user's sessions on every other device, and when this
+      // session is already gone it answers 403 on /auth/v1/logout?scope=global; supabase-js clears the local session either way.
+      signOut: async () => { await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined); },
     };
   }, [session, ready, profileQ.data, profileQ.isLoading, uid]);
 

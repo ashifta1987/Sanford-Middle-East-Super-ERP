@@ -270,6 +270,9 @@ DECLARE t text := btrim(left(coalesce(p_query, ''), 80));
                            'ar_credit_note','purchase_request','purchase_quotation','purchase_order','goods_receipt_po','goods_return','ap_down_payment','ap_invoice',
                            'ap_credit_note','transfer_request','inventory_transfer','goods_receipt','goods_issue']) k WHERE erp.sana_doc_allowed(k));
         partners jsonb := '[]'; items jsonb := '[]'; docs jsonb := '[]';
+        -- normalised item-code keys worked out ONCE up front (an OR with a sub-select per row made the planner scan every item
+        -- under RLS: 2 s on AE05 in the 52 dry run); then a plain = ANY on the (company_code, item_code) key
+        ikeys text[] := CASE WHEN see_i THEN ARRAY(SELECT k.code FROM erp._sana_item_keys(cos, left(coalesce(p_query, ''), 80)) k) ELSE '{}' END;
 BEGIN
   -- same shape as 36: 'partners' / 'items' only for roles that may see them, 'documents' always
   IF length(t) < 2 THEN RETURN jsonb_build_object('error', 'Search text is too short'); END IF;
@@ -289,8 +292,7 @@ BEGIN
   IF see_i THEN
     SELECT coalesce(jsonb_agg(x), '[]') INTO items FROM (
       SELECT i.company_code AS company, i.item_code AS code, i.name, '/items/' || i.company_code || '/' || i.item_code AS link
-        FROM erp.item i WHERE i.company_code = ANY (cos) AND (i.item_code IN (t, upper(t)) OR i.barcode = t
-          OR (i.company_code, i.item_code) IN (SELECT k.company_code, k.code FROM erp._sana_item_keys(cos, t) k))
+        FROM erp.item i WHERE i.company_code = ANY (cos) AND (i.item_code = ANY (ARRAY[t, upper(t)] || ikeys) OR i.barcode = t)
        ORDER BY i.item_code LIMIT 8) x;
   END IF;
   -- documents: SAP number (company_code, doc_num index) or Southfield number (doc_workflow (company_code, upper(doc_no)) index)
@@ -342,13 +344,13 @@ CREATE OR REPLACE FUNCTION erp.sana_stock(p_query text, p_company varchar DEFAUL
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = erp, extensions, pg_temp AS $$
 DECLARE cost boolean := erp.sana_has('finance', 'purchase', 'inventory'); t text := btrim(left(coalesce(p_query, ''), 80));
         q text := '%' || replace(replace(replace(left(btrim(coalesce(p_query, '')), 80), '\', ''), '%', ''), '_', '\_') || '%';
-        cos varchar[] := erp._sana_search_companies(p_company); comps varchar[]; codes text[];
+        cos varchar[] := erp._sana_search_companies(p_company); comps varchar[]; codes text[]; ikeys text[];
 BEGIN
   IF NOT erp.sana_has('inventory', 'sales', 'purchase') THEN RETURN erp.sana_denied('inventory'); END IF;
   IF length(t) < 2 OR cardinality(cos) = 0 THEN RETURN jsonb_build_object('items', '[]'::jsonb, 'cost_visible', cost); END IF;
+  ikeys := ARRAY(SELECT k.code FROM erp._sana_item_keys(cos, t) k);   -- once, up front (see sana_find)
   SELECT array_agg(i.company_code), array_agg(i.item_code::text) INTO comps, codes FROM (
-    SELECT company_code, item_code FROM erp.item WHERE company_code = ANY (cos) AND (item_code IN (t, upper(t)) OR barcode = t
-      OR (company_code, item_code) IN (SELECT k.company_code, k.code FROM erp._sana_item_keys(cos, t) k)) LIMIT 5) i;
+    SELECT company_code, item_code FROM erp.item WHERE company_code = ANY (cos) AND (item_code = ANY (ARRAY[t, upper(t)] || ikeys) OR barcode = t) LIMIT 5) i;
   IF codes IS NULL AND length(t) >= 3 THEN
     SELECT array_agg(i.company_code), array_agg(i.item_code::text) INTO comps, codes FROM (
       SELECT k.company_code, k.code AS item_code FROM erp._sana_text_keys('item', cos, t) k ORDER BY k.code LIMIT 5) i;

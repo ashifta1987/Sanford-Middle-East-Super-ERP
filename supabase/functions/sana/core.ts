@@ -463,6 +463,13 @@ export function scriptViolation(text: string, lang: string): boolean {
   }
   return false;
 }
+/** Language check: a non-English answer language with its own script (ml, ar, hi, …) but no letter of that script in the reply. */
+export function languageMissing(text: string, lang: string): boolean {
+  const own = LANG_SCRIPT[lang];
+  if (!own || lang === 'en' || !text.trim()) return false;
+  for (const ch of text) if (own.test(ch)) return false;
+  return true;
+}
 /** A reply that states a company figure: a number of 2+ digits or with decimals, not a general-knowledge answer, not a refusal. */
 export function hasCompanyFigure(text: string): boolean {
   const t = text.trim();
@@ -577,6 +584,7 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     let toolRounds = 0;
     let scriptRetry = false;
     let refusalRetry = false;
+    let languageRetry = false;
     let answeredBy = model;
     emit?.('meta', { mode, language: lang, provider: model?.provider ?? null, model: model?.model ?? null, model_main: main?.model ?? null });
 
@@ -594,10 +602,13 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
         const history: ProviderMessage[] = (hist?.messages ?? []).map((m) => ({ role: m.role, content: m.content }));   // not mine / gone: start fresh
         const sys = systemPrompt(who, company, lang, via, ctx, st.languages, detail);
         let ai = await aiAnswer(model, sys, history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
-        // S4 script guard: letters from another script (e.g. Japanese inside Malayalam) → discard, ask once more on the main model
-        if (!ai.refused && main && model !== main && scriptViolation(redactor ? redactor.full : ai.reply, lang)) {
-          console.error('sana script guard', lang, model.model);
-          scriptRetry = true;
+        // S4 script guard: letters from another script (e.g. Japanese inside Malayalam) → discard, ask once more on the main model.
+        // Language check: a Malayalam / Arabic / … answer with no letter of that script (it came back in English) → the same retry.
+        const text1 = redactor ? redactor.full : ai.reply;
+        const badScript = scriptViolation(text1, lang), noLang = !badScript && languageMissing(text1, lang);
+        if (!ai.refused && main && model !== main && (badScript || noLang)) {
+          console.error(badScript ? 'sana script guard' : 'sana language check', lang, model.model);
+          if (badScript) scriptRetry = true; else languageRetry = true;
           if (emit) emit('reset', {});
           redactor = emit ? new StreamRedactor() : undefined;
           const first = ai.usage;
@@ -653,11 +664,11 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       }
     };
     const msTotal = Date.now() - t0;
-    const timing = { ms_first_token: msFirstToken ?? msTotal, ms_total: msTotal, tool_rounds: toolRounds, model: modelId, model_main: main?.model ?? null, script_retry: scriptRetry, refusal_retry: refusalRetry };
+    const timing = { ms_first_token: msFirstToken ?? msTotal, ms_total: msTotal, tool_rounds: toolRounds, model: modelId, model_main: main?.model ?? null, script_retry: scriptRetry, language_retry: languageRetry, refusal_retry: refusalRetry };
     const base = { reply, sources, mode, fallback, denied, language: lang, provider, model: modelId, timing };
     // stored with the answer (49_sana_timing.sql); before 49 is applied the RPC is missing and this is skipped
-    // a guard retry is counted in the timing row: model_fast = '<main model>:script-retry' or ':refusal-retry' (no schema change)
-    const saveTiming = (messageId: number) => rpc('sana_timing_set', { p_message: messageId, p_timing: { ...timing, model_fast: scriptRetry ? `${modelId}:script-retry` : refusalRetry ? `${modelId}:refusal-retry` : modelId } }).catch(() => null);
+    // a guard retry is counted in the timing row: model_fast = '<main model>:script-retry', ':language-retry' or ':refusal-retry' (no schema change)
+    const saveTiming = (messageId: number) => rpc('sana_timing_set', { p_message: messageId, p_timing: { ...timing, model_fast: scriptRetry ? `${modelId}:script-retry` : languageRetry ? `${modelId}:language-retry` : refusalRetry ? `${modelId}:refusal-retry` : modelId } }).catch(() => null);
     if (emit) {
       // S4 step 3: streaming sends 'done' first, then logs (conversation, messages, audit, daily count) while the stream is still
       // open and sends 'logged' with the ids. Logging always happens; it just no longer delays the answer.

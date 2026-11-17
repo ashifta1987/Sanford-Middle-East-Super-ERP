@@ -5,7 +5,7 @@
 //   node scripts/local-stack/sana-live-eval.mjs --compare a.json b.json      (questions where the two runs differ)
 // Test users only; their questions count toward their daily limit. No answer text is stored beyond the local JSON file.
 import fs from 'node:fs';
-import { scriptViolation } from '../../supabase/functions/sana/core.ts';
+import { languageMissing, scriptViolation } from '../../supabase/functions/sana/core.ts';
 // the same 10 questions as sana-timing.mjs (copied: importing that file would start a timing run)
 const QUESTIONS = [
   { en: 'How many open sales orders do we have?', ml: 'എത്ര തുറന്ന സെയിൽസ് ഓർഡറുകൾ ഉണ്ട്?' },
@@ -130,6 +130,7 @@ for (const user of ['sales', 'finance']) {
     for (const q of new Set(turns.map((t) => t.q))) if ((await truth(tok, q)).denied) denied.add(q);
     turns = turns.filter((t) => denied.has(t.q) || MUST_NOT_FOUND.includes(t.q));
   }
+  if (opt('--subset') === 'ml-ar') turns = turns.filter((t) => t.lang === 'ml' || t.lang === 'ar');   // every Malayalam and Arabic turn
   {
     for (const T of turns) {
       const { q, lang } = T; const Q = { [lang]: T.text };
@@ -143,7 +144,7 @@ for (const user of ['sales', 'finance']) {
       else if (tr.zero) figure_ok = ZERO.test(reply);
       else { const hits = tr.figures.filter((f) => f != null && nums.some((n) => close(n, Number(f)))).length; figure_ok = hits >= (tr.need ?? 1); }
       const tool_ok = tr.denied ? true : a.tools.length > 0;   // a refusal needs no lookup
-      const script_ok = !scriptViolation(reply, lang);
+      const script_ok = !scriptViolation(reply, lang) && !languageMissing(reply, lang);   // right script, and the answer is in that language
       const must = MUST_NOT_FOUND.includes(q) && !tr.denied ? 'must say not found' : tr.denied ? 'must refuse' : '';
       const row = { user, lang, q, must, text: T.text, tool_ok, script_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
       rows.push(row);

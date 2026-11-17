@@ -109,7 +109,18 @@ Google's pricing page (confirmed 17 Nov 2026): audio in **\$3 / 1M tokens**, aud
 - **Example:** 20 users × 10 minutes a day = 200 minutes, at most about **\$4.50 a day** (about \$100 a month over 22 working days).
 - **Realistic case:** Sana speaks perhaps a third of the time, which comes to about \$0.01 per minute, or \$2 a day for the same 20 users.
 - **Not included:** text tokens (system prompt, tool results), which are small next to audio.
-- **Rate limits:** see the AI Studio rate-limit page for the project (Live models).
+
+## Rate limits (AI Studio, project "southfield erp", Tier 1, read 17 Nov 2026)
+
+| Model (AI Studio name) | Used for | RPM | TPM | RPD | Peak use, last 28 days |
+|---|---|---|---|---|---|
+| Gemini 3 Flash Live | Sana Live (`gemini-3.1-flash-live-preview`) | unlimited | **150K** | unlimited | 3 RPM · 1.27K TPM · 28 RPD |
+| Gemini 2.5 Flash Native Audio Dialog | not used (lost the M2 probe) | unlimited | 1M | unlimited | 1 RPM · 556 TPM · 2 RPD |
+| Gemini 3.8 Flash TTS | `sana-voice` read-aloud when "Always use Sana's voice" is ticked | 10 | 10K | 100 | 10 RPM · 108 RPD (at the limit) |
+
+What 150K TPM means for Live: audio counts 25 tokens per second each way. The microphone streams the whole session (1,500 tokens a minute) and Sana's speech adds up to 1,500 a minute, plus the prompt and tool results as text. One busy session therefore uses roughly 2–4K tokens a minute, so **about 40–70 sessions at the same minute** fit under 150K TPM. That is well above 20 users. If the limit is reached, the Live API refuses new turns: the panel ends the session with the error note, and the push-to-talk microphone (Ask) still works.
+
+The TTS row is the tight one: 10 RPM / 100 RPD, already reached once (108 / 100). That is why the device voice is the default, and why `sana-voice` falls back to it on a 429. Live does not use this quota.
 
 ## Final results (live, AE05, 10-turn run 4)
 

@@ -3459,7 +3459,10 @@
         "total": "Whole answer",
         "firstAudio": "First sound",
         "rounds": "Lookups",
-        "voices": "Voices"
+        "voices": "Voices",
+        "liveFirstAudio": "Live first sound",
+        "liveMinutes": "Live minutes",
+        "liveSessions": "Live sessions"
       },
       "refusalRate": "Refusal rate",
       "voiceShare": "Voice share",
@@ -3498,7 +3501,8 @@
       "noSpeed": "No timings yet",
       "noSpeedBody": "Answers given after the speed update show here.",
       "speedBody": "Seconds from sending a question: first text, whole answer and first sound (p50 / p90). Voices: device / Sana (Gemini) / on phones. Numbers only, never the questions.",
-      "voicesCell": "{{device}} / {{gemini}} / {{phone}}"
+      "voicesCell": "{{device}} / {{gemini}} / {{phone}}",
+      "liveSessionsCell": "{{sessions}} · {{people}} people"
     }
   },
   "rpt": {
@@ -5137,6 +5141,43 @@
     },
     "forceGemini": "Always use Sana's voice",
     "forceGeminiHint": "Read answers with Sana's own voice (Gemini) instead of this device's voice. Limited to a few answers a day.",
-    "tryGeminiVoice": "Tick “Always use Sana's voice” below to hear it."
+    "tryGeminiVoice": "Tick “Always use Sana's voice” below to hear it.",
+    "live": {
+      "talk": "Talk to Sana",
+      "talkHint": "Sana Live: talk continuously; Sana answers in speech and can be interrupted",
+      "end": "End",
+      "byLive": "Said in Sana Live",
+      "tools_one": "{{count}} lookup available for your role",
+      "tools_other": "{{count}} lookups available for your role",
+      "noTools": "Your role has no Sana lookups: Sana can talk, not look up figures",
+      "state": {
+        "idle": "",
+        "connecting": "Connecting…",
+        "listening": "Listening… just talk",
+        "speaking": "Sana is speaking — talk to interrupt",
+        "looking": "Looking up…",
+        "ended": "Ended",
+        "error": "Stopped"
+      },
+      "flag": {
+        "unverified": "Unverified: this figure did not come from a lookup",
+        "no_quantity": "Check this: Sana named the item but no quantity",
+        "currency": "Check this: the currency may be wrong",
+        "script": "Check this: the answer mixed in another language"
+      },
+      "err": {
+        "mic": "The microphone could not start.",
+        "start": "Sana Live couldn't start right now. Use the microphone button instead.",
+        "connect": "Couldn't connect to Sana Live. Check the connection and try again."
+      },
+      "ended": {
+        "user": "Sana Live ended.",
+        "silence": "Sana Live ended after 60 seconds of silence.",
+        "cap": "You've used today's Sana Live minutes. Type or use the microphone button instead.",
+        "hidden": "Sana Live ended because the tab was in the background for more than 30 seconds.",
+        "expired": "Sana Live ended (the session time ran out). Press Talk to start again.",
+        "error": "Sana Live stopped."
+      }
+    }
   }
 }

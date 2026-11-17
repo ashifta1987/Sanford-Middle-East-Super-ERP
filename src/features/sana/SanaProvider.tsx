@@ -19,9 +19,14 @@ export interface SanaMessage {
   streaming?: boolean;
   /** S4: the lookup running right now (tool name only, from the 'tool' event), shown as a small grey line */
   tool?: string | null;
-  via?: 'text' | 'voice';
+  via?: 'text' | 'voice' | 'live';
   language?: string;
   feedback?: 1 | -1 | null;
+  /** S5 Live: a check on the spoken answer that could not be re-asked (rule 1a figure without a lookup, stock without a quantity,
+   *  another currency, another script) — shown as a small mark on the transcript line */
+  liveFlag?: 'unverified' | 'no_quantity' | 'currency' | 'script' | null;
+  /** S5 Live: ms from the end of the user's speech to Sana's first audio */
+  firstAudioMs?: number | null;
 }
 /** What the user is looking at when they press "Ask Sana about this". A hint only: the server still checks every record. */
 export interface SanaContext { type: 'document' | 'partner' | 'item' | 'report' | 'page'; company?: string; kind?: string; number?: string; code?: string; label?: string }
@@ -55,6 +60,11 @@ interface SanaCtx {
   loadConversation: (id: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   feedback: (m: SanaMessage, value: 1 | -1) => Promise<void>;
+  /** S5 Live: transcript lines are added and updated by the Live session (not by ask) */
+  upsertMessage: (m: SanaMessage) => void;
+  patchMessage: (id: string, fn: (m: SanaMessage) => SanaMessage) => void;
+  /** S5 Live: the conversation the Live turns were logged into (so History and the next typed question continue it) */
+  adoptConversation: (id: string | null) => void;
 }
 const Ctx = createContext<SanaCtx | null>(null);
 const uid = () => Math.random().toString(36).slice(2);
@@ -217,7 +227,7 @@ export function SanaProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
   const loadConversation = useCallback(async (id: string) => {
-    const r = await rpc<{ conversation_id: string; messages: Array<{ message_id: number; role: 'user' | 'assistant'; content: string; sources: SanaSource[]; denied: boolean; mode: 'ai' | 'basic'; via: 'text' | 'voice'; language: string; fallback: boolean; feedback: 1 | -1 | null }> }>('sana_messages', { p_conversation: id });
+    const r = await rpc<{ conversation_id: string; messages: Array<{ message_id: number; role: 'user' | 'assistant'; content: string; sources: SanaSource[]; denied: boolean; mode: 'ai' | 'basic'; via: 'text' | 'voice' | 'live'; language: string; fallback: boolean; feedback: 1 | -1 | null }> }>('sana_messages', { p_conversation: id });
     setConv(r.conversation_id);
     setContext(null);
     setMessages(r.messages.map((m) => ({ id: `m${m.message_id}`, messageId: m.role === 'assistant' ? m.message_id : null, role: m.role, text: m.content, sources: m.sources,
@@ -247,12 +257,16 @@ export function SanaProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const upsertMessage = useCallback((m: SanaMessage) => setMessages((list) => (list.some((x) => x.id === m.id) ? list.map((x) => (x.id === m.id ? { ...x, ...m } : x)) : [...list, m])), []);
+  const patchMessage = useCallback((id: string, fn: (m: SanaMessage) => SanaMessage) => setMessages((list) => list.map((x) => (x.id === id ? fn(x) : x))), []);
+  const adoptConversation = useCallback((id: string | null) => { if (id) { setConv(id); qc.invalidateQueries({ queryKey: ['sana-history'] }); qc.invalidateQueries({ queryKey: ['sana-status'] }); } }, [qc]);
+
   const value = useMemo<SanaCtx>(() => ({
     open, setOpen, messages, busy, mode, language, autoSpeak, ask, newChat, openAndAsk, openWith, context, setContext, status: status.data,
-    conversationId, loadConversation, deleteConversation, feedback,
+    conversationId, loadConversation, deleteConversation, feedback, upsertMessage, patchMessage, adoptConversation,
     setLanguage: (l) => { setLang(l); save('sana-lang', l); },
     setAutoSpeak: (v) => { setAuto(v); save('sana-speak', v ? '1' : '0'); },
-  }), [open, messages, busy, mode, language, autoSpeak, ask, newChat, openAndAsk, openWith, context, status.data, conversationId, loadConversation, deleteConversation, feedback]);
+  }), [open, messages, busy, mode, language, autoSpeak, ask, newChat, openAndAsk, openWith, context, status.data, conversationId, loadConversation, deleteConversation, feedback, upsertMessage, patchMessage, adoptConversation]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

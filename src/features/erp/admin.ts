@@ -150,7 +150,9 @@ export const useSanaSetup = (company: string) => useQuery({
 });
 /** S4 step 5 · Usage › speed: p50 / p90 per day (numbers only; 49_sana_timing.sql). Empty when 49 is not applied yet. */
 export interface SanaTimingDay { day: string; answers: number; first_token_p50: number | null; first_token_p90: number | null; total_p50: number | null; total_p90: number | null;
-  first_audio_p50: number | null; first_audio_p90: number | null; tool_rounds_avg: number | null; voice_device: number; voice_gemini: number; voice_phone: number }
+  first_audio_p50: number | null; first_audio_p90: number | null; tool_rounds_avg: number | null; voice_device: number; voice_gemini: number; voice_phone: number;
+  /** S5 M3 (54): Sana Live — turns, first audio, sessions, minutes, people (absent before 54 is applied) */
+  live_turns?: number; live_first_audio_p50?: number | null; live_first_audio_p90?: number | null; live_sessions?: number; live_minutes?: number; live_users?: number }
 export const useSanaTiming = (company: string) => useQuery({
   queryKey: ['adm-sana-timing', company], enabled: Boolean(company), retry: false,
   queryFn: () => rpc<SanaTimingDay[]>('sana_timing_usage', { p_company: company, p_days: 14 }).catch(() => [] as SanaTimingDay[]),

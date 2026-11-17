@@ -565,12 +565,14 @@ export function AiAssistantPage() {
             <SectionCard title={t('adm.ai.speed')}>
               {!speed.data?.length ? <EmptyState title={t('adm.ai.noSpeed')} body={t('adm.ai.noSpeedBody')} /> : (
                 <div className="relative overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-[14px]" data-testid="adm-ai-speed">
+                  <table className="w-full min-w-[880px] text-[14px]" data-testid="adm-ai-speed">
                     <thead><tr className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-muted">
                       <th className="px-4 py-2.5 text-start">{t('adm.ai.col.day')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.answers')}</th>
                       <th className="px-4 py-2.5 text-end">{t('adm.ai.col.firstText')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.total')}</th>
                       <th className="px-4 py-2.5 text-end">{t('adm.ai.col.firstAudio')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.rounds')}</th>
                       <th className="px-4 py-2.5 text-end">{t('adm.ai.col.voices')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.liveFirstAudio')}</th><th className="px-4 py-2.5 text-end">{t('adm.ai.col.liveMinutes')}</th>
+                      <th className="px-4 py-2.5 text-end">{t('adm.ai.col.liveSessions')}</th>
                     </tr></thead>
                     <tbody className="[&>tr]:border-t [&>tr]:border-line [&_td]:px-4 [&_td]:py-2.5">
                       {speed.data.map((d) => (
@@ -581,6 +583,9 @@ export function AiAssistantPage() {
                           <td className="num text-end">{secs(d.first_audio_p50)} / {secs(d.first_audio_p90)}</td>
                           <td className="num text-end">{d.tool_rounds_avg ?? '—'}</td>
                           <td className="num text-end">{t('adm.ai.voicesCell', { device: d.voice_device, gemini: d.voice_gemini, phone: d.voice_phone })}</td>
+                          <td className="num text-end" data-testid="adm-ai-live-audio">{d.live_turns ? `${secs(d.live_first_audio_p50 ?? null)} / ${secs(d.live_first_audio_p90 ?? null)}` : '—'}</td>
+                          <td className="num text-end" data-testid="adm-ai-live-minutes">{d.live_sessions ? d.live_minutes ?? 0 : '—'}</td>
+                          <td className="num text-end">{d.live_sessions ? t('adm.ai.liveSessionsCell', { sessions: d.live_sessions, people: d.live_users ?? 0 }) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeft, ArrowUp, History, Lock, MessageSquare, Mic, MicOff, Plus, ShieldCheck, Square, ThumbsDown, ThumbsUp, Trash2, Volume2, VolumeX, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowUp, AudioLines, History, Lock, MessageSquare, Mic, MicOff, Plus, ShieldCheck, Square, ThumbsDown, ThumbsUp, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { errorMessage } from '@/lib/format';
 import { SanaMark } from './SanaMark';
@@ -12,6 +12,14 @@ import { SANA_LANGUAGES, speechLocale, stopSpeaking as stopBrowserSpeaking, useS
 import { stopProviderAudio, useProviderSpeechInput } from './providerVoice';
 import { primeAudio, SentenceSpeaker, stopAllSpeech, type VoiceEngine } from './speechQueue';
 import { erp } from '@/lib/supabase';
+import { liveSupported, SanaLiveSession, type LiveEndReason, type LiveState } from './liveClient';
+
+/** Live tool names → the rpc names the "Looking up …" line already knows (sana.tool.*) */
+const LIVE_TOOL_RPC: Record<string, string> = {
+  find_records: 'sana_find', get_document: 'sana_document', list_documents: 'sana_documents', sales_summary: 'sana_sales_summary', purchase_summary: 'sana_purchase_summary',
+  inventory_summary: 'sana_inventory_summary', record_counts: 'sana_find', get_partner: 'sana_partner', get_stock: 'sana_stock', receivables: 'sana_receivables', payables: 'sana_payables',
+  finance_summary: 'sana_finance_summary', banking: 'sana_banking', alerts: 'sana_alerts', my_approvals: 'sana_my_approvals', my_employee_record: 'sana_my_employee', people: 'sana_people',
+};
 
 const stopSpeaking = () => { stopAllSpeech(); stopBrowserSpeaking(); stopProviderAudio(); };
 
@@ -29,16 +37,17 @@ function Bubble({ m, onSpeak, speaking, voiceNote, engine }: { m: SanaMessage; o
   const [fbErr, setFbErr] = useState<string | null>(null);
   if (m.role === 'user') {
     return (
-      <div className="flex justify-end" data-testid="sana-user-msg">
+      <div className="flex justify-end" data-testid={m.via === 'live' ? 'sana-live-user' : 'sana-user-msg'}>
         <p dir="auto" className="max-w-[85%] whitespace-pre-wrap rounded-[18px] rounded-ee-md bg-primary px-4 py-2.5 text-[15px] text-white">
-          {m.via === 'voice' && <Mic className="me-1.5 inline h-3.5 w-3.5 opacity-80" aria-label={t('sana.byVoice')} />}{m.text}
+          {m.via === 'voice' && <Mic className="me-1.5 inline h-3.5 w-3.5 opacity-80" aria-label={t('sana.byVoice')} />}
+          {m.via === 'live' && <AudioLines className="me-1.5 inline h-3.5 w-3.5 opacity-80" aria-label={t('sana.live.byLive')} />}{m.text}
         </p>
       </div>
     );
   }
   const vote = async (v: 1 | -1) => { setFbErr(null); try { await s.feedback(m, v); } catch (e) { setFbErr(errorMessage(e)); } };
   return (
-    <div className="flex items-start gap-2.5" data-testid={m.denied ? 'sana-refusal' : m.error ? 'sana-error' : 'sana-answer'} data-voice-engine={engine} data-speaking={speaking || undefined}>
+    <div className="flex items-start gap-2.5" data-testid={m.via === 'live' ? 'sana-live-answer' : m.denied ? 'sana-refusal' : m.error ? 'sana-error' : 'sana-answer'} data-live-flag={m.liveFlag ?? undefined} data-voice-engine={engine} data-speaking={speaking || undefined}>
       <SanaMark className="mt-1 h-7 w-7" />
       <div className="min-w-0 max-w-[88%]">
         <div dir="auto" className={clsx('whitespace-pre-wrap rounded-[18px] rounded-ss-md border px-4 py-2.5 text-[15px] leading-relaxed',
@@ -63,9 +72,12 @@ function Bubble({ m, onSpeak, speaking, voiceNote, engine }: { m: SanaMessage; o
             ))}
           </div>
         )}
+        {m.via === 'live' && m.liveFlag && (
+          <p className="mt-1 text-[12px] text-warn-fg" data-testid="sana-live-flag">{t(`sana.live.flag.${m.liveFlag}`)}</p>
+        )}
         {!m.error && !m.streaming && (
           <div className="mt-1 flex flex-wrap items-center gap-1">
-            {s.status?.voice_enabled !== false && (
+            {m.via !== 'live' && s.status?.voice_enabled !== false && (
               <button type="button" onClick={() => onSpeak(m)} className="inline-flex min-h-[32px] items-center gap-1 rounded-btn px-1.5 text-[12px] text-muted hover:text-ink">
                 {speaking ? <Square className="h-3.5 w-3.5" aria-hidden /> : <Volume2 className="h-3.5 w-3.5" aria-hidden />} {speaking ? t('sana.stop') : t('sana.listen')}
               </button>
@@ -172,6 +184,44 @@ export function SanaPanel() {
   const voiceOn = s.status?.voice_enabled !== false;
   const off = s.status && !s.status.enabled;
   const langs = SANA_LANGUAGES.filter((l) => l.code === 'auto' || !s.status?.languages || s.status.languages.includes(l.code));
+  // S5 · M3: Sana Live (continuous voice). The push-to-talk mic stays as the fallback and for devices without AudioWorklet.
+  const [liveState, setLiveState] = useState<LiveState>('idle');
+  const [liveNote, setLiveNote] = useState<string | null>(null);
+  const [liveTools, setLiveTools] = useState<string[] | null>(null);
+  const liveRef = useRef<SanaLiveSession | null>(null);
+  const canLive = liveSupported() && voiceOn && !off && !!s.status;
+  const liveOn = liveState === 'connecting' || liveState === 'listening' || liveState === 'speaking' || liveState === 'looking';
+  function startLive() {
+    if (liveRef.current || s.busy) return;
+    stopSpeaking(); mic.stop(); setLiveNote(null); setLiveTools(null); setView('chat');
+    const key = Math.random().toString(36).slice(2, 8);
+    const lang = s.language === 'auto' ? (i18n.language === 'ar' ? 'ar' : 'en') : s.language;
+    const id = (turn: number, who: 'u' | 's') => `live-${key}-${turn}-${who}`;
+    const session = new SanaLiveSession({
+      onState: setLiveState,
+      onInfo: (i) => setLiveTools(i.tools),
+      onUserText: (turn, text) => s.upsertMessage({ id: id(turn, 'u'), role: 'user', text, via: 'live', language: lang }),
+      onSanaText: (turn, text) => s.upsertMessage({ id: id(turn, 's'), role: 'assistant', text, via: 'live', streaming: true, tool: null, language: lang }),
+      onTool: (turn, name) => s.upsertMessage({ id: id(turn, 's'), role: 'assistant', text: '', via: 'live', streaming: true, tool: LIVE_TOOL_RPC[name] ?? 'default', language: lang }),
+      onSources: (turn, sources) => s.patchMessage(id(turn, 's'), (m) => ({ ...m, sources })),
+      onTurnDone: (turn, r) => s.patchMessage(id(turn, 's'), (m) => ({ ...m, streaming: false, tool: null, firstAudioMs: r.firstAudioMs })),
+      onLogged: (turn, r) => {
+        s.patchMessage(id(turn, 's'), (m) => ({ ...m, messageId: r.messageId, liveFlag: r.unverified ? 'unverified' : r.noQuantity ? 'no_quantity' : r.wrongCurrency ? 'currency' : r.script ? 'script' : null }));
+        s.adoptConversation(r.conversationId);
+      },
+      onEnd: (reason: LiveEndReason, msg?: string) => {
+        liveRef.current = null;
+        const code = (msg ?? '').split('|')[0];
+        const detail = (msg ?? '').split('|').slice(1).join('|');
+        setLiveNote(code === 'mic-denied' ? t('sana.mic.denied') : code === 'mic-failed' ? t('sana.live.err.mic') : code === 'cap' ? (detail || t('sana.live.ended.cap'))
+          : code === 'token' ? (detail || t('sana.live.err.start')) : code === 'setup' || code === 'socket' ? t('sana.live.err.connect')
+            : t(`sana.live.ended.${reason}`));
+      },
+    }, { company: s.status?.company ?? null, language: lang });
+    liveRef.current = session;
+    void session.start();
+  }
+  function endLive(reason: LiveEndReason = 'user') { liveRef.current?.end(reason); }
 
   /** S4: one speaker per answer. `target.id` is 'live' while the answer streams, then the answer's id. */
   function makeSpeaker(target: { id: string; engine?: VoiceEngine }, language: string, t0?: number, onFirstAudio?: (ms: number) => void) {
@@ -216,13 +266,15 @@ export function SanaPanel() {
   }
   function onSubmit(e: FormEvent) { e.preventDefault(); void send(text); }
 
+  useEffect(() => () => { liveRef.current?.end('user'); }, []);   // leaving the page ends Live
+  useEffect(() => { liveRef.current?.end('user'); }, [s.status?.company]);   // another company: a new session is needed
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }); }, [s.messages, s.busy]);
   useEffect(() => {
     if (s.open) {
       opener.current = document.activeElement as HTMLElement | null;
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
-      stopSpeaking(); mic.stop(); setView('chat');
+      stopSpeaking(); mic.stop(); setView('chat'); endLive('user');
       opener.current?.focus?.();   // focus returns to the button that opened Sana
     }
   }, [s.open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -337,6 +389,27 @@ export function SanaPanel() {
             </p>
           )}
           {micMsg && <p role="alert" className="mb-2 text-[13px] text-crit-fg" data-testid="sana-mic-msg">{micMsg}</p>}
+          {liveNote && !liveOn && <p role="status" className="mb-2 text-[13px] text-muted" data-testid="sana-live-note">{liveNote}</p>}
+          {liveOn ? (
+            <div className="flex items-center gap-3 rounded-[14px] bg-primary-soft px-3 py-2" data-testid="sana-live-bar" data-live-state={liveState} aria-live="polite">
+              <span className="relative flex h-3 w-3 shrink-0" aria-hidden>
+                <span className={clsx('absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping', liveState === 'speaking' ? 'bg-brand-teal' : 'bg-brand-coral')} />
+                <span className={clsx('relative inline-flex h-3 w-3 rounded-full', liveState === 'speaking' ? 'bg-brand-teal' : 'bg-brand-coral')} />
+              </span>
+              <span className="min-w-0 flex-1 text-[14px] font-medium text-primary-text">
+                {t(`sana.live.state.${liveState}`)}
+                {liveTools && liveState === 'listening' && <span className="block truncate text-[12px] font-normal text-muted">{liveTools.length ? t('sana.live.tools', { count: liveTools.length }) : t('sana.live.noTools')}</span>}
+              </span>
+              <button type="button" onClick={() => endLive('user')} data-testid="sana-live-end"
+                className="min-h-[44px] shrink-0 rounded-full bg-brand-coral px-5 text-[14px] font-semibold text-white hover:opacity-90">{t('sana.live.end')}</button>
+            </div>
+          ) : (<>
+          {canLive && (
+            <button type="button" onClick={startLive} disabled={s.busy} data-testid="sana-talk-phone"
+              className="mb-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-brand-navy text-[16px] font-semibold text-white disabled:opacity-60 sm:hidden">
+              <AudioLines className="h-5 w-5" aria-hidden /> {t('sana.live.talk')}
+            </button>
+          )}
           <div className="flex items-end gap-2">
             <label htmlFor="sana-input" className="sr-only">{t('sana.placeholder')}</label>
             <textarea id="sana-input" ref={inputRef} rows={1} dir="auto" value={text} maxLength={2000} disabled={off}
@@ -351,11 +424,18 @@ export function SanaPanel() {
                 mic.listening ? 'border-brand-coral bg-brand-coral text-white' : 'border-line-strong bg-surface text-ink hover:border-primary hover:text-primary', (!mic.supported || !voiceOn) && 'opacity-50')}>
               {mic.supported && voiceOn ? <Mic className="h-5 w-5" aria-hidden /> : <MicOff className="h-5 w-5" aria-hidden />}
             </button>
+            {canLive && (
+              <button type="button" onClick={startLive} disabled={s.busy} data-testid="sana-talk" aria-label={t('sana.live.talk')} title={t('sana.live.talkHint')}
+                className="hidden h-12 w-12 shrink-0 place-items-center rounded-full border border-brand-navy bg-brand-navy text-white transition hover:opacity-90 disabled:opacity-60 sm:grid">
+                <AudioLines className="h-5 w-5" aria-hidden />
+              </button>
+            )}
             <button type="submit" disabled={s.busy || !text.trim() || off} aria-label={t('sana.send')}
               className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-white transition hover:bg-primary-hover disabled:bg-neutral-bg disabled:text-muted">
               <ArrowUp className="h-5 w-5" aria-hidden />
             </button>
           </div>
+          </>)}
           <p className="mt-2 flex items-start gap-1.5 text-[11.5px] leading-snug text-muted">
             <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-brand-teal" aria-hidden />
             <span>{t('sana.privacy')}{providerVoice && voiceOn ? ` ${t('sana.voiceProviderNote')}` : ''}{left != null && left <= 20 ? ` ${t('sana.left', { count: left })}` : ''}</span>

@@ -48,7 +48,36 @@ const audioCtx = () => {
 /** Call from a click/tap (send, microphone): browsers only allow sound after a gesture, and this unlocks it early. */
 export function primeAudio() { try { audioCtx(); } catch { /* no Web Audio: device voice only */ } }
 /** Stop whatever Sana is saying and drop the queue (new message, stop button, panel closed). */
-export function stopAllSpeech() { current?.stop(); current = null; }
+export function stopAllSpeech() { current?.stop(); current = null; livePlayer?.stop(); }
+
+let livePlayer: PcmStreamPlayer | null = null;
+/**
+ * S5 · Sana Live: streamed 16-bit PCM from the Live API, played back to back on the same AudioContext as the read-aloud
+ * (each chunk scheduled at the previous one's end). stop() drops everything at once (barge-in: the user talks over Sana).
+ */
+export class PcmStreamPlayer {
+  private nextAt = 0;
+  private sources = new Set<AudioBufferSourceNode>();
+  private idle: Array<() => void> = [];
+  get playing() { return this.sources.size > 0; }
+  push(pcm: Uint8Array, rate = 24000) {
+    let c: AudioContext;
+    try { c = audioCtx(); } catch { return; }
+    livePlayer = this;
+    const bytes = pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength) as ArrayBuffer;
+    const src = c.createBufferSource(); src.buffer = pcmToBuffer(c, bytes, rate); src.connect(c.destination);
+    const at = Math.max(c.currentTime + SENTINEL_LEAD, this.nextAt); src.start(at); this.nextAt = at + src.buffer.duration;
+    this.sources.add(src);
+    src.onended = () => { this.sources.delete(src); if (!this.sources.size) { const cbs = this.idle; this.idle = []; cbs.forEach((f) => f()); } };
+  }
+  /** run once playback has finished (now, if nothing is playing) */
+  whenIdle(f: () => void) { if (!this.sources.size) f(); else this.idle.push(f); }
+  stop() {
+    for (const s of this.sources) { try { s.stop(); } catch { /* ended */ } }
+    this.sources.clear(); this.nextAt = 0;
+    const cbs = this.idle; this.idle = []; cbs.forEach((f) => f());
+  }
+}
 
 const langOf = (text: string, asked: string) => {
   if (asked && asked !== 'auto') return asked;

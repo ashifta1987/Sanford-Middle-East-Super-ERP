@@ -121,7 +121,7 @@ async function ask(tok, message, language) {
 }
 
 const rows = [];
-for (const user of ['sales', 'finance']) {
+for (const user of (opt('--user') ? [opt('--user')] : ['sales', 'finance'])) {
   const tok = await signIn(users[user]);
   let turns = [...['en', 'ml'].flatMap((lang) => QUESTIONS.map((Q, i) => ({ q: i + 1, lang, text: Q[lang] }))), ...(has('--base-only') ? [] : EXTRA)];
   // --subset refusal: the questions this user must have refused, plus the "must say not found" pair (q4 stock SMP-1010, q6 balance C0001)

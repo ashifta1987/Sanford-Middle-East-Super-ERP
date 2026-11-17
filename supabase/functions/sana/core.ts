@@ -204,7 +204,10 @@ function collectSources(results: unknown[]): Source[] {
 const isDenied = (r: unknown) => Boolean(r && typeof r === 'object' && (r as Json).denied === true);
 /** S2: does a model's reply contain the standard refusal (any language, any team)? Then Sana sends exactly the standard sentence. */
 const REFUSAL_HEADS = Object.values(REFUSAL).map((f) => f('responsible').slice(0, 28));
-export const isRefusalText = (t: string) => { const n = t.replace(/[’‘`]/g, "'"); return REFUSAL_HEADS.some((h) => n.includes(h)); };
+// The model sometimes refuses in its own words (17 Nov: "stock, inventory എന്നീ വിഷയങ്ങൾ ഈ റോളിന് ലഭ്യമല്ല…", which also named
+// topics). These paraphrases count as a refusal too, so the reply is replaced by the standard sentence (rule 3: no topic names).
+const REFUSAL_PARAPHRASE = /not available (?:for|to) your role|isn't available for your role|റോളിന് ലഭ്യമല്ല|റോളിനു ലഭ്യമല്ല|غير متاحة لدورك|غير متاح لدورك/i;
+export const isRefusalText = (t: string) => { const n = t.replace(/[’‘`]/g, "'"); return REFUSAL_HEADS.some((h) => n.includes(h)) || REFUSAL_PARAPHRASE.test(n); };
 
 export function makeRpc(env: Env, auth: string): Rpc {
   return async (fn, args) => {

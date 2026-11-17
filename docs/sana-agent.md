@@ -150,3 +150,17 @@ Gemini Live (ephemeral tokens) will be the main voice path. Steps 3–5 keep the
 6. **Timing and quota stay per turn.** The Step 5 fields (ms_first_token, ms_first_audio, ms_total, model, voice engine and device)
    are recorded per Live turn. The voice budget (`TTS_DAILY_CAP`, moving to `erp.sana_settings`) becomes a Live-minutes budget per
    user.
+
+## Rule · definer-rights helpers (agreed 17 Nov 2026)
+
+SANA reads data with the user's own rights (SECURITY INVOKER, RLS). A SECURITY DEFINER helper is allowed for only two things:
+
+1. **Key-only search.** `erp._sana_text_keys` (50) returns record keys (company + code, or obj_type + doc_entry), at most 50,
+   from the caller's own companies (re-checked inside). The caller then reads the rows by key under its normal RLS and role rules.
+2. **Counts.** `erp.sana_partner_counts` (51) returns numbers only: customers, suppliers and items by status, plus today's and
+   this month's buyers and billers. It covers only the caller's companies, and only the parts the caller's role may see
+   (`erp.sana_has`, read from the caller's token).
+
+Definer helpers must **never** return row data (names, amounts, documents, people). Anything a user reads goes through
+invoker functions and RLS. Both helpers exist for speed: under RLS, a text match (ILIKE, LIKE) cannot use an index, and every row
+runs the access check one by one.

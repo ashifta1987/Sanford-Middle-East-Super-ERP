@@ -51,6 +51,7 @@ const cors = {
 // through as before (none on the build machine). The base-URL variables exist only here, never in the Edge Functions.
 const MOCK = `http://127.0.0.1:${PORT}/local/mock`;
 const sanaLocal = { provider: 'basic', timeout_ms: undefined };
+let lastLiveSetup = null;   // S5 e2e only
 function sanaEnv() {
   const env = { SUPABASE_URL: `http://127.0.0.1:${PORT}`, SUPABASE_ANON_KEY: 'local', SANA_PROVIDER: process.env.SANA_PROVIDER, SANA_MODEL: process.env.SANA_MODEL,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, SANA_TIMEOUT_MS: sanaLocal.timeout_ms };
@@ -139,6 +140,18 @@ http.createServer(async (req, res) => {
     ttsCacheClear();
     return send(res, 200, { cleared: true });
   }
+  // S5 Live: the same handlers as the Edge Functions; the token is a LOCAL fake (no Gemini call), the session rows are real
+  if ((url.pathname === '/functions/v1/sana-live-token' || url.pathname === '/functions/v1/sana-live-tool') && req.method === 'POST') {
+    const { handleLiveToken, handleLiveTool } = await import('../../supabase/functions/sana/livecore.ts');
+    let body = null;
+    try { body = JSON.parse((await readBody(req)) || 'null'); } catch { /* bad JSON */ }
+    const env = { ...sanaEnv(), SANA_LIVE_MODEL: 'gemini-live-local-mock' };
+    const r = url.pathname.endsWith('token')
+      ? await handleLiveToken(req.headers.authorization ?? null, body, env, async (setup, exp) => { lastLiveSetup = setup; return { token: 'auth_tokens/local-mock', expireTime: exp }; })
+      : await handleLiveTool(req.headers.authorization ?? null, body, env);
+    return send(res, r.status, r.json);
+  }
+  if (url.pathname === '/local/live-last-setup') return send(res, 200, lastLiveSetup ?? {});   // e2e: what the token locked in
   if (url.pathname === '/functions/v1/sana-voice' && req.method === 'POST') {
     const { handleVoice } = await import('../../supabase/functions/sana-voice/core.ts');
     let body = null;

@@ -22,9 +22,9 @@ if (!process.env.NO_REBUILD) {
 
 // a1_explain.sql is a 1M-row performance probe, not a pass/fail suite. Phase A suites first, then B (follow-up phases),
 // then S (Sana) with the Sana role matrix.
-const rank = (f) => (f === 'sana_roles.sql' ? 2500 : f === 'sana_agent.sql' ? 2600 : { a: 0, b: 1000, s: 2000 }[f[0]] + Number(f.match(/^[abs](\d+)/)[1]));
+const rank = (f) => (f === 'sana_roles.sql' ? 2500 : f === 'sana_agent.sql' ? 2600 : f === 'sana_live.sql' ? 2700 : { a: 0, b: 1000, s: 2000 }[f[0]] + Number(f.match(/^[abs](\d+)/)[1]));
 const suites = fs.readdirSync(path.join(REPO, 'supabase/tests'))
-  .filter((f) => (/^[abs]\d+_.*\.sql$/.test(f) || f === 'sana_roles.sql' || f === 'sana_agent.sql') && f !== 'a1_explain.sql')
+  .filter((f) => (/^[abs]\d+_.*\.sql$/.test(f) || f === 'sana_roles.sql' || f === 'sana_agent.sql' || f === 'sana_live.sql') && f !== 'a1_explain.sql')
   .sort((a, b) => rank(a) - rank(b));
 
 let pass = 0, fail = 0, broken = 0;

@@ -182,8 +182,8 @@ BEGIN
                         'system health shows the file', left((r -> 'files')::text, 200));
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                                      WHERE n.nspname = 'erp' AND p.prosecdef AND (p.proname LIKE 'sana%' OR p.proname LIKE '\_sana%')
-                                       AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR NOT coalesce(array_to_string(p.proconfig, ',') LIKE '%search_path=erp, pg_temp%', false))),
-                        'SECURITY DEFINER Sana functions: search_path set, no anon execute');
+                                       AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR NOT coalesce(array_to_string(p.proconfig, ',') ~ 'search_path=erp, (extensions, )?pg_temp', false))),
+                        'SECURITY DEFINER Sana functions: search_path pinned (erp[, extensions], pg_temp — the trigram helpers of 50/52 need extensions), no anon execute');
   PERFORM pg_temp.check(NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                                      WHERE n.nspname = 'erp' AND p.proname LIKE 'sana%' AND has_function_privilege('anon', p.oid, 'EXECUTE')),
                         'no Sana function is callable without signing in');

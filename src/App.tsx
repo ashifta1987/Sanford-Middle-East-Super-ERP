@@ -135,7 +135,7 @@ export default function App() {
         <Route path="m/:key" element={<ModuleRoute />} />
         <Route path="preview/:key" element={<PreviewPage />} />
         <Route path="search" element={<SearchPage />} />
-        <Route path="sana/live-test" element={<Suspense fallback={null}><LiveTestPage /></Suspense>} />   {/* S5 M1 · hidden, Administration only */}
+        <Route path="sana/live-test" element={<Suspense fallback={null}><LiveTestPage /></Suspense>} />   {/* S5 · hidden test page; the server checks Sana, voice and the Live cap */}
         <Route path="control" element={<ControlTowerPage />} />
 
         {/* Working screens on live data (Stage 1: read, search, filter, export) */}

@@ -15,7 +15,7 @@ import { geminiSpeak, geminiTranscribe, pcmToWav } from '../sana/providers/gemin
 // Gemini speaks only when the user ticks "Always use Sana's voice". Per user per day at most TTS_DAILY_CAP Gemini calls (a cache hit
 // costs nothing and is still served). Counted from sana_usage.voice_calls (provider speech-to-text calls count too); this becomes a
 // per-company setting in erp.sana_settings later (needs SQL).
-export const TTS_DAILY_CAP = 10;
+export const TTS_DAILY_CAP = 10;   // fallback only: the per-company value is erp.sana_settings.tts_daily_cap (52)
 export const VOICE_LIMITS = { audioBytes: 1_500_000, seconds: 60, ttsChars: 1500, timeoutMs: 25_000 };
 const AUDIO_TYPES = ['audio/wav', 'audio/x-wav', 'audio/wave', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/aac', 'audio/flac'];
 
@@ -115,7 +115,10 @@ export async function handleVoice(auth: string | null, body: unknown, env: Env):
       const key = ttsKey(m.tts, m.voice, lang, text);
       let hit = ttsCache.get(key);
       const cached = Boolean(hit);
-      if (!hit && (st.voice_calls ?? 0) >= TTS_DAILY_CAP) {
+      // the cap is a company setting since 52 (erp.sana_settings.tts_daily_cap via sana_caps); before 52 the constant applies
+      const ttsCap = hit ? TTS_DAILY_CAP : await (rpc('sana_caps', { p_company: company }) as Promise<{ tts_daily_cap?: number }>)
+        .then((c) => (Number.isFinite(c?.tts_daily_cap) ? c.tts_daily_cap! : TTS_DAILY_CAP)).catch(() => TTS_DAILY_CAP);
+      if (!hit && (st.voice_calls ?? 0) >= ttsCap) {
         return fail(429, "Sana's own voice is used up for today. Your device's voice reads the answers instead.");
       }
       if (!hit) {

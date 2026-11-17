@@ -43,7 +43,7 @@ const sql = postgres({ ...conn, database: db, max: 1 });
 if (process.env.FRESH) {
   await sql.unsafe(`
     CREATE SCHEMA IF NOT EXISTS auth; CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text);
-    CREATE SCHEMA IF NOT EXISTS storage; CREATE SCHEMA IF NOT EXISTS sap;
+    CREATE SCHEMA IF NOT EXISTS storage; CREATE SCHEMA IF NOT EXISTS sap; CREATE SCHEMA IF NOT EXISTS extensions;
     CREATE TABLE IF NOT EXISTS sap._company (company_code varchar(8) PRIMARY KEY, legal_name text, country text, currency text, licence_type text, sap_schema text, in_scope boolean DEFAULT true);
     CREATE TABLE IF NOT EXISTS sap._load_log (load_id bigserial PRIMARY KEY, run_id uuid, company_code varchar(8), table_name text, status text, rows_expected bigint, rows_loaded bigint, loaded_at timestamptz DEFAULT now());
     CREATE TABLE IF NOT EXISTS storage.buckets (id text PRIMARY KEY, name text, public boolean DEFAULT false, file_size_limit bigint, allowed_mime_types text[]);

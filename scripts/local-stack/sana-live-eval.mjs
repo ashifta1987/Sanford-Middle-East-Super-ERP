@@ -21,6 +21,8 @@ const QUESTIONS = [
 ];
 // 17 Nov: more Malayalam and Arabic (script check) and the "active customers" question (record status, not today's invoices).
 // q = the truth to compare with (same numbering as QUESTIONS; 11 = active customers by status).
+// 17 Nov: answered with the role refusal although the lookup only came back empty → these must say "not found" (en + ml)
+const MUST_NOT_FOUND = [4, 6];
 const EXTRA = [
   { q: 3, lang: 'ml', text: 'കാലാവധി കഴിഞ്ഞ ഇൻവോയ്സുകൾ എത്രയാണ്?' }, { q: 5, lang: 'ml', text: 'ഏത് കസ്റ്റമറാണ് ഏറ്റവും കൂടുതൽ കുടിശ്ശിക വരുത്തിയത്?' },
   { q: 2, lang: 'ml', text: 'ഈ മാസം ഇതുവരെയുള്ള വിൽപ്പന എത്ര?' }, { q: 8, lang: 'ml', text: 'ഇപ്പോൾ തുറന്നിരിക്കുന്ന പർച്ചേസ് ഓർഡറുകൾ എത്ര?' },
@@ -121,7 +123,13 @@ async function ask(tok, message, language) {
 const rows = [];
 for (const user of ['sales', 'finance']) {
   const tok = await signIn(users[user]);
-  const turns = [...['en', 'ml'].flatMap((lang) => QUESTIONS.map((Q, i) => ({ q: i + 1, lang, text: Q[lang] }))), ...(has('--base-only') ? [] : EXTRA)];
+  let turns = [...['en', 'ml'].flatMap((lang) => QUESTIONS.map((Q, i) => ({ q: i + 1, lang, text: Q[lang] }))), ...(has('--base-only') ? [] : EXTRA)];
+  // --subset refusal: the questions this user must have refused, plus the "must say not found" pair (q4 stock SMP-1010, q6 balance C0001)
+  if (opt('--subset') === 'refusal') {
+    const denied = new Set();
+    for (const q of new Set(turns.map((t) => t.q))) if ((await truth(tok, q)).denied) denied.add(q);
+    turns = turns.filter((t) => denied.has(t.q) || MUST_NOT_FOUND.includes(t.q));
+  }
   {
     for (const T of turns) {
       const { q, lang } = T; const Q = { [lang]: T.text };
@@ -136,7 +144,8 @@ for (const user of ['sales', 'finance']) {
       else { const hits = tr.figures.filter((f) => f != null && nums.some((n) => close(n, Number(f)))).length; figure_ok = hits >= (tr.need ?? 1); }
       const tool_ok = tr.denied ? true : a.tools.length > 0;   // a refusal needs no lookup
       const script_ok = !scriptViolation(reply, lang);
-      const row = { user, lang, q, text: T.text, tool_ok, script_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
+      const must = MUST_NOT_FOUND.includes(q) && !tr.denied ? 'must say not found' : tr.denied ? 'must refuse' : '';
+      const row = { user, lang, q, must, text: T.text, tool_ok, script_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
       rows.push(row);
       console.log(`${user} ${lang} q${q}: tool ${row.tool ? 'y' : 'n'} · figure ${figure_ok ? 'y' : 'n'} · refusal ${refusal_ok ? 'y' : 'n'} · script ${script_ok ? 'y' : 'n'}${a.error ? ' · ERROR ' + a.error : ''}`);
     }

@@ -5,6 +5,7 @@
 //   node scripts/local-stack/sana-live-eval.mjs --compare a.json b.json      (questions where the two runs differ)
 // Test users only; their questions count toward their daily limit. No answer text is stored beyond the local JSON file.
 import fs from 'node:fs';
+import { scriptViolation } from '../../supabase/functions/sana/core.ts';
 // the same 10 questions as sana-timing.mjs (copied: importing that file would start a timing run)
 const QUESTIONS = [
   { en: 'How many open sales orders do we have?', ml: 'എത്ര തുറന്ന സെയിൽസ് ഓർഡറുകൾ ഉണ്ട്?' },
@@ -18,6 +19,19 @@ const QUESTIONS = [
   { en: 'What were the top selling items this month?', ml: 'ഈ മാസം ഏറ്റവും കൂടുതൽ വിറ്റ ഇനങ്ങൾ ഏതൊക്കെ?' },
   { en: 'Summarise the receivables ageing.', ml: 'സ്വീകാര്യ തുകകളുടെ കാലപ്പഴക്കം ചുരുക്കി പറയുക.' },
 ];
+// 17 Nov: more Malayalam and Arabic (script check) and the "active customers" question (record status, not today's invoices).
+// q = the truth to compare with (same numbering as QUESTIONS; 11 = active customers by status).
+const EXTRA = [
+  { q: 3, lang: 'ml', text: 'കാലാവധി കഴിഞ്ഞ ഇൻവോയ്സുകൾ എത്രയാണ്?' }, { q: 5, lang: 'ml', text: 'ഏത് കസ്റ്റമറാണ് ഏറ്റവും കൂടുതൽ കുടിശ്ശിക വരുത്തിയത്?' },
+  { q: 2, lang: 'ml', text: 'ഈ മാസം ഇതുവരെയുള്ള വിൽപ്പന എത്ര?' }, { q: 8, lang: 'ml', text: 'ഇപ്പോൾ തുറന്നിരിക്കുന്ന പർച്ചേസ് ഓർഡറുകൾ എത്ര?' },
+  { q: 7, lang: 'ml', text: 'സപ്ലയർമാർക്ക് കൊടുക്കാനുള്ള ആകെ തുക എത്ര?' }, { q: 10, lang: 'ml', text: '30, 60, 90 ദിവസത്തെ കുടിശ്ശിക എത്രയാണ്?' },
+  { q: 9, lang: 'ml', text: 'ഈ മാസം ഏറ്റവും കൂടുതൽ വിറ്റ ഉൽപ്പന്നം ഏതാണ്?' }, { q: 1, lang: 'ml', text: 'തുറന്ന സെയിൽസ് ഓർഡറുകൾ ഉണ്ടോ?' },
+  { q: 4, lang: 'ml', text: 'SMP-1010 സ്റ്റോക്കിൽ ഉണ്ടോ?' }, { q: 6, lang: 'ml', text: 'C0001 ന്റെ ബാലൻസ് പറയാമോ?' },
+  { q: 8, lang: 'ar', text: 'كم عدد أوامر الشراء المفتوحة؟' }, { q: 2, lang: 'ar', text: 'ما هو صافي المبيعات هذا الشهر؟' },
+  { q: 7, lang: 'ar', text: 'كم ندين للموردين؟' }, { q: 5, lang: 'ar', text: 'من هم العملاء الأكثر مديونية؟' }, { q: 3, lang: 'ar', text: 'اعرض فواتير العملاء المتأخرة.' },
+  { q: 11, lang: 'en', text: 'How many customers are active today?' }, { q: 11, lang: 'ml', text: 'ഇന്ന് എത്ര കസ്റ്റമേഴ്സ് ആക്ടീവ് ആണ്?' },
+];
+
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -63,6 +77,7 @@ async function truth(tok, q) {
     case 7: { const r = await rpc(tok, 'sana_payables', { p_company: company }); return den(r) ? { denied: true } : { figures: [r.open_total, r.overdue] }; }
     case 8: { const r = await rpc(tok, 'sana_documents', { p_kind: 'purchase_order', p_status: 'open', p_company: company, p_limit: 3 }); return den(r) ? { denied: true } : { figures: [r.count, r.total] }; }
     case 9: { const r = await rpc(tok, 'sana_sales_summary', { p_from: monthStart, p_to: today, p_company: company }); return den(r) ? { denied: true } : { names: (r.top_items ?? []).slice(0, 1).flatMap((x) => [x.code]) }; }
+    case 11: { const r = await rpc(tok, 'sana_partner_counts', { p_company: company }); return den(r) || !r.customers ? { denied: true } : { figures: [r.customers.active], status_count: true }; }
     case 10: { const r = await rpc(tok, 'sana_receivables', { p_company: company }); return den(r) ? { denied: true } : { figures: [r.not_due, r.d1_30, r.d31_60, r.d61_90, r.over_90], need: 2 }; }
   }
 }
@@ -106,9 +121,11 @@ async function ask(tok, message, language) {
 const rows = [];
 for (const user of ['sales', 'finance']) {
   const tok = await signIn(users[user]);
-  for (const lang of ['en', 'ml']) {
-    for (const [i, Q] of QUESTIONS.entries()) {
-      const q = i + 1, tr = await truth(tok, q), a = await ask(tok, Q[lang], lang);
+  const turns = [...['en', 'ml'].flatMap((lang) => QUESTIONS.map((Q, i) => ({ q: i + 1, lang, text: Q[lang] }))), ...(has('--base-only') ? [] : EXTRA)];
+  {
+    for (const T of turns) {
+      const { q, lang } = T; const Q = { [lang]: T.text };
+      const tr = await truth(tok, q), a = await ask(tok, T.text, lang);
       const reply = String(a.done?.reply ?? ''), denied = a.done?.denied === true, nums = numbersIn(reply);
       const refusal_ok = tr.denied ? denied : !denied;
       let figure_ok;
@@ -118,9 +135,10 @@ for (const user of ['sales', 'finance']) {
       else if (tr.zero) figure_ok = ZERO.test(reply);
       else { const hits = tr.figures.filter((f) => f != null && nums.some((n) => close(n, Number(f)))).length; figure_ok = hits >= (tr.need ?? 1); }
       const tool_ok = tr.denied ? true : a.tools.length > 0;   // a refusal needs no lookup
-      const row = { user, lang, q, tool_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
+      const script_ok = !scriptViolation(reply, lang);
+      const row = { user, lang, q, text: T.text, tool_ok, script_ok, model: a.model, feedback_ms: a.feedback_ms, first_ms: a.first_ms, total_ms: a.total_ms, tool: a.tools.length > 0, tools: a.tools, figure_ok, refusal_ok, expected: tr.denied ? 'refusal' : tr.none ? 'nothing found' : 'answer', denied, error: a.error, reply: reply.slice(0, 300) };
       rows.push(row);
-      console.log(`${user} ${lang} q${q}: tool ${row.tool ? 'y' : 'n'} · figure ${figure_ok ? 'y' : 'n'} · refusal ${refusal_ok ? 'y' : 'n'}${a.error ? ' · ERROR ' + a.error : ''}`);
+      console.log(`${user} ${lang} q${q}: tool ${row.tool ? 'y' : 'n'} · figure ${figure_ok ? 'y' : 'n'} · refusal ${refusal_ok ? 'y' : 'n'} · script ${script_ok ? 'y' : 'n'}${a.error ? ' · ERROR ' + a.error : ''}`);
     }
   }
 }
@@ -129,5 +147,5 @@ const sum = (k) => rows.filter((r) => r[k]).length;
 const pct = (xs, p) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return v.length ? Math.round(v[Math.min(v.length - 1, Math.ceil(p / 100 * v.length) - 1)]) : null; };
 const ok = rows.filter((r) => !r.error);
 console.log(`timing: feedback p50/p90 ${pct(ok.map((r) => r.feedback_ms), 50)}/${pct(ok.map((r) => r.feedback_ms), 90)} · first text ${pct(ok.map((r) => r.first_ms), 50)}/${pct(ok.map((r) => r.first_ms), 90)} · total ${pct(ok.map((r) => r.total_ms), 50)}/${pct(ok.map((r) => r.total_ms), 90)} ms · errors ${rows.length - ok.length}`);
-console.log(`\n${label} (${rows[0]?.model}): tool ${sum('tool')}/${rows.length} · figure ${sum('figure_ok')}/${rows.length} · refusal ${sum('refusal_ok')}/${rows.length}`);
+console.log(`\n${label} (${rows[0]?.model}): tool ${sum('tool')}/${rows.length} · figure ${sum('figure_ok')}/${rows.length} · refusal ${sum('refusal_ok')}/${rows.length} · script ${sum('script_ok')}/${rows.length}`);
 if (opt('--json')) fs.writeFileSync(opt('--json'), JSON.stringify({ label, model: rows[0]?.model, at: new Date().toISOString(), rows }, null, 1));

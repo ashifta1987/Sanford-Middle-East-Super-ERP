@@ -239,6 +239,23 @@ BEGIN
                         'stock: exact code first, still no cost for sales', left(r::text, 160));
 END $$;
 
+-- ---------- 51_sana_counts.sql: status counts + today's activity, by role ----------
+DO $$
+DECLARE r jsonb; n integer;
+BEGIN
+  IF to_regprocedure('erp.sana_partner_counts(varchar)') IS NULL THEN PERFORM pg_temp.check(true, 'counts: 51 not loaded, skipped'); RETURN; END IF;
+  SELECT count(*) INTO n FROM erp.business_partner WHERE company_code = 'ZZ99' AND kind = 'customer' AND active;
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_partner_counts(''ZZ99'')');
+  PERFORM pg_temp.check((r -> 'customers' ->> 'active')::integer = n AND r ? 'items' AND NOT r ? 'suppliers' AND r -> 'customers' ? 'bought_today',
+                        'counts: sales sees active customers (= the dashboard rule) and today''s buyers, items, no suppliers', left(r::text, 200));
+  r := pg_temp.call(pg_temp.u(10), 'SELECT erp.sana_partner_counts(''ZZ99'')');
+  PERFORM pg_temp.check(r ? 'suppliers' AND NOT r ? 'customers', 'counts: purchasing sees suppliers, not customers', left(r::text, 200));
+  r := pg_temp.call(pg_temp.u(18), 'SELECT erp.sana_partner_counts(''ZZ99'')');
+  PERFORM pg_temp.check((r ->> 'denied')::boolean, 'counts: HR is refused', r::text);
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_partner_counts(''AE05'')');
+  PERFORM pg_temp.check(r -> 'customers' ->> 'total' = '0', 'counts: a company the user cannot see counts nothing', left(r::text, 160));
+END $$;
+
 SELECT CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS result, name, detail FROM sr_result ORDER BY n;
 SELECT 'TOTAL' AS result, count(*) FILTER (WHERE ok) || ' passed, ' || count(*) FILTER (WHERE NOT ok) || ' failed' AS name, '' AS detail FROM sr_result;
 ROLLBACK;

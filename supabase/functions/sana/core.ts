@@ -100,6 +100,8 @@ export const TOOLS: Tool[] = [
     rpc: 'sana_purchase_summary', args: (i, c) => ({ p_from: i.from, p_to: i.to, p_company: c }) },
   { name: 'inventory_summary', description: 'Items in stock, items below their minimum, warehouses, stock documents of the last 30 days and open transfer requests.',
     input_schema: { type: 'object', properties: {} }, allowed: (t) => t.inventory, rpc: 'sana_inventory_summary', args: (_i, c) => ({ p_company: c }) },
+  { name: 'record_counts', description: 'How many customers, suppliers and items there are by status (active / inactive, the same count as the dashboard), and how many customers bought and suppliers billed today and this month.',
+    input_schema: { type: 'object', properties: {} }, allowed: (t) => t.partners || t.inventory || t.sales || t.purchasing, rpc: 'sana_partner_counts', args: (_i, c) => ({ p_company: c }) },
   { name: 'get_partner', description: 'A customer or supplier: balance, credit limit, credit left, contact and latest documents.',
     input_schema: { type: 'object', properties: { query: str }, required: ['query'] }, allowed: (t) => t.partners,
     rpc: 'sana_partner', args: (i, c) => ({ p_query: i.query, p_company: c }) },
@@ -277,6 +279,7 @@ export function systemPrompt(who: Who, company: string | null, lang: string, via
       ? '7. This answer will be spoken aloud: plain sentences only — no markdown, no tables, no bullet lists, no lists of codes; at most three short sentences; round amounts sensibly.'
       : '7. Be brief: one to four sentences, or a short list for several records. No raw JSON, no tables wider than three columns.',
     '8. Short general business questions (what VAT is, how aging works) may be answered from general knowledge; start with "In general," so it is clearly not company data.',
+    '9. "Active" customers, suppliers or items means the record status (the count on the dashboard), even when the user adds "today" or "now" — unless they ask about sales or purchases ("bought today", "today\'s sales", "invoiced today"). When both readings are plausible, give the status count first and add one line with today\'s activity (for example "1,452 active customers; 12 bought today"). Use the record_counts tool for these counts.',
   ].filter(Boolean).join('\n');
 }
 
@@ -443,6 +446,22 @@ async function basicAnswer(q: string, lang: string, who: Who, rpc: Rpc, company:
 }
 
 // ---------- AI mode (provider adapter with tool use; streaming text) ----------
+/** S4 script guard: letters allowed in a reply besides Latin, digits, punctuation and symbols (Common / Inherited script). */
+const LANG_SCRIPT: Record<string, RegExp> = {
+  ml: /\p{Script=Malayalam}/u, ar: /\p{Script=Arabic}/u, ur: /\p{Script=Arabic}/u, hi: /\p{Script=Devanagari}/u, ta: /\p{Script=Tamil}/u,
+  bn: /\p{Script=Bengali}/u, zh: /\p{Script=Han}/u, ru: /\p{Script=Cyrillic}/u,
+};
+/** True when the reply has letters from a script that is not the answer language's (e.g. katakana inside Malayalam). */
+export function scriptViolation(text: string, lang: string): boolean {
+  const own = LANG_SCRIPT[lang];
+  for (const ch of text) {
+    if (!/[\p{L}\p{M}]/u.test(ch)) continue;
+    if (/[\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/u.test(ch)) continue;
+    if (own && own.test(ch)) continue;
+    return true;
+  }
+  return false;
+}
 /** A reply that states a company figure: a number of 2+ digits or with decimals, not a general-knowledge answer, not a refusal. */
 export function hasCompanyFigure(text: string): boolean {
   const t = text.trim();
@@ -555,6 +574,8 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     let usage: Usage | null = null;
     let modelRefused = false;
     let toolRounds = 0;
+    let scriptRetry = false;
+    let answeredBy = model;
     emit?.('meta', { mode, language: lang, provider: model?.provider ?? null, model: model?.model ?? null, model_main: main?.model ?? null });
 
     if (SENSITIVE.test(question)) {
@@ -564,12 +585,24 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     } else if (model && partnerKindDenied(question.toLowerCase(), who)) {
       out = { reply: refusalText(partnerKindDenied(question.toLowerCase(), who)!, lang), results: [{ denied: true }], used: [{ tool: 'guard', input: { rule: 'partner_kind' } }] };
     } else if (model) {
-      const redactor = emit ? new StreamRedactor() : undefined;
+      let redactor = emit ? new StreamRedactor() : undefined;
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), Number(env.SANA_TIMEOUT_MS) || LIMITS.timeoutMs);
       try {
         const history: ProviderMessage[] = (hist?.messages ?? []).map((m) => ({ role: m.role, content: m.content }));   // not mine / gone: start fresh
-        const ai = await aiAnswer(model, systemPrompt(who, company, lang, via, ctx, st.languages, detail), history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
+        const sys = systemPrompt(who, company, lang, via, ctx, st.languages, detail);
+        let ai = await aiAnswer(model, sys, history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
+        // S4 script guard: letters from another script (e.g. Japanese inside Malayalam) → discard, ask once more on the main model
+        if (!ai.refused && main && model !== main && scriptViolation(redactor ? redactor.full : ai.reply, lang)) {
+          console.error('sana script guard', lang, model.model);
+          scriptRetry = true;
+          if (emit) emit('reset', {});
+          redactor = emit ? new StreamRedactor() : undefined;
+          const first = ai.usage;
+          ai = await aiAnswer(main, sys, history, question, tools, rpc, company, ac.signal, emit, redactor, maxRounds(env));
+          ai.usage = { in: ai.usage.in + first.in, out: ai.usage.out + first.out };
+          answeredBy = main;
+        }
         out = ai; usage = ai.usage; modelRefused = ai.refused; toolRounds = ai.rounds ?? 0;
         if (emit && redactor && !modelRefused) { const rest = redactor.rest(); if (rest) emit('delta', { text: rest }); }
       } catch (e) {
@@ -591,8 +624,8 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
     if (via === 'voice') reply = plainForVoice(reply);
     const sources = denied ? [] : collectSources(out.results);
     if (emit && (mode === 'basic' || via === 'voice' || denied)) emit('delta', { text: reply, replace: true });
-    const provider = model?.provider ?? null;
-    const modelId = model?.model ?? null;
+    const provider = answeredBy?.provider ?? null;
+    const modelId = answeredBy?.model ?? null;
     const logArgs: Json = { p_conversation: conversationId, p_company: company, p_language: lang, p_question: question,
       p_answer: reply, p_tools: out.used, p_sources: sources, p_denied: denied, p_mode: mode, p_via: via, p_context: ctx, p_fallback: fallback };
     const log = async (): Promise<{ conversation_id: string; message_id: number }> => {
@@ -605,10 +638,11 @@ export async function handleAsk(auth: string | null, body: unknown, env: Env, em
       }
     };
     const msTotal = Date.now() - t0;
-    const timing = { ms_first_token: msFirstToken ?? msTotal, ms_total: msTotal, tool_rounds: toolRounds, model: modelId, model_main: main?.model ?? null };
+    const timing = { ms_first_token: msFirstToken ?? msTotal, ms_total: msTotal, tool_rounds: toolRounds, model: modelId, model_main: main?.model ?? null, script_retry: scriptRetry };
     const base = { reply, sources, mode, fallback, denied, language: lang, provider, model: modelId, timing };
     // stored with the answer (49_sana_timing.sql); before 49 is applied the RPC is missing and this is skipped
-    const saveTiming = (messageId: number) => rpc('sana_timing_set', { p_message: messageId, p_timing: { ...timing, model_fast: modelId } }).catch(() => null);
+    // a script-guard retry is counted in the timing row: model_fast = '<main model>:script-retry' (no schema change)
+    const saveTiming = (messageId: number) => rpc('sana_timing_set', { p_message: messageId, p_timing: { ...timing, model_fast: scriptRetry ? `${modelId}:script-retry` : modelId } }).catch(() => null);
     if (emit) {
       // S4 step 3: streaming sends 'done' first, then logs (conversation, messages, audit, daily count) while the stream is still
       // open and sends 'logged' with the ids. Logging always happens; it just no longer delays the answer.

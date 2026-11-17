@@ -164,3 +164,25 @@ SANA reads data with the user's own rights (SECURITY INVOKER, RLS). A SECURITY D
 Definer helpers must **never** return row data (names, amounts, documents, people). Anything a user reads goes through
 invoker functions and RLS. Both helpers exist for speed: under RLS, a text match (ILIKE, LIKE) cannot use an index, and every row
 runs the access check one by one.
+
+Later uses of the same two categories: `_sana_item_keys` / `_sana_item_similar` (52, item keys), `sana_finance_summary` stayed
+invoker (55, an index was enough), `home_kpis` (56, counts and sums only, the RLS module rules checked once), and
+`_my_companies` (57, the caller's company codes, used inside RLS policies).
+
+## Rule · timers and page loads must be fast (agreed 17 Nov 2026)
+
+**Anything that refreshes on a timer must return in under 1 s as admin on all companies.** This covers `refetchInterval`
+queries, polling and the warm-up ping's targets. The same budget is the goal for the Home page, Control Tower and the Sana
+panel on load. Check with the role that sees the most (admin or the owner, "All companies") on AE05-sized data before shipping.
+
+Why: a slow timer query fails again every minute for everyone. The Home glance (56) and Control Tower (57) were each over 15 s
+for admin, because RLS ran the company check `erp.can_see(company_code)` once per row.
+
+How to stay under it:
+
+- keep the company check out of the per-row path: policies use `company_code = ANY ((SELECT erp._my_companies())::varchar[])`
+  (evaluated once per query, and an indexable equality) instead of `erp.can_see(company_code)`. 57 changed the five hottest
+  tables; the other tables still use `can_see`;
+- add partial indexes for the rows a check looks for (below minimum, discount above 5 %, below cost, non-SAP journals);
+- use a definer helper only under the rule above (keys or counts, never row data);
+- time it as admin, cfo and finance on AE05 and on all companies before it goes live.

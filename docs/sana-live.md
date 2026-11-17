@@ -2,7 +2,9 @@
 
 Sana Live is a continuous voice conversation with Sana on the **Gemini Live API**. It answers in the session language, uses the same lookups as Ask (the user's role and companies, with the user's own sign-in) and logs every turn like a typed one. No audio is stored.
 
-Status: M2 went live on 17 Nov 2026. The fixes after the first real run (53) are live too. M3 (the panel's Talk button and Usage › Speed Live columns, file 54) is built and tested locally; it waits for the go before it is deployed.
+Status: **S5 complete, 17 Nov 2026.** Everything is live: M2 (52), the fixes from the first real run (53), the panel's Talk button with Usage › Speed Live columns (M3, 54) and the faster finance summary lookup (55). Final timing tables are in `docs/sana-performance.md` (S5 section).
+
+**Warm-up ping:** the `sana-live-warm` pg_cron job stays on for as long as Live is in use. Turn it off only if Live is retired: `SELECT cron.unschedule('sana-live-warm');` (and log that in `erp.audit_log`).
 
 ## Model
 
@@ -73,7 +75,7 @@ Measured on live on 17 Nov over 3 runs × 10 turns. "Speech end" is the end of t
 | Step | Typical | Notes |
 |---|---|---|
 | Speech end → model asks for a tool | 1.1 s spoken / 0.5 s typed | includes the Live API's end-of-speech detection |
-| Tool round trip (browser → `sana-live-tool` → RPC → back) | stock 0.16–0.37 s; search 0.7–1.1 s; payables 0.9 s; receivables 1.4–1.5 s; finance summary > 3 s (cut at the 3 s limit) | the RPC itself is most of it (receivables 1.25–1.5 s, payables 0.7 s, find 0.6 s, whoami 0.08 s) |
+| Tool round trip (browser → `sana-live-tool` → RPC → back) | stock 0.16–0.37 s; search 0.7–1.1 s; payables 0.7–0.9 s; receivables 1.2–1.5 s; finance summary 1.1 s (it was over 3 s and cut off before 55) | the RPC itself is most of it (receivables 1.25–1.5 s, payables 0.7 s, find 0.6 s, whoami 0.08 s) |
 | Tool result → first audio | 0.65–0.9 s | the model |
 | Token (`sana-live-token`) | warm 0.55–0.9 s; cold start +1.3 s | kept warm by the ping below; it comes before the session, so it is not part of first audio |
 
@@ -109,11 +111,26 @@ Google's pricing page (confirmed 17 Nov 2026): audio in **\$3 / 1M tokens**, aud
 - **Not included:** text tokens (system prompt, tool results), which are small next to audio.
 - **Rate limits:** see the AI Studio rate-limit page for the project (Live models).
 
+## Final results (live, AE05, 10-turn run 4)
+
+| | Result |
+|---|---|
+| First audio, turns without a lookup | about 1.3 s (M1 browser test: p50 1.3 s, p90 1.6 s) |
+| First audio, turns with a lookup | p50 2.0 s, p90 2.8 s (the lookup time dominates: receivables 1.3–1.5 s) |
+| Item codes | spoken codes found after normalisation; near misses give `did_you_mean` (Malayalam and English) |
+| Currency | AED / dirhams / ദിർഹം every time |
+| Role-hidden items | "not available for your role" (Malayalam and English) |
+| Stock totals | 122 pieces in both languages (the item total from the result) |
+| Tampered tool calls | 403 every time (a tool outside the session's list) |
+| Auth with the platform JWT check off | no sign-in → 401, bad token → 401 (in `sana-live-e2e.mjs`) |
+| Known gap | the model now and then sends no output transcription for a spoken answer (1 of 10 turns in run 4); the turn is flagged "check this" and its audio was played |
+
 ## Security rules (same as Ask)
 
 - The user's JWT is used for every RPC. The API key is kept only in Edge secrets.
 - Tokens are single-use, last at most 10 minutes and have the config locked.
 - The tool list is fixed at minting and checked on every call against the server-side session and the role.
+- The platform JWT check is off on `sana-live-token` and `sana-live-tool`, because the warm-up ping has no JWT. The handlers verify the user's JWT themselves (no Bearer → 401; PostgREST rejects a bad token → 401), and `sana-live-e2e.mjs` tests both cases.
 - Definer helpers are used only for key-only search (`_sana_item_keys`, `_sana_item_similar`, `_sana_text_keys`) and counts, never for row data.
 - No audio is stored. Only transcripts are kept, like typed turns.
 

@@ -119,6 +119,13 @@ try {
   ok('token for a company the user cannot see → 403', bad.status === 403, JSON.stringify(bad.j));
   const anon = await fetch(`${GW}/functions/v1/sana-live-token`, { method: 'POST', body: '{}' });
   ok('token without sign-in → 401', anon.status === 401);
+  // The platform JWT check is off on both Live functions (the warm-up ping carries no JWT): the handlers must refuse on their own
+  const noAuthTool = await fetch(`${GW}/functions/v1/sana-live-tool`, { method: 'POST', body: JSON.stringify({ action: 'end', live_session_id: '00000000-0000-4000-8000-000000000000' }) });
+  ok('auth: sana-live-tool without sign-in → 401', noAuthTool.status === 401, String(noAuthTool.status));
+  const badJwt = 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4Iiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQifQ.not-a-valid-signature';
+  const badTok = await fetch(`${GW}/functions/v1/sana-live-token`, { method: 'POST', headers: { authorization: badJwt, 'content-type': 'application/json' }, body: JSON.stringify({ company: 'ZZ99', language: 'en' }) });
+  const badTool = await fetch(`${GW}/functions/v1/sana-live-tool`, { method: 'POST', headers: { authorization: badJwt, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'tool', live_session_id: '00000000-0000-4000-8000-000000000000', tool: 'get_stock', args: { query: 'SMP-1010' } }) });
+  ok('auth: a bad token → 401 from sana-live-token and sana-live-tool (no session, no data)', badTok.status === 401 && badTool.status === 401, `${badTok.status} / ${badTool.status}`);
 
   // ---------- tool calls against the session ----------
   const sid = s1.j.live_session_id;

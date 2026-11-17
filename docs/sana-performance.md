@@ -218,3 +218,34 @@ Review of the raw misses, with the grader rules fixed in the script:
 
 The one real difference is finance / ml / q6 (balance of C0001). gemini-3.8-flash refused it; the right answer is "not found",
 and the lite model gave that. The lite model is not worse on any question.
+
+## S5 · Sana Live and the finance lookup (17 Nov 2026, live, AE05, qa.sales + qa.finance)
+
+### Sana Live: first audio on the same 10 turns (end of speech, or text sent, → Sana's first audio)
+
+| Run | What changed | Tool turns p50 / p90 | Notes |
+|---|---|---|---|
+| 1 (M2) | — | 1.9 / 2.7 s | rupees for AED, "not found" for role-hidden items, one bare-code answer |
+| 2 | 53: currency, denied parts, quantity rule, warm-up ping | 2.2 / 2.7 s | Malayalam stock total wrong (88 vs 122) |
+| 3 | stock totals in Live results, script flag | 2.1 / 3.0 s | finance summary over 3 s (cut off) |
+| 4 | 55: finance summary 30 s+ → 0.6 s | 2.0 / 2.8 s | every figure right; one turn without output transcript (flagged) |
+
+Where the time goes, per tool turn (run 4):
+
+| Step | Spoken | Typed |
+|---|---|---|
+| End of speech → the model asks for a lookup | 1.15–1.25 s | 0.5–0.6 s |
+| Lookup round trip | stock 0.2–0.36 s · search 0.8–0.9 s · payables 0.7 s · receivables 1.3–1.5 s | same |
+| Lookup result → first audio | 0.65–1.0 s | same |
+
+**Non-tool turns:** about 1.3 s, matching the M1 browser test (p50 1.3 s, p90 1.6 s). The 2 s p90 target holds without a lookup and for fast lookups (stock). The heavier finance lookups (receivables 1.3–1.5 s) still put tool turns at about 2.8 s (p90). The first useful figure arrives under 4 s on every turn.
+
+### Finance summary lookup (55: partial index on non-SAP journal entries, Southfield lines summed set-based)
+
+| | Before 55 | After 55 |
+|---|---|---|
+| `erp.sana_finance_summary('AE05')` as qa.finance (database) | > 30 s (cancelled at 30 s) | 0.63–0.66 s |
+| Through `sana-live-tool` (Live) | > 3 s → "no match" | 1.12–1.16 s |
+| Ask, 6 finance questions (first text p50 / p90) | 5.1 / 6.7 s; 4 of the 5 summary questions answered "not found / timed out" | 3.1 / 4.4 s; all answered with the right figures (assets 17,076,843.38 AED, 3,105 journals in 30 days) |
+
+Other Live lookup round trips after 55: payables 0.7–0.9 s, receivables 1.2–1.4 s, banking 0.2–0.7 s.

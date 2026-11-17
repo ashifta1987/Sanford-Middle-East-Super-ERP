@@ -39,3 +39,5 @@ supabase/sql/49_sana_timing.sql
 supabase/sql/50_sana_search.sql
 supabase/sql/51_sana_counts.sql
 supabase/sql/52_sana_live.sql
+supabase/sql/53_sana_fixes.sql
+supabase/sql/54_sana_live_usage.sql

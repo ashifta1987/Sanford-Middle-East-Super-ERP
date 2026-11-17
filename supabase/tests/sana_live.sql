@@ -57,6 +57,17 @@ BEGIN
   PERFORM pg_temp.check((SELECT count(*) FROM erp.sana_message m WHERE m.conversation_id = (r ->> 'conversation_id')::uuid AND m.via = 'live') >= 1
                     AND EXISTS (SELECT 1 FROM erp.audit_log WHERE action = 'sana.ask' AND object_ref = r ->> 'conversation_id' AND detail ->> 'via' = 'live'),
                         'log_turn: a Live turn is stored like a typed turn with via live, with its audit row', r::text);
+  -- 54: Usage › Speed — Live turns counted in their own columns (first audio), not in the Ask columns; sessions and minutes
+  PERFORM pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_timing_set(%s, ''{"ms_first_token": 1400, "ms_total": 1400, "tool_rounds": 1, "model_fast": "gemini-3.1-flash-live-preview"}'')', r ->> 'message_id'));
+  PERFORM pg_temp.call(pg_temp.u(2), format('SELECT erp.sana_audio_beacon(%s, 1400, ''gemini'', ''desktop'')', r ->> 'message_id'));
+  r := pg_temp.call(pg_temp.u(1), 'SELECT erp.sana_timing_usage(''ZZ99'', 14) -> 0');
+  PERFORM pg_temp.check((r ->> 'live_turns')::integer >= 1 AND (r ->> 'live_first_audio_p50') IS NOT NULL AND (r ->> 'live_sessions')::integer >= 1 AND r ? 'live_minutes'
+                        AND (r ->> 'answers')::integer = (SELECT count(*) FROM erp.sana_message m JOIN erp.sana_conversation c USING (conversation_id)
+                              WHERE c.company_code = 'ZZ99' AND m.role = 'assistant' AND m.ms_total IS NOT NULL AND (m.created_at AT TIME ZONE 'Asia/Dubai')::date = (r ->> 'day')::date)
+                            - (r ->> 'live_turns')::integer,
+                        '54: Speed shows Live turns, Live first audio, sessions and minutes; Live turns are not counted in the Ask columns', r::text);
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_timing_usage(''ZZ99'', 14)');
+  PERFORM pg_temp.check(r ->> 'error' = '42501', '54: Speed stays Administration only', r::text);
 
   -- expiry, end
   UPDATE erp.sana_live_session SET started_at = now() - interval '12 minutes', expires_at = now() - interval '2 minutes' WHERE id = sid;
@@ -92,6 +103,13 @@ BEGIN
   PERFORM pg_temp.check(jsonb_array_length(r -> 'items') = 0 AND jsonb_array_length(coalesce(r -> 'did_you_mean', '[]')) >= 1, 'codes: a near miss is not found but offers did_you_mean', r::text);
   r := pg_temp.call(pg_temp.u(2), 'SELECT coalesce(jsonb_agg(k), ''[]'') FROM erp._sana_item_keys(''{AE05}'', ''SMP1010'') k');
   PERFORM pg_temp.check(r = '[]'::jsonb, 'codes: the helper gives nothing from companies the user cannot see', r::text);
+
+  -- 53: empty vs denied in search — a finance user (no item topics) gets items as {"denied": true}, not an empty list
+  r := pg_temp.call(pg_temp.u(4), 'SELECT erp.sana_find(''SMP-1010'', ''ZZ99'')');
+  PERFORM pg_temp.check((r -> 'items' ->> 'denied')::boolean AND jsonb_typeof(r -> 'partners') = 'array' AND NOT r::text ILIKE '%SMP-1010%',
+                        '53: finance searching an item code gets items {"denied": true} (not "not found"), partners still a list, no item data', r::text);
+  r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''SMP-1010'', ''ZZ99'')');
+  PERFORM pg_temp.check(jsonb_typeof(r -> 'items') = 'array' AND jsonb_array_length(r -> 'items') >= 1, '53: sales (may see items) still gets the item list', left(r::text, 160));
 
   SELECT count(*) INTO n FROM erp.sana_event_log;
   PERFORM pg_temp.check(n = ev0, 'append-only event log unchanged by Live', format('%s → %s', ev0, n));

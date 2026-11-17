@@ -2,7 +2,7 @@
 
 Sana Live is a continuous voice conversation with Sana on the **Gemini Live API**. It answers in the session language, uses the same lookups as Ask (the user's role and companies, with the user's own sign-in) and logs every turn like a typed one. No audio is stored.
 
-Status: **M2 live on 17 Nov 2026** (server side, plus the hidden test page `/sana/live-test`). The panel Talk button and the Usage Live columns are M3.
+Status: M2 went live on 17 Nov 2026. The fixes after the first real run (53) are live too. M3 (the panel's Talk button and Usage › Speed Live columns, file 54) is built and tested locally; it waits for the go before it is deployed.
 
 ## Model
 
@@ -33,6 +33,51 @@ Browser test on AE05 in Malayalam (M1): first audio p50 1,298 ms, p90 1,567 ms.
    - The result is masked before it goes back.
 4. **Turns.** `{action:'log_turn'}` writes the turn like a typed one (`via='live'`, label `live`), plus the timing and the audio beacon. A company figure given without a lookup is labelled `live-unverified`.
 5. **End.** `{action:'end'}` closes the session once. The seconds counted stop at the token expiry.
+
+## In the panel (M3)
+
+| | |
+|---|---|
+| **Talk button** | Desktop: next to the microphone. Phone: a large button at the bottom of the panel. It is shown only when the browser has AudioWorklet, WebSocket and a microphone, voice is on for the company and Sana is enabled. Otherwise the push-to-talk microphone stays, and it always stays as the fallback. |
+| **States** | connecting, listening ("just talk"), looking up, Sana speaking ("talk to interrupt"), then ended. The bar replaces the text box while Live is on and has a large **End** button. |
+| **Transcript** | Normal message bubbles: the user on the right (input transcription, in the session language's script), Sana on the left. Source chips come from the tool results (the same links as Ask), plus a small mark when `log_turn` flagged the turn. |
+| **Interruption** | When the Live API sends `interrupted` (the user talked over Sana), playback stops at once and the bar goes back to listening. |
+| **End rules** | The End button; **60 s** with nobody speaking and Sana silent; the daily minutes cap (refused at the start with the message, or the token expiring); the tab hidden for more than **30 s**; closing the panel; switching company. The server session is ended once, with the reason. |
+| **History** | Live turns are logged into a normal conversation, so History shows them and a typed question afterwards continues the same conversation. |
+
+Code: `src/features/sana/liveClient.ts` (session: token, microphone worklet, socket, tools, logging, end rules), `speechQueue.ts` `PcmStreamPlayer` (24 kHz PCM playback, stop on barge-in), `SanaPanel.tsx` (button, bar, bubbles), `SanaProvider.tsx` (`upsertMessage` / `patchMessage` / `adoptConversation`).
+
+## Checks on a spoken answer (Live cannot re-ask)
+
+`log_turn` labels the question row and returns flags; the panel shows the mark.
+
+| Label | When | Mark |
+|---|---|---|
+| `live-unverified` | a company figure and no lookup in the turn (rule 1a, same detector as Ask) | "Unverified: this figure did not come from a lookup" |
+| `live-no-quantity` | a stock lookup ran and the reply names the item code but no quantity (a choice between codes is not flagged) | "Check this: Sana named the item but no quantity" |
+| `live-currency` | the reply names another currency than the company's (`erp.company.currency`), unless a lookup returned that currency | "Check this: the currency may be wrong" |
+| `live-script` | letters from another script (for example a Hindi word in Malayalam), or no letter of the session language | "Check this: the answer mixed in another language" |
+
+Ask does the same currency check but **re-asks once on gemini-3.8-flash**. That retry is counted like the other guard retries (`model_fast = '<model>:currency-retry'`).
+
+The Live prompt also says: company amounts are in AED (UAE dirhams, ദിർഹം in Malayalam); state the stock quantity first; use `total_available` from the result and never add up warehouses (Live stock results carry the item totals and only the warehouses that hold stock); a part that is `{"denied": true}` is "not available for your role", never "not found".
+
+## Empty vs denied in search (53)
+
+`sana_find` returns a part the role may not see as `{"denied": true}` (for example `"items": {"denied": true}` for a finance user) instead of leaving it out. Sana then says it is not available for the role, not "not found". It is the same rule as Ask's guard, which now also counts a denied *part* as a refused lookup.
+
+## Speed (where the time goes)
+
+Measured on live on 17 Nov over 3 runs × 10 turns. "Speech end" is the end of the clip; for typed turns it is the moment the text was sent.
+
+| Step | Typical | Notes |
+|---|---|---|
+| Speech end → model asks for a tool | 1.1 s spoken / 0.5 s typed | includes the Live API's end-of-speech detection |
+| Tool round trip (browser → `sana-live-tool` → RPC → back) | stock 0.16–0.37 s; search 0.7–1.1 s; payables 0.9 s; receivables 1.4–1.5 s; finance summary > 3 s (cut at the 3 s limit) | the RPC itself is most of it (receivables 1.25–1.5 s, payables 0.7 s, find 0.6 s, whoami 0.08 s) |
+| Tool result → first audio | 0.65–0.9 s | the model |
+| Token (`sana-live-token`) | warm 0.55–0.9 s; cold start +1.3 s | kept warm by the ping below; it comes before the session, so it is not part of first audio |
+
+**Warm-up:** the pg_cron job `sana-live-warm` (53) posts `{"ping": true}` to `sana-live-token` and `sana-live-tool` every 5 minutes. The functions answer before any check (no auth, no data). Because the ping carries no JWT, both functions are deployed with `--no-verify-jwt`. Every real call is still checked: no Bearer gives 401, and each RPC runs with the caller's JWT, which PostgREST verifies (a bad token gives 401).
 
 ## Item codes
 
@@ -76,5 +121,6 @@ Google's pricing page (confirmed 17 Nov 2026): audio in **\$3 / 1M tokens**, aud
 
 - `supabase/tests/sana_live.sql`: sessions, cap, expiry, end, tool list, logging, item codes.
 - `scripts/local-stack/sana-live-e2e.mjs`: local, with the Live socket mocked. Covers the role tools, the locked setup with the language pin, GRP, refusals, codes, `did_you_mean`, masking, `log_turn`, end, expiry and the cap.
-- `scripts/local-stack/sana-live-run.mjs`: one real run on live with the qa users (enabled only for the run).
+- `scripts/local-stack/sana-live-run.mjs`: one real run on live with the qa users (enabled only for the run). It prints the time split per turn.
+- `scripts/local-stack/sana-live-panel-e2e.mjs`: local panel test with the Live socket mocked through Playwright `routeWebSocket`. Covers the Talk button (desktop and phone), the states, bubbles, source chips, the unverified mark, barge-in, the end rules (button, silence, hidden tab, cap), the fallback without AudioWorklet, and the rows in the database.
 

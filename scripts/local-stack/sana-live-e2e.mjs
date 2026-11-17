@@ -69,6 +69,28 @@ const said = (t) => ({ serverContent: { inputTranscription: { text: t } } });
 const spoke = (t) => ({ serverContent: { outputTranscription: { text: t } } });
 const done = { serverContent: { turnComplete: true } };
 
+// ---------- unit: the S5 fixes (currency check, stock answer without a quantity) ----------
+{
+  const { currencyMismatch, systemPrompt } = await import('../../supabase/functions/sana/core.ts');
+  const { stockWithoutQuantity } = await import('../../supabase/functions/sana/livecore.ts');
+  ok('currency: "94.4 മില്യൺ രൂപ" for an AED company is flagged (INR)', currencyMismatch('94.4 മില്യൺ രൂപയുടെ ബില്ലുകൾ', 'AED') === 'INR');
+  ok('currency: dirhams / AED / ദിർഹം / درهم are fine for AED', ['17 million dirhams', '12,500.00 AED', '94.4 ദശലക്ഷം ദിർഹം', '500 درهم'].every((t) => currencyMismatch(t, 'AED') === null));
+  ok('currency: "rupees", "$" words, riyals flagged; a USD amount is fine when a lookup returned USD', currencyMismatch('5 lakh rupees', 'AED') === 'INR' && currencyMismatch('300 riyals', 'AED') === 'SAR'
+    && currencyMismatch('1,200 US dollars', 'AED') === 'USD' && currencyMismatch('1,200 US dollars', 'AED', [{ total: 1200, currency: 'USD' }]) === null);
+  ok('stock: a reply with only the code is flagged; with a quantity or "no stock" it is not', stockWithoutQuantity('SF5160IC KC', ['get_stock'])
+    && !stockWithoutQuantity('അതെ, SF2665SL LC സ്റ്റോക്കിൽ ഉണ്ട്. ആകെ 62 പീസ് അവൈലബിൾ ആണ്.', ['get_stock']) && !stockWithoutQuantity('There is no stock of SF5160IC KC.', ['get_stock'])
+    && !stockWithoutQuantity('SF5160IC KC', ['receivables']) && !stockWithoutQuantity('Which code did you mean? I found SF5160IC KC, SF5160IC, and SF-5160IC.', ['get_stock']));
+  const { stockTotals } = await import('../../supabase/functions/sana/livecore.ts');
+  const st = stockTotals({ items: [{ code: 'X1', warehouses: [{ warehouse: '01', on_hand: 48, committed: 0, ordered: 0, available: 48 }, { warehouse: '02', on_hand: 0, committed: 0, ordered: 0, available: 0 },
+    { warehouse: '03', on_hand: 74, committed: 0, ordered: 11, available: 74 }] }], cost_visible: false });
+  ok('stock totals: Live stock results carry the item totals and only warehouses with stock (122 = 48 + 74; zero rows counted, not listed)',
+    st.items[0].total_available === 122 && st.items[0].total_ordered === 11 && st.items[0].warehouses.length === 2 && st.items[0].warehouses_without_stock === 1, JSON.stringify(st.items[0]).slice(0, 160));
+  const who = { profile: true, name: 'T', position: 'P', home_company: 'ZZ99', companies: [{ code: 'ZZ99', name: 'Sample', currency: 'AED' }], topics: { sales: true } };
+  const sp = systemPrompt(who, 'ZZ99', 'ml', 'text', null, ['en', 'ml']);
+  ok('Ask prompt: company currency code and name (and the Malayalam name), never rupees', sp.includes('Company currency: AED (UAE dirhams; in Malayalam: ദിർഹം)') && sp.includes('never call them rupees'), sp.split('\n')[2]);
+  ok('Ask prompt: a denied part is refused, never "not found"', sp.includes('"items": {"denied": true}'));
+}
+
 try {
   const ts = await token(U.sales), tf = await token(U.finance), ta = await token(U.admin), to = await token(U.owner);
   await db.query("DELETE FROM erp.sana_live_session WHERE user_id IN (SELECT user_id FROM erp.app_user WHERE email LIKE 'qa.%@sample.test')");
@@ -81,6 +103,8 @@ try {
     JSON.stringify({ status: s1.status, tools: s1.j.tools, left: s1.j.seconds_left, err: s1.j.error }));
   ok('token (sales): no finance tools', !s1.j.tools?.some((t) => FINANCE.includes(t)), s1.j.tools?.join());
   ok('locked setup: the declared tools are exactly the role\'s tools', declared.length === s1.j.tools?.length && declared.every((d) => s1.j.tools.includes(d)), declared.join());
+  const ptxt = setupS.systemInstruction?.parts?.[0]?.text ?? '';
+  ok('locked setup: the Live prompt has the company currency (AED, ദിർഹം) and "quantity first" for stock', ptxt.includes('AED (UAE dirhams; in Malayalam say ദിർഹം)') && /quantity first/.test(ptxt), ptxt.slice(0, 120));
   ok('locked setup: transcription pinned to ml-IN, speech in ml-IN, audio out, system prompt set',
     JSON.stringify(setupS.inputAudioTranscription?.languageCodes) === '["ml-IN"]' && setupS.generationConfig?.speechConfig?.languageCode === 'ml-IN'
     && setupS.generationConfig?.responseModalities?.[0] === 'AUDIO' && (setupS.systemInstruction?.parts?.[0]?.text ?? '').length > 200,
@@ -100,6 +124,9 @@ try {
   const sid = s1.j.live_session_id;
   const fin = await call('sana-live-tool', ts, { action: 'tool', live_session_id: sid, tool: 'payables', args: {} });
   ok('a finance tool in a sales session → 403 (not in the minted list)', fin.status === 403, JSON.stringify(fin.j));
+  const fsid = f1.j.live_session_id;
+  const fItem = await call('sana-live-tool', tf, { action: 'tool', live_session_id: fsid, tool: 'find_records', args: { query: 'SMP-1010' } });
+  ok('53: finance find_records on an item code → items {"denied": true}, no item data', fItem.status === 200 && fItem.j.result?.items?.denied === true && !JSON.stringify(fItem.j).includes('SMP-1010'), JSON.stringify(fItem.j).slice(0, 160));
   const other = await call('sana-live-tool', tf, { action: 'tool', live_session_id: sid, tool: 'find_records', args: { query: 'SMP' } });
   ok('someone else\'s session id → 403', other.status === 403, JSON.stringify(other.j));
   const unknown = await call('sana-live-tool', ts, { action: 'tool', live_session_id: sid, tool: 'run_sql', args: { q: 'select 1' } });
@@ -123,7 +150,7 @@ try {
   // ---------- the mocked socket: one spoken turn with a tool call ----------
   const sock = mockLive([
     [said('എസ്എംപി 1010 സ്റ്റോക്ക് എത്ര?'), { toolCall: { functionCalls: [{ id: 'c1', name: stockTool, args: { query: 'smp 1010' } }] } }],
-    [audio, spoke('SMP-1010 ന്റെ സ്റ്റോക്ക് ലഭ്യമാണ്.'), done],
+    [audio, spoke('SMP-1010: 861 എണ്ണം ലഭ്യമാണ്.'), done],
   ]);
   sock.send({ setup: { model: s1.j.model } });
   ok('mock socket: setupComplete after {setup:{model}} (the browser sends only the model)', !!sock.next()?.setupComplete);
@@ -135,8 +162,15 @@ try {
   ok('the logged turn is a via=\'live\' row like a typed turn (question row: via live, language ml, label live)', row?.via === 'live' && row?.language === 'ml' && row?.context?.label === 'live', JSON.stringify(row));
   const unv = await call('sana-live-tool', ts, { action: 'log_turn', live_session_id: sid, user_text: 'how much stock', sana_text: 'You have 1,240 units in stock.', tools: [] });
   ok('log_turn: a figure without a lookup is flagged live-unverified (rule 1a)', unv.status === 200 && unv.j.unverified === true, JSON.stringify(unv.j));
+  const bare = await call('sana-live-tool', ts, { action: 'log_turn', live_session_id: sid, user_text: 'SMP 1010 stock?', sana_text: 'SMP-1010', tools: ['get_stock'] });
+  ok('log_turn: a stock turn that only says the code is flagged no_quantity (label live-no-quantity)', bare.status === 200 && bare.j.no_quantity === true
+    && (await db.query('SELECT context FROM erp.sana_message WHERE message_id = $1', [bare.j.question_id])).rows[0]?.context?.label === 'live-no-quantity', JSON.stringify(bare.j));
+  const rup = await call('sana-live-tool', ts, { action: 'log_turn', live_session_id: sid, user_text: 'open bills', sana_text: '94.4 മില്യൺ രൂപയുടെ ബില്ലുകൾ ഉണ്ട്.', tools: ['list_documents'] });
+  ok('log_turn: a reply in rupees for an AED company is flagged wrong_currency INR (label live-currency)', rup.status === 200 && rup.j.wrong_currency === 'INR', JSON.stringify(rup.j));
+  const hin = await call('sana-live-tool', ts, { action: 'log_turn', live_session_id: sid, user_text: 'x', sana_text: 'നിങ്ങളുടെ റോളിൽ അതിന് परवानगी ഇല്ല.', tools: ['find_records'] });
+  ok('log_turn: a Malayalam reply with a Hindi (Devanagari) word is flagged script (label live-script)', hin.status === 200 && hin.j.script === true, JSON.stringify(hin.j));
   const sess = (await db.query('SELECT turns, tool_calls FROM erp.sana_live_session WHERE id = $1', [sid])).rows[0];
-  ok('session counts turns and tool calls', sess.turns >= 2 && sess.tool_calls >= 5, JSON.stringify(sess));
+  ok('session counts turns and tool calls', sess.turns >= 5 && sess.tool_calls >= 5, JSON.stringify(sess));
 
   // ---------- masking ----------
   const { maskDeep } = await import('../../supabase/functions/sana/mask.ts');

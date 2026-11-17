@@ -48,6 +48,9 @@ const stubs = () => {
   Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, writable: true, value: function (t) { this.text = t; this.lang = ''; this.voice = null; } });
   window.__played = [];
   HTMLMediaElement.prototype.play = function () { window.__played.push(this.src); setTimeout(() => this.dispatchEvent(new Event('ended')), 300); return Promise.resolve(); };
+  // S4: Gemini speech is raw PCM played through Web Audio (speechQueue) — count each buffer that starts as played too
+  const start0 = AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start = function (...a) { window.__played.push('webaudio'); return start0.apply(this, a); };
 };
 async function context(browser, { width = 1440, lang = 'en', theme = 'light', sanaLang = 'auto' } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height: width < 640 ? 844 : 900 }, deviceScaleFactor: 1, permissions: ['microphone'], ...(width < 640 ? { isMobile: true, hasTouch: true } : {}) });
@@ -199,9 +202,11 @@ try {
     const calls = [];
     p.on('request', (r) => { if (r.url().includes('/functions/v1/sana-voice')) { const b = JSON.parse(r.postData() || '{}'); calls.push({ mode: b.mode, mime: b.mime, language: b.language, audio: (b.audio ?? '').length, text: b.text }); } });
     const ttsReplies = [];
-    p.on('response', async (r) => { if (r.url().includes('/functions/v1/sana-voice') && r.headers()['content-type'] === 'audio/wav') ttsReplies.push({ status: r.status(), provider: r.headers()['x-sana-provider'] }); });
+    p.on('response', async (r) => { if (r.url().includes('/functions/v1/sana-voice') && /^audio\/(wav|L16)/.test(r.headers()['content-type'] ?? '')) ttsReplies.push({ status: r.status(), provider: r.headers()['x-sana-provider'] }); });
     await login(p, 'qa.sales@sample.test', 'local-only-2');
     await openPanel(p);
+    // S4 voice policy (16 Nov): the device voice is the default; Gemini reads answers only with "Always use Sana's voice" ticked
+    if (!(await p.isChecked('[data-testid=sana-force-gemini]'))) await p.check('[data-testid=sana-force-gemini]');
     ok('provider voice: the microphone uses the provider path, the privacy line says so', (await p.getAttribute('[data-testid=sana-mic]', 'data-voice-mode')) === 'provider'
       && /transcribed and read aloud by Gemini/.test(await txt(p.locator('aside[role=dialog] form'))));
     const t1 = await talk(p);

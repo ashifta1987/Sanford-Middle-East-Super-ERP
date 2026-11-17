@@ -121,7 +121,7 @@ BEGIN
   r := pg_temp.call(pg_temp.u(3), 'SELECT erp.sana_documents(''sales_order'')');
   PERFORM pg_temp.check(pg_temp.denied(r), 'no profile: documents refused', r::text);
   r := pg_temp.call(pg_temp.u(3), 'SELECT erp.sana_find(''SMP'')');
-  PERFORM pg_temp.check(r = '{"documents": []}'::jsonb, 'no profile: find returns nothing', r::text);
+  PERFORM pg_temp.check(r = '{"documents": [], "items": {"denied": true}, "partners": {"denied": true}}'::jsonb, 'no profile: find returns nothing (partners and items {"denied": true}, 53)', r::text);
 
   -- ---------- field limits ----------
   r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_stock(''SMP-1010'', ''ZZ99'')');
@@ -164,7 +164,7 @@ BEGIN
   PERFORM pg_temp.check(pg_temp.denied(r), 'staff: other people refused', r::text);
   r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_find(''100'', ''ZZ99'')');
   w := pg_temp.call(pg_temp.u(23), 'SELECT erp.sana_find(''100'', ''ZZ99'')');
-  PERFORM pg_temp.check(jsonb_array_length(w -> 'documents') = 0 AND NOT (w ? 'partners') AND NOT (w ? 'items'), 'IT: find returns no documents, partners or items', w::text);
+  PERFORM pg_temp.check(jsonb_array_length(w -> 'documents') = 0 AND (w -> 'partners' ->> 'denied')::boolean AND (w -> 'items' ->> 'denied')::boolean, 'IT: find returns no documents; partners and items are {"denied": true} (53: hidden, not "not found")', w::text);
   -- Southfield document numbers: a sales user can ask by the number on the screen (SO-…) as well as SAP's DocNum
   r := pg_temp.call(pg_temp.u(2), 'SELECT erp.sana_document(''sales_order'', ''no-such-number'', ''ZZ99'')');
   PERFORM pg_temp.check(r = '{"found": false}'::jsonb, 'unknown number: found false', r::text);

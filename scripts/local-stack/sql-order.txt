@@ -42,3 +42,4 @@ supabase/sql/52_sana_live.sql
 supabase/sql/53_sana_fixes.sql
 supabase/sql/54_sana_live_usage.sql
 supabase/sql/55_sana_finance_speed.sql
+supabase/sql/56_home_kpis_speed.sql
